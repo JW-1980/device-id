@@ -1,0 +1,37 @@
+{
+    "meta": {
+        "engine": "webkit",
+        "launcher": "webkit",
+        "browserVersion": "26.6",
+        "playwrightVersion": "1.63.0",
+        "headless": true,
+        "launchOptions": {},
+        "capturedAt": "2026-10-05",
+        "command": "node scripts/fingerprint/capture-engine-fixtures.mjs",
+        "note": "Playwright WebKit (Linux build), not Safari."
+    },
+    "claims": {
+        "tier1": {
+            "environment": {
+                "identity": {
+                    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15"
+                }
+            },
+            "esFeatures": {
+                "count": 64,
+                "present": "weakRef,finalizationRegistry,arrayAt,errorCause,errorErrors,regExpHasIndices,arrayToSorted,arrayToReversed,arrayToSpliced,arrayWith,arrayFindLast,arrayFindLastIndex,objectGroupBy,promiseWithResolvers,arrayBufferResize,arrayBufferTransfer,regexpVFlag,stringIsWellFormed,stringToWellFormed,iteratorHelpers,setUnion,regexpEscape,promiseTry,float16Array,uint8FromBase64,uint8ToBase64,uint8SetFromBase64,uint8ToHex,errorIsError,mathSumPrecise,arrayFromAsync,mapGetOrInsert,temporal,disposableStack,structuredClone,navLocks,navMediaCapabilities,navGamepads,viewTransitions,invokerCommands,selectedContent,trustedTypes,offscreenCanvas,imageDecoder,videoFrame,wakeLock,showModalDialog,popoverApi,cssHas,cssNesting,cssSubgrid,cssOklch,cssColorMix,cssAnchor,cssScrollTimeline,cssFieldSizing,cssAttrTyped,cssTextWrapBalance,cssScrollbarGutter,cssLinearEasing,cssTransitionBehavior,cssLightDark,cssBackdropFilter,webkitAppearance"
+            },
+            "engineIdentity": {
+                "engine": "jsc",
+                "errorOwnProps": "column,line,message,sourceURL,stack",
+                "stackShape": "at-sign",
+                "toFixedMessageLength": 44,
+                "internalError": false
+            },
+            "uaClientHints": {
+                "supported": false
+            }
+        }
+    },
+    "headers": {}
+}

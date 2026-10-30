@@ -1,0 +1,74 @@
+{
+    "meta": {
+        "engine": "chromium",
+        "launcher": "chromium",
+        "browserVersion": "153.0.8010.12",
+        "playwrightVersion": "1.63.0",
+        "headless": true,
+        "launchOptions": {},
+        "capturedAt": "2026-10-05",
+        "command": "node scripts/fingerprint/capture-engine-fixtures.mjs",
+        "note": "Playwright Chromium, headless; the User-Agent carries a HeadlessChrome token."
+    },
+    "claims": {
+        "tier1": {
+            "environment": {
+                "identity": {
+                    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+                }
+            },
+            "esFeatures": {
+                "count": 76,
+                "present": "weakRef,finalizationRegistry,arrayAt,errorCause,errorErrors,regExpHasIndices,arrayToSorted,arrayToReversed,arrayToSpliced,arrayWith,arrayFindLast,arrayFindLastIndex,objectGroupBy,promiseWithResolvers,arrayBufferResize,arrayBufferTransfer,regexpVFlag,stringIsWellFormed,stringToWellFormed,iteratorHelpers,setUnion,regexpEscape,promiseTry,float16Array,uint8FromBase64,uint8ToBase64,uint8SetFromBase64,uint8ToHex,errorIsError,mathSumPrecise,arrayFromAsync,mapGetOrInsert,temporal,disposableStack,structuredClone,schedulerYield,navLocks,navCredentials,navMediaCapabilities,navUsb,navSerial,navHid,navKeyboardLayout,navBattery,navGamepads,viewTransitions,invokerCommands,selectedContent,trustedTypes,speechRecognition,offscreenCanvas,imageDecoder,videoFrame,webgpu,eyeDropper,fileSystemPicker,wakeLock,showModalDialog,popoverApi,cssHas,cssNesting,cssSubgrid,cssOklch,cssColorMix,cssAnchor,cssScrollTimeline,cssFieldSizing,cssAttrTyped,cssTextWrapBalance,cssScrollbarGutter,cssInterpolateSize,cssLinearEasing,cssTransitionBehavior,cssLightDark,cssBackdropFilter,webkitAppearance"
+            },
+            "engineIdentity": {
+                "engine": "v8",
+                "errorOwnProps": "message,stack",
+                "stackShape": "at",
+                "toFixedMessageLength": 51,
+                "internalError": false
+            },
+            "uaClientHints": {
+                "supported": true,
+                "brands": [
+                    {
+                        "brand": "HeadlessChrome",
+                        "version": "153"
+                    },
+                    {
+                        "brand": "Not_A Brand",
+                        "version": "8"
+                    },
+                    {
+                        "brand": "Chromium",
+                        "version": "153"
+                    }
+                ],
+                "mobile": false,
+                "platform": "Linux",
+                "high": {
+                    "uaFullVersion": "153.0.8010.12",
+                    "fullVersionList": [
+                        {
+                            "brand": "HeadlessChrome",
+                            "version": "153.0.8010.12"
+                        },
+                        {
+                            "brand": "Not_A Brand",
+                            "version": "8.0.0.0"
+                        },
+                        {
+                            "brand": "Chromium",
+                            "version": "153.0.8010.12"
+                        }
+                    ],
+                    "architecture": "x86",
+                    "bitness": "64"
+                }
+            }
+        }
+    },
+    "headers": {
+        "sec_ch_ua": "\"HeadlessChrome\";v=\"153\", \"Not_A Brand\";v=\"8\", \"Chromium\";v=\"153\""
+    }
+}

@@ -1,0 +1,76 @@
+{
+ "_provenance": "Captured 2026-10-12 with `npm run fingerprint:capture-envelopes` (engines: chromium) from stock Playwright engines (headless, Linux, http://127.0.0.1 page): for each probe key in the tier-1 and tier-2 envelopes the real collector built, the state it carried (ok / unavailable / a value with no state tag). Besides those states, only the browser version, its User-Agent and its resistance (privacy-mode) report are stored; no other probe values. Used by ProbeOmissionTest to prove that honest engines omit nothing and never send a null.",
+ "engines": {
+  "chromium": {
+   "browserVersion": "141.0.7390.37",
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36",
+   "tier1": {
+    "tier1": {
+     "dateParsing": "value",
+     "cssMedia": "value",
+     "codecs": "value",
+     "esFeatures": "value",
+     "environment": "value",
+     "uaClientHints": "value",
+     "objectShape": "value",
+     "removedApiBoundary": "value",
+     "architecture": "value",
+     "engineIdentity": "value"
+    },
+    "integrity": {
+     "wrongReceiver": "ok",
+     "descriptorIntegrity": "ok",
+     "mathDual": "ok",
+     "canvasDual": "ok",
+     "domBlockers": "ok",
+     "webdriverPresence": "ok",
+     "canvasFill": "ok",
+     "lieBattery": "ok",
+     "resistance": "ok"
+    }
+   },
+   "tier2": {
+    "tier1": {},
+    "tier2": {
+     "workerScope": "unavailable",
+     "textMetrics": "value",
+     "errorText": "value",
+     "permissions": "value",
+     "canvasGeometry": "value",
+     "fontFallback": "value",
+     "intl": "value",
+     "timezoneLmt": "value",
+     "audioReadback": "value",
+     "heapMemory": "value",
+     "buildFingerprint": "value",
+     "fontMetrics": "value",
+     "emojiMetrics": "value",
+     "scripts": "value",
+     "gpu": "value",
+     "gpuMath": "value",
+     "decoders": "value",
+     "voices": "unavailable",
+     "fontFaces": "value",
+     "audioRealtime": "value",
+     "audioOffline": "value",
+     "audioHardware": "value"
+    },
+    "integrity": {
+     "phantomRealm": "ok",
+     "resistance": "ok",
+     "canvasFill": "ok"
+    }
+   },
+   "resistance": {
+    "state": "ok",
+    "value": {
+     "brave": false,
+     "timerGranularityUs": 100,
+     "rfp": false,
+     "tor": false,
+     "gecko": false
+    }
+   }
+  }
+ }
+}

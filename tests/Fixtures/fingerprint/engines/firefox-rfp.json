@@ -1,0 +1,41 @@
+{
+    "meta": {
+        "engine": "firefox-rfp",
+        "launcher": "firefox",
+        "browserVersion": "155.0",
+        "playwrightVersion": "1.63.0",
+        "headless": true,
+        "launchOptions": {
+            "firefoxUserPrefs": {
+                "privacy.resistFingerprinting": true
+            }
+        },
+        "capturedAt": "2026-10-05",
+        "command": "node scripts/fingerprint/capture-engine-fixtures.mjs",
+        "note": "Playwright Firefox with privacy.resistFingerprinting=true."
+    },
+    "claims": {
+        "tier1": {
+            "environment": {
+                "identity": {
+                    "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0"
+                }
+            },
+            "esFeatures": {
+                "count": 63,
+                "present": "weakRef,finalizationRegistry,arrayAt,errorCause,errorErrors,regExpHasIndices,arrayToSorted,arrayToReversed,arrayToSpliced,arrayWith,arrayFindLast,arrayFindLastIndex,objectGroupBy,promiseWithResolvers,arrayBufferResize,arrayBufferTransfer,regexpVFlag,stringIsWellFormed,stringToWellFormed,iteratorHelpers,setUnion,regexpEscape,promiseTry,float16Array,uint8FromBase64,uint8ToBase64,uint8SetFromBase64,uint8ToHex,errorIsError,mathSumPrecise,arrayFromAsync,mapGetOrInsert,temporal,disposableStack,structuredClone,schedulerYield,navLocks,navCredentials,navMediaCapabilities,navSerial,navGamepads,viewTransitions,invokerCommands,trustedTypes,offscreenCanvas,wakeLock,showModalDialog,popoverApi,cssHas,cssNesting,cssSubgrid,cssOklch,cssColorMix,cssAnchor,cssFieldSizing,cssAttrTyped,cssTextWrapBalance,cssScrollbarGutter,cssLinearEasing,cssTransitionBehavior,cssLightDark,cssBackdropFilter,webkitAppearance"
+            },
+            "engineIdentity": {
+                "engine": "spidermonkey",
+                "errorOwnProps": "columnNumber,fileName,lineNumber,message",
+                "stackShape": "at-sign",
+                "toFixedMessageLength": 25,
+                "internalError": true
+            },
+            "uaClientHints": {
+                "supported": false
+            }
+        }
+    },
+    "headers": {}
+}

@@ -1,0 +1,43 @@
+{
+    "name": "jw-1980/device-id",
+    "description": "Device fingerprinting engine: challenge, claims, contradictions, verdict, confidence and keyed device keys. Framework-free (no Laravel, no Symfony, no PSR-7 required). Private package; installed from the private GitHub repository.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "ext-hash": "*",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "suggest": {
+        "ext-intl": "Region inference for `tz_vs_lang_region`; the rule degrades to silent without it."
+    },
+    "autoload": {
+        "psr-4": {
+            "NutriCompare\\Fingerprint\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "DeviceId\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "prove-standalone": "php tools/prove-standalone.php",
+        "golden-check": "php tools/golden-check.php",
+        "demo": "php demo/standalone-demo.php",
+        "gates": [
+            "@prove-standalone",
+            "@golden-check",
+            "@demo",
+            "@test"
+        ]
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}
