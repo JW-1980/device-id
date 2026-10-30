@@ -18,7 +18,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { collectDeferredIntegrity, collectIntegrity, INTEGRITY_CODES, phantomFindings } from '@device-id/v3/integrity';
+import { collectDeferredIntegrity, collectIntegrity, INTEGRITY_CODES, phantomFindings } from '@device-id/collector/integrity';
 import {
     compareToString,
     evaluateDomRect,
@@ -32,7 +32,7 @@ import {
     type LieTarget,
     type PhantomRealmValue,
     type RectPair,
-} from '@device-id/v3/phantom';
+} from '@device-id/collector/phantom';
 
 const undos: Array<() => void> = [];
 afterEach(() => {

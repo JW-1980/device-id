@@ -10,11 +10,11 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { failed, probe, probeAsync } from '@device-id/v3/canonical';
-import { collectTier2 } from '@device-id/v3/index';
-import { SCOPE_REPLY_KIND, scopeSnapshot } from '@device-id/v3/realm';
-import { acquireShared, onRelease, releaseShared } from '@device-id/v3/shared';
-import { workerScope } from '@device-id/v3/value-probes';
+import { failed, probe, probeAsync } from '@device-id/collector/canonical';
+import { collectTier2 } from '@device-id/collector/index';
+import { SCOPE_REPLY_KIND, scopeSnapshot } from '@device-id/collector/realm';
+import { acquireShared, onRelease, releaseShared } from '@device-id/collector/shared';
+import { workerScope } from '@device-id/collector/value-probes';
 
 const undos: Array<() => void> = [];
 afterEach(() => {

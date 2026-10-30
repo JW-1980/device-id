@@ -21,8 +21,8 @@ import {
     resistance,
     TIMER_SPIN_CAP,
     timerGranularityUs,
-} from '@device-id/v3/integrity';
-import { LIE_TARGETS, type LieTarget } from '@device-id/v3/phantom';
+} from '@device-id/collector/integrity';
+import { LIE_TARGETS, type LieTarget } from '@device-id/collector/phantom';
 
 const undos: Array<() => void> = [];
 afterEach(() => {

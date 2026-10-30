@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { canvasDual, collectIntegrity, INTEGRITY_CODES } from '@device-id/v3/integrity';
+import { canvasDual, collectIntegrity, INTEGRITY_CODES } from '@device-id/collector/integrity';
 
 /**
  * `canvasDual` under a randomised canvas read-back (round-1 BR-5).

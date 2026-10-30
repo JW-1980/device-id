@@ -8,10 +8,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import * as collector from '@device-id/v3/index';
-import { canonicalise } from '@device-id/v3/canonical';
-import { describeCanonical, measureTierOne } from '@device-id/v3/harness';
-import { probesOf, TIER } from '@device-id/v3/value-probes';
+import * as collector from '@device-id/collector/index';
+import { canonicalise } from '@device-id/collector/canonical';
+import { describeCanonical, measureTierOne } from '@device-id/collector/harness';
+import { probesOf, TIER } from '@device-id/collector/value-probes';
 
 describe('harness-only measurement helpers', () => {
     it('are not exported by the production entry, which keeps the two the admin demo uses', () => {

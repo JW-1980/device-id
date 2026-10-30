@@ -9,9 +9,9 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fnv1a32 } from '@device-id/v3/canonical';
-import { releaseShared } from '@device-id/v3/shared';
-import { collectTier2 } from '@device-id/v3/index';
+import { fnv1a32 } from '@device-id/collector/canonical';
+import { releaseShared } from '@device-id/collector/shared';
+import { collectTier2 } from '@device-id/collector/index';
 import {
     FONT_FACE_FAMILIES,
     FONT_FACES_TIMEOUT_MS,
@@ -27,7 +27,7 @@ import {
     probesOf,
     timezoneLmt,
     TIER,
-} from '@device-id/v3/value-probes';
+} from '@device-id/collector/value-probes';
 
 const undos: Array<() => void> = [];
 afterEach(() => {

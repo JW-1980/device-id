@@ -19,9 +19,24 @@
  *
  * Aggregates only, capped sets only. The snapshot is therefore safe to send as a tier-2
  * claim and small enough for the keepalive budget.
+ *
+ * ## It is SESSION data, never device identity
+ *
+ * Nothing here belongs in a device key: how this visitor moved a pointer in the last two seconds
+ * says nothing about the device, and it changes on every visit. The server keeps it out of both
+ * keys (`DeviceKeyDeriver` excludes the whole tier-2 block) and out of the matcher components.
+ *
+ * ## Lifecycle
+ *
+ * `startBehaviorCollection()` installs the listeners (the challenge path calls it before it
+ * asks for a challenge, so the round trip is not lost); `behavior()` is the tier-2 probe and
+ * reads whatever has arrived; `stopBehaviorCollection()` removes every listener again (the
+ * deferred pass calls it once the snapshot is taken, so no handler outlives its use). A probe
+ * run on a page that never started collection answers `unavailable('not-started')`, which is
+ * what the identify path (no decision page, no listeners) reports.
  */
 
-import { fnv1a32, ok, unavailable, type ProbeResult } from './canonical';
+import { fnv1a32, probe, unavailable, type ProbeResult } from './canonical';
 
 const MAX_DISTINCT = 16;
 const MAX_TYPES = 8;
@@ -90,8 +105,10 @@ const snapshotStats = (stats: Stats): Record<string, number> => {
     };
 };
 
-const state = {
+const freshState = () => ({
     started: false,
+    /** True once collection has been started on this page, even if it has been stopped since. */
+    everStarted: false,
     startedAt: 0,
     pointer: {
         moves: 0,
@@ -161,13 +178,34 @@ const state = {
         blur: 0,
         visibility: 0,
     },
-};
+});
+
+let state = freshState();
 
 const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
+const LISTENER_OPTIONS = { passive: true, capture: true } as const;
+
+/** Every listener installed, so `stopBehaviorCollection()` can remove exactly those. */
+let installed: Array<{ target: Window | Document; type: string; handler: EventListener }> = [];
+
+/**
+ * Install one passive, capture-phase listener. The handler runs inside a `try`: an exception
+ * thrown from a listener is reported to the PAGE's `window.onerror`, and a fingerprint
+ * collector must never appear in the page's error reporting (index.ts, "what is never done").
+ */
 const listen = (target: Window | Document, type: string, handler: EventListener): void => {
+    const guarded: EventListener = (event) => {
+        try {
+            handler(event);
+        } catch {
+            // One malformed event costs one sample, never an error on the host page.
+        }
+    };
+
     try {
-        target.addEventListener(type, handler, { passive: true, capture: true });
+        target.addEventListener(type, guarded, LISTENER_OPTIONS);
+        installed.push({ target, type, handler: guarded });
     } catch {
         // A target that rejects the listener is a target this module cannot observe.
     }
@@ -347,7 +385,10 @@ export function startBehaviorCollection(): void {
     }
 
     state.started = true;
-    state.startedAt = now();
+    if (!state.everStarted) {
+        state.everStarted = true;
+        state.startedAt = now();
+    }
 
     listen(window, 'pointermove', onPointer);
     listen(window, 'pointerdown', onPointer);
@@ -391,6 +432,33 @@ export function startBehaviorCollection(): void {
     });
 }
 
+/**
+ * Remove every listener this module installed. The aggregates stay readable (`behavior()`),
+ * and `startBehaviorCollection()` may be called again. Idempotent; never throws.
+ */
+export function stopBehaviorCollection(): void {
+    for (const { target, type, handler } of installed) {
+        try {
+            target.removeEventListener(type, handler, LISTENER_OPTIONS);
+        } catch {
+            // A target that cannot remove has nothing registered.
+        }
+    }
+    installed = [];
+    state.started = false;
+}
+
+/** Whether the listeners are installed right now. */
+export function isBehaviorCollecting(): boolean {
+    return state.started;
+}
+
+/** Stop collecting and forget every aggregate. Tests only. */
+export function resetBehaviorForTests(): void {
+    stopBehaviorCollection();
+    state = freshState();
+}
+
 /** Whether any input or sensor event has arrived. Visibility/focus alone are not input. */
 export function hasBehaviorData(): boolean {
     return (
@@ -405,19 +473,24 @@ export function hasBehaviorData(): boolean {
 }
 
 /**
- * Snapshot the aggregates. Returns `unavailable` when there has been no input at all, so
- * an empty page does not hash as two devices agreeing on a default.
+ * Snapshot the aggregates. `unavailable` when collection never started on this page
+ * (`not-started`) or when no input has arrived (`no-interaction`), so an empty page does not
+ * hash as two devices agreeing on a default.
  */
 export function behavior(): ProbeResult<Record<string, unknown>> {
-    if (!state.started) {
-        startBehaviorCollection();
+    if (!state.everStarted) {
+        return unavailable('not-started');
     }
 
     if (!hasBehaviorData()) {
         return unavailable('no-interaction');
     }
 
-    return ok({
+    return probe('behavior', () => snapshot());
+}
+
+function snapshot(): Record<string, unknown> {
+    return {
         elapsedMs: round(now() - state.startedAt),
         pointer: {
             moves: state.pointer.moves,
@@ -472,5 +545,5 @@ export function behavior(): ProbeResult<Record<string, unknown>> {
             accel: snapshotStats(state.motion.accel),
         },
         events: { ...state.events },
-    });
+    };
 }

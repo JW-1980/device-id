@@ -15,8 +15,8 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canvasDual, canvasFill, collectIntegrity, INTEGRITY_CODES, webdriverPresence } from '@device-id/v3/integrity';
-import { AUDIO_READBACK_TIMEOUT_MS, audioReadback, permissions, probesOf, TIER } from '@device-id/v3/value-probes';
+import { canvasDual, canvasFill, collectIntegrity, INTEGRITY_CODES, webdriverPresence } from '@device-id/collector/integrity';
+import { AUDIO_READBACK_TIMEOUT_MS, audioReadback, permissions, probesOf, TIER } from '@device-id/collector/value-probes';
 
 const undos: Array<() => void> = [];
 afterEach(() => {

@@ -9,10 +9,10 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CORE_PROBES, effectiveDisabled, type Challenge } from '@device-id/v3/protocol';
-import { collect, collectAndSend, collectForIdentity, collectTier2, fetchChallenge, readDisabledMeta, DISABLED_META_NAME } from '@device-id/v3/index';
-import { enabledProbesOf, probesOf, TIER, VALUE_PROBES } from '@device-id/v3/value-probes';
-import { collectDeferredIntegrity, collectIntegrity } from '@device-id/v3/integrity';
+import { CORE_PROBES, effectiveDisabled, type Challenge } from '@device-id/collector/protocol';
+import { collect, collectAndSend, collectForIdentity, collectTier2, fetchChallenge, readDisabledMeta, DISABLED_META_NAME } from '@device-id/collector/index';
+import { enabledProbesOf, probesOf, TIER, VALUE_PROBES } from '@device-id/collector/value-probes';
+import { collectDeferredIntegrity, collectIntegrity } from '@device-id/collector/integrity';
 
 const challenge = (disabledProbes?: readonly string[]): Challenge => ({ token: 't', purpose: 'signin', expiresAt: 0, disabledProbes });
 

@@ -5,9 +5,9 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { collectForIdentity, IDENTITY_TIER2_TIMEOUT_MS } from '@device-id/v3/index';
-import { FINGERPRINT_VERSION } from '@device-id/v3/protocol';
-import { TIER, probesOf } from '@device-id/v3/value-probes';
+import { collectForIdentity, IDENTITY_TIER2_TIMEOUT_MS } from '@device-id/collector/index';
+import { FINGERPRINT_VERSION } from '@device-id/collector/protocol';
+import { TIER, probesOf } from '@device-id/collector/value-probes';
 
 describe('collectForIdentity', () => {
     afterEach(() => {

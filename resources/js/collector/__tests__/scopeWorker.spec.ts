@@ -8,7 +8,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { canvasRealmHash, sanitiseReply, SCOPE_REPLY_KIND, SPIN_MAX_MS, SPIN_REPLY_KIND, spinIterations, spinRequestMs, type RealmContext2D } from '@device-id/v3/realm';
+import { canvasRealmHash, sanitiseReply, SCOPE_REPLY_KIND, SPIN_MAX_MS, SPIN_REPLY_KIND, spinIterations, spinRequestMs, type RealmContext2D } from '@device-id/collector/realm';
 
 afterEach(() => {
     vi.restoreAllMocks();
@@ -21,7 +21,7 @@ describe('scope.worker', () => {
             posted.push(message);
         }) as typeof window.postMessage);
 
-        await import('@device-id/v3/scope.worker');
+        await import('@device-id/collector/scope.worker');
         expect(posted).toHaveLength(0); // nothing is sent unasked
 
         window.dispatchEvent(new MessageEvent('message', { data: 'scope' }));
@@ -42,7 +42,7 @@ describe('scope.worker', () => {
         vi.spyOn(window, 'postMessage').mockImplementation(() => {
             throw new DOMException('could not be cloned', 'DataCloneError');
         });
-        await import('@device-id/v3/scope.worker');
+        await import('@device-id/collector/scope.worker');
 
         const errors: unknown[] = [];
         const onError = (event: ErrorEvent): void => {
@@ -62,7 +62,7 @@ describe('scope.worker', () => {
         vi.spyOn(window, 'postMessage').mockImplementation(((message: unknown) => {
             posted.push(message);
         }) as typeof window.postMessage);
-        await import('@device-id/v3/scope.worker');
+        await import('@device-id/collector/scope.worker');
 
         window.dispatchEvent(new MessageEvent('message', { data: { ask: 'spin', ms: 0 } }));
         const started = performance.now();
@@ -82,7 +82,7 @@ describe('scope.worker', () => {
         vi.spyOn(window, 'postMessage').mockImplementation(((message: unknown) => {
             posted.push(message);
         }) as typeof window.postMessage);
-        await import('@device-id/v3/scope.worker');
+        await import('@device-id/collector/scope.worker');
 
         const started = performance.now();
         window.dispatchEvent(new MessageEvent('message', { data: { ask: 'spin', ms: 60_000 } }));
@@ -121,7 +121,7 @@ describe('scope.worker canvasRealm', () => {
             posted.push(message);
         }) as typeof window.postMessage);
         try {
-            await import('@device-id/v3/scope.worker');
+            await import('@device-id/collector/scope.worker');
             window.dispatchEvent(new MessageEvent('message', { data: 'scope' }));
         } finally {
             if (original) Object.defineProperty(globalThis, 'OffscreenCanvas', original);

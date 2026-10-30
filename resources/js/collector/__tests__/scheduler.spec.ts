@@ -9,8 +9,8 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ok, type ProbeResult } from '@device-id/v3/canonical';
-import { collectForIdentity, measureDeferred } from '@device-id/v3/index';
+import { ok, type ProbeResult } from '@device-id/collector/canonical';
+import { collectForIdentity, measureDeferred } from '@device-id/collector/index';
 import {
     FALLBACK_SLICE_MS,
     FONT_METRICS_STEPS,
@@ -23,7 +23,7 @@ import {
     nextIdle,
     runDeferred,
     type UnitTrace,
-} from '@device-id/v3/value-probes';
+} from '@device-id/collector/value-probes';
 
 /** Install a `requestIdleCallback` whose deadline reports `remaining()` and runs the callback on a macrotask. */
 function installIdle(remaining: () => number): { undo: () => void; calls: () => number } {
@@ -110,11 +110,11 @@ describe('runDeferred', () => {
         return units;
     };
 
-    it('runs the late (audio) probes of BOTH tiers after every other probe', async () => {
+    it('runs the late probes (audio, behaviour) of BOTH tiers after every other probe', async () => {
         const units = await traceOf(() => 50);
         const names = units.map((u) => u.name);
         const late = VALUE_PROBES.filter((p) => p.late).map((p) => p.name);
-        expect(late).toEqual(['audioRealtime', 'audioOffline', 'audioHardware']);
+        expect(late).toEqual(['audioRealtime', 'audioOffline', 'audioHardware', 'behavior']);
         const firstLate = Math.min(...late.map((name) => names.indexOf(name)));
         for (const [index, name] of names.entries()) {
             if (late.includes(name)) continue;

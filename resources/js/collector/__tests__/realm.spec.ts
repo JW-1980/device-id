@@ -20,8 +20,8 @@ import {
     SCOPE_REPLY_KIND,
     type EngineMarks,
     type ScopeSnapshot,
-} from '@device-id/v3/realm';
-import { engineIdentity, probesOf, TIER } from '@device-id/v3/value-probes';
+} from '@device-id/collector/realm';
+import { engineIdentity, probesOf, TIER } from '@device-id/collector/value-probes';
 
 const undos: Array<() => void> = [];
 afterEach(() => {

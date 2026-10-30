@@ -21,7 +21,7 @@ namespace NutriCompare\Fingerprint\Rules;
  *
  * ## The rules mirror the client's, line by line
  *
- * Each derivation below is the decision rule in `resources/js/v3/integrity.ts`
+ * Each derivation below is the decision rule in `resources/js/collector/integrity.ts`
  * (`collectIntegrity`, `collectDeferredIntegrity`, `phantomFindings`) applied to the value that
  * rule reads, with JavaScript truthiness (`jsFalsy`) where the client uses `!x`. On the wire
  * (JSON) a non-finite number arrives as `null`, which is why a `null` `*Pf` value counts as

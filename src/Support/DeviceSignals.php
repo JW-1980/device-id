@@ -10,7 +10,7 @@ use NutriCompare\Fingerprint\Rules\IntegrityFindings;
 /**
  * The browser signals the device risk rules read, and nothing else.
  *
- * Signals reach the server two ways: the page's identify call (a v3 claim set
+ * Signals reach the server two ways: the page's identify call (a collector claim set
  * from the in-house collector, mapped by {@see self::fromClaims()}) and, for
  * API clients and pages loaded before the identity layer, an
  * `X-Device-Signals` header or a `device_signals` field
@@ -76,7 +76,7 @@ final class DeviceSignals
     ];
 
     /**
-     * The signals a v3 claim set carries (resources/js/v3), in
+     * The signals a collector claim set carries (resources/js/collector), in
      * the shape above:
      *
      *   platform       <- tier1.environment.identity.platform

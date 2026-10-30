@@ -7,9 +7,9 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { collectAndSend, collectAndSendDetailed, reportDeclined, scheduleTier2 } from '@device-id/v3/index';
-import { sendClaims, sendDecline } from '@device-id/v3/transport';
-import type { Challenge } from '@device-id/v3/protocol';
+import { collectAndSend, collectAndSendDetailed, reportDeclined, scheduleTier2 } from '@device-id/collector/index';
+import { sendClaims, sendDecline } from '@device-id/collector/transport';
+import type { Challenge } from '@device-id/collector/protocol';
 
 const CHALLENGE: Challenge = { token: 'issued-token', purpose: 'signin', expiresAt: Date.now() + 300_000 };
 

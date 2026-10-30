@@ -29,6 +29,21 @@
  * inside the integrity phase; `buildFingerprint`'s ICU load is tier 2 now) and 3-6 ms warm;
  * tests/Browser/transport-checks.mjs prints the per-engine numbers on every run.
  *
+ * ## The host decides endpoints and purposes
+ *
+ * `collectAndSend(purpose, challengeUrl, claimsUrl)` takes all three from the caller: the
+ * purpose is any string the host's challenge endpoint accepts, and the URLs default to
+ * `/security/fingerprint/challenge` and `/security/fingerprint/claims`. Pages without a
+ * single-page application start it through `boot.ts` (`data-fingerprint-*` attributes).
+ *
+ * ## Behaviour is session data
+ *
+ * `behavior` (behavior.ts) aggregates pointer, keyboard, wheel, touch and motion input from
+ * the moment `collectAndSendDetailed` starts until the tier-2 snapshot is taken, then the
+ * listeners are removed. It rides in the tier-2 envelope; a later snapshot (on page hide) would
+ * need a third envelope slot, which the challenge store does not have. The server keeps it out
+ * of every key.
+ *
  * ## The method policy
  *
  * An operator can switch individual non-core probes off (`ProbeRegistry` on the server). The
@@ -54,6 +69,7 @@
  */
 
 import { xsrfToken } from '../shared/xsrf';
+import { startBehaviorCollection, stopBehaviorCollection } from './behavior';
 import { claimDigest, type ProbeResult } from './canonical';
 import { collectDeferredIntegrity, collectIntegrity, type IntegrityReport } from './integrity';
 import {
@@ -435,6 +451,8 @@ export function scheduleTier2Send(
         const run = (): void => {
             collectTier2(challenge, purpose)
                 .then(async (result) => {
+                    // The behaviour snapshot is part of `result`; the listeners have done their job.
+                    stopBehaviorCollection();
                     let send: SendResult | null = null;
                     let tier1WasDelivered: boolean | null = null;
                     if (claimsUrl) {
@@ -453,7 +471,10 @@ export function scheduleTier2Send(
                 // `collectTier2` never throws by contract; a rejection here is a bug, and it
                 // is returned as `error` so the caller can show it. It is not logged: this
                 // module makes no `console.*` call.
-                .catch((error: unknown) => resolve({ result: null, send: null, tier1Delivered: null, error }));
+                .catch((error: unknown) => {
+                    stopBehaviorCollection();
+                    resolve({ result: null, send: null, tier1Delivered: null, error });
+                });
         };
 
         if (typeof requestIdleCallback === 'function') {
@@ -556,16 +577,27 @@ export async function collectAndSendDetailed(
         return { status: 'unsupported' };
     }
 
+    // Before the challenge round trip, so the first input is not lost to it. Every path that
+    // does not reach the tier-2 pass stops it again (a listener must not outlive its use).
+    startBehaviorCollection();
+
     const issued = await requestChallenge(challengeUrl, purpose);
     if (issued.challenge === null) {
+        stopBehaviorCollection();
+
         return { status: 'no-challenge', challenge: issued };
     }
     const challenge = issued.challenge;
+    if (effectiveDisabled(challenge.disabledProbes).includes('behavior')) {
+        // The operator switched the method off: it is not collected, and the server does not expect it.
+        stopBehaviorCollection();
+    }
 
     let result: CollectionResult;
     try {
         result = await collect(challenge, purpose);
     } catch (error) {
+        stopBehaviorCollection();
         // `name` is read structurally: a DOMException from another realm is not an
         // `instanceof Error` here, and its name is the fact that matters.
         const name = typeof error === 'object' && error !== null ? (error as { name?: unknown }).name : undefined;
@@ -578,6 +610,8 @@ export async function collectAndSendDetailed(
     if (!send.sent) {
         // Tier 2 is not scheduled either: the server would hold a tier-2 envelope for a
         // token whose tier-1 slot was never filled.
+        stopBehaviorCollection();
+
         return { status: 'send-failed', result, send };
     }
 
@@ -601,6 +635,23 @@ export async function collectAndSend(
     const outcome = await collectAndSendDetailed(purpose, challengeUrl, claimsUrl);
 
     return outcome.status === 'sent' ? outcome.result : null;
+}
+
+/**
+ * Collect tier 1 and wait until the server has answered it 2xx, for a decision that needs the
+ * device recorded first (a guest vote: the response sets the device cookie the vote then
+ * carries). Tier 2 still follows in idle time. Resolves `true` once the claims were accepted;
+ * `false` on any failure (nothing sent, refused, or the network failed), and never rejects.
+ * The caller bounds the wait itself (`Promise.race` with its own timeout).
+ */
+export async function collectAndConfirm(
+    purpose: CollectionPurpose,
+    challengeUrl = '/security/fingerprint/challenge',
+    claimsUrl = '/security/fingerprint/claims',
+): Promise<boolean> {
+    const outcome = await collectAndSendDetailed(purpose, challengeUrl, claimsUrl);
+
+    return outcome.status === 'sent' ? outcome.send.delivered : false;
 }
 
 /**

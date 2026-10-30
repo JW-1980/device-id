@@ -79,6 +79,7 @@ import {
     type EngineIdentity,
     type ScopeSnapshot,
 } from './realm';
+import { behavior } from './behavior';
 import { CORE_PROBES } from './protocol';
 import { onRelease, sharedAudioContext, sharedWebGl, type SharedWebGl } from './shared';
 import {
@@ -2168,6 +2169,164 @@ export function voices(): Promise<ProbeResult<{ count: number; osCount: number; 
     })();
 }
 
+/** How long `webrtc` waits for an offer before giving up. */
+export const WEBRTC_TIMEOUT_MS = 1500;
+
+interface WebRtcCodec {
+    readonly mimeType: string;
+    readonly clockRate: number;
+    readonly channels: number | null;
+    readonly fmtp: string;
+    readonly feedback: string;
+}
+
+/**
+ * Parse only the capability part of an SDP offer.
+ *
+ * This deliberately ignores `a=candidate` lines and the ICE credentials. The goal is the
+ * codec/extension set that describes the browser's media stack, not the visitor's network;
+ * a candidate line is exactly the thing that would leak a LAN address and is therefore
+ * never read, hashed or sent.
+ */
+export function parseWebRtcSdp(sdp: string): Record<string, unknown> {
+    const lines = sdp.split(/\r?\n/);
+    const payloads: Record<'audio' | 'video', Set<string>> = {
+        audio: new Set<string>(),
+        video: new Set<string>(),
+    };
+
+    for (const line of lines) {
+        const match = /^m=(audio|video) \S+ \S+ (.*)$/.exec(line);
+        if (match === null) {
+            continue;
+        }
+
+        const kind = match[1] as 'audio' | 'video';
+        for (const payload of match[2].split(/\s+/)) {
+            if (/^\d+$/.test(payload)) {
+                payloads[kind].add(payload);
+            }
+        }
+    }
+
+    const codecOf = (kind: 'audio' | 'video', payload: string): WebRtcCodec | null => {
+        const rtpmap = lines.find((line) => line.startsWith(`a=rtpmap:${payload} `));
+        if (rtpmap === undefined) {
+            return null;
+        }
+
+        const encoding = (rtpmap.split(' ')[1] ?? '').split('/');
+        const mimeType = `${kind}/${encoding[0] ?? 'unknown'}`;
+        const clockRate = Number(encoding[1] ?? 0);
+        const channels = kind === 'audio' ? Number(encoding[2] ?? 1) : null;
+        const fmtp = lines
+            .filter((line) => line.startsWith(`a=fmtp:${payload} `))
+            .map((line) => line.slice(`a=fmtp:${payload} `.length))
+            .sort()
+            .join('|');
+        const feedback = lines
+            .filter((line) => line.startsWith(`a=rtcp-fb:${payload} `))
+            .map((line) => line.slice(`a=rtcp-fb:${payload} `.length))
+            .sort()
+            .join('|');
+
+        return { mimeType, clockRate, channels, fmtp, feedback };
+    };
+
+    const codecs = (kind: 'audio' | 'video'): WebRtcCodec[] =>
+        [...payloads[kind]]
+            .map((payload) => codecOf(kind, payload))
+            .filter((codec): codec is WebRtcCodec => codec !== null)
+            .sort((a, b) => {
+                // Code-unit order, not `localeCompare`: a locale-sensitive collation would order
+                // `audio/PCMU` and `audio/opus` differently for different visitors' languages and
+                // change the hash of one and the same browser.
+                const left = `${a.mimeType}:${a.clockRate}`;
+                const right = `${b.mimeType}:${b.clockRate}`;
+
+                return left < right ? -1 : left > right ? 1 : 0;
+            });
+
+    const extensions = lines
+        .filter((line) => line.startsWith('a=extmap:'))
+        .map((line) => line.split(' ').slice(1).join(' '))
+        .sort();
+
+    const audio = codecs('audio');
+    const video = codecs('video');
+    const capabilityLines = lines
+        .filter((line) => /^(m=|a=rtpmap:|a=fmtp:|a=rtcp-fb:|a=extmap:)/.test(line))
+        .sort();
+
+    return {
+        audio: { count: audio.length, hash: fnv1a32(JSON.stringify(audio)) },
+        video: { count: video.length, hash: fnv1a32(JSON.stringify(video)) },
+        extensions: { count: extensions.length, hash: fnv1a32(JSON.stringify(extensions)) },
+        sdpHash: fnv1a32(capabilityLines.join('\n')),
+    };
+}
+
+/**
+ * The WebRTC media-stack fingerprint: codecs, RTCP feedback and RTP header extensions.
+ *
+ * The probe creates a data channel and a local OFFER with no ICE servers, reads only the
+ * SDP capability lines, and closes the peer at once. It never calls `setLocalDescription`,
+ * which is what starts ICE gathering: with no description set, no candidate is gathered,
+ * no host or mDNS address exists to leak and no packet leaves the page. (The earlier
+ * collector set the description and then filtered the SDP; the offer already carries every
+ * capability line, so the extra step bought nothing and cost the gathering.)
+ *
+ * The signal identifies the browser/OS media stack (which codecs and extensions exist), not
+ * the network and not the device: it moves with a browser update, so it is a soft engine-level
+ * signal and is in neither key. Tier 2 because creating a peer and an offer is asynchronous
+ * and can take tens of milliseconds on a cold stack; bounded by `WEBRTC_TIMEOUT_MS`.
+ */
+export function webrtc(): Promise<ProbeResult<Record<string, unknown>>> {
+    const constructor = (window.RTCPeerConnection ??
+        (window as Window & { webkitRTCPeerConnection?: typeof RTCPeerConnection }).webkitRTCPeerConnection) as
+        | typeof RTCPeerConnection
+        | undefined;
+
+    if (typeof constructor !== 'function') {
+        return Promise.resolve(unavailable('no-webrtc'));
+    }
+
+    return (async (): Promise<ProbeResult<Record<string, unknown>>> => {
+        let peer: RTCPeerConnection | null = null;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+
+        try {
+            peer = new constructor({ iceServers: [] });
+            peer.createDataChannel('fingerprint');
+
+            const offer = await Promise.race([
+                peer.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true }),
+                new Promise<never>((_, reject) => {
+                    timer = setTimeout(() => reject(new Error('webrtc-timeout')), WEBRTC_TIMEOUT_MS);
+                }),
+            ]);
+
+            const sdp = typeof offer?.sdp === 'string' ? offer.sdp : '';
+            if (sdp === '') {
+                return unavailable('no-sdp');
+            }
+
+            return ok(parseWebRtcSdp(sdp));
+        } catch (error) {
+            return failed(error);
+        } finally {
+            if (timer !== undefined) {
+                clearTimeout(timer);
+            }
+            try {
+                peer?.close();
+            } catch {
+                // A peer that cannot close has nothing left to release.
+            }
+        }
+    })();
+}
+
 /** `tier2.gpuMath` on the wire. */
 export interface GpuMathValue {
     /** `fnv1a32` of the 64 RGBA bytes of the 4×4 render. */
@@ -2860,6 +3019,8 @@ export const VALUE_PROBES: readonly ValueProbe[] = [
     // deferred probe of BOTH tiers; the tier (and so the wire block) is unchanged.
     { name: 'audioRealtime', tier: TIER.TWO, run: audioRealtime, heavy: true, late: true },
     { name: 'audioOffline', tier: TIER.TWO, run: audioOffline, late: true },       // 2-4 ms, async render
+    // The media stack's codecs and RTP extensions from a local offer; async, no ICE gathering.
+    { name: 'webrtc', tier: TIER.TWO, run: webrtc },
 
     // Tier HARDWARE — the cross-browser device/OS signals, after tier 2. Sent under `tier2`.
     // Stepped over FONT_METRICS_STEPS slices; `run` is the un-sliced form for the diagnostics.
@@ -2880,6 +3041,10 @@ export const VALUE_PROBES: readonly ValueProbe[] = [
     { name: 'parallelism', tier: TIER.HARDWARE, run: parallelism, heavy: true },   // 4 rounds of workers, off-thread
     // The second audio probe, after everything else (G-D5i): reads the same shared context.
     { name: 'audioHardware', tier: TIER.HARDWARE, run: audioHardware, late: true },
+    // Passive input aggregates (behavior.ts). Session data, in no key. `late`: the snapshot is
+    // taken in the last group of the deferred pass, because the visitor has had the longest
+    // time to touch the page by then.
+    { name: 'behavior', tier: TIER.TWO, run: behavior, late: true },
 ];
 
 /** Probes of one tier, in registry order. */

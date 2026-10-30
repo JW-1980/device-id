@@ -9,9 +9,9 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { fnv1a32 } from '@device-id/v3/canonical';
-import { INTEGRITY_CODES, collectIntegrity } from '@device-id/v3/integrity';
-import { LIE_TARGETS } from '@device-id/v3/phantom';
+import { fnv1a32 } from '@device-id/collector/canonical';
+import { INTEGRITY_CODES, collectIntegrity } from '@device-id/collector/integrity';
+import { LIE_TARGETS } from '@device-id/collector/phantom';
 import {
     CANVAS_REALM_HEIGHT,
     CANVAS_REALM_WIDTH,
@@ -21,9 +21,9 @@ import {
     sanitiseReply,
     scopeSnapshot,
     type RealmContext2D,
-} from '@device-id/v3/realm';
-import { releaseShared } from '@device-id/v3/shared';
-import { gpuMath, isSoftwareRenderer, probesOf, TIER, workerScope } from '@device-id/v3/value-probes';
+} from '@device-id/collector/realm';
+import { releaseShared } from '@device-id/collector/shared';
+import { gpuMath, isSoftwareRenderer, probesOf, TIER, workerScope } from '@device-id/collector/value-probes';
 
 const undos: Array<() => void> = [];
 afterEach(() => {

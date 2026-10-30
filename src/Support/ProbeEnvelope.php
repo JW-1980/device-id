@@ -7,7 +7,7 @@ namespace NutriCompare\Fingerprint\Support;
 /**
  * The ONE reader of the client's probe envelope.
  *
- * The v3 collector (`resources/js/v3/index.ts`, `resolveAll`) sends a probe
+ * The collector (`resources/js/collector/index.ts`, `resolveAll`) sends a probe
  * that succeeded as its raw value and a probe that did not as `{state: 'unavailable'|'error',
  * …}` — a `state` key and NO `value` key. An older shape, `{state, value}`, is still read for
  * the v2 fixtures and the parity gate. Until this class existed the envelope was unwrapped in

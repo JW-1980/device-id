@@ -10,11 +10,11 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SCOPE_REPLY_KIND, scopeSnapshot, type ScopeSnapshot } from '@device-id/v3/realm';
-import { releaseShared } from '@device-id/v3/shared';
-import { probesOf, TIER, WORKER_SCOPE_TIMEOUT_MS, workerScope } from '@device-id/v3/value-probes';
-import { collectTier2 } from '@device-id/v3/index';
-import type { Challenge } from '@device-id/v3/protocol';
+import { SCOPE_REPLY_KIND, scopeSnapshot, type ScopeSnapshot } from '@device-id/collector/realm';
+import { releaseShared } from '@device-id/collector/shared';
+import { probesOf, TIER, WORKER_SCOPE_TIMEOUT_MS, workerScope } from '@device-id/collector/value-probes';
+import { collectTier2 } from '@device-id/collector/index';
+import type { Challenge } from '@device-id/collector/protocol';
 
 type Behaviour = (worker: FakeWorker, message: unknown) => void;
 

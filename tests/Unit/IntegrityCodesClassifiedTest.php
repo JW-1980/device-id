@@ -9,7 +9,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The contract between the v3 collector (`resources/js/v3/integrity.ts`) and the engine: every
+ * The contract between the collector (`resources/js/collector/integrity.ts`) and the engine: every
  * integrity code the client can send is either derived on the server
  * (`IntegrityFindings::DERIVED_CODES`) or recorded here as not derivable.
  */
@@ -30,7 +30,7 @@ final class IntegrityCodesClassifiedTest extends TestCase
     {
         // Read from the client source, so a code added to integrity.ts fails here until it
         // is either derived on the server or recorded as not derivable, with a reason.
-        $source = (string) file_get_contents(__DIR__.'/../../resources/js/v3/integrity.ts');
+        $source = (string) file_get_contents(__DIR__.'/../../resources/js/collector/integrity.ts');
         if (preg_match('/export const INTEGRITY_CODES = \{(.*?)\} as const;/s', $source, $block) !== 1) {
             self::fail('INTEGRITY_CODES not found in integrity.ts');
         }

@@ -19,10 +19,31 @@
  * when the SHAPE changes, so the server can reject a payload it cannot read rather
  * than misinterpreting one. A field being added is a minor change and increments it;
  * the server treats an unknown version as "no claims", never as "claims missing".
+ *
+ * v3 adds `slot`: one challenge token is redeemable once per slot, so the tier-1
+ * envelope and the deferred tier-2 envelope of one visit share a nonce and the server
+ * attaches the second to the observation created by the first.
  */
 
 /** Bumped when the claim set or envelope shape changes. */
-export const FINGERPRINT_VERSION = 2;
+export const FINGERPRINT_VERSION = 3;
+
+/**
+ * Which set of probes this bundle runs, sent as `probes` in every envelope.
+ *
+ * Bumped whenever a probe is ADDED (the server's `ProbeRegistry::PROBE_SET`, kept equal by
+ * `tests/Unit/ProbeSetTest`; set 3 added `webrtc` and `behavior`). The server's omission gate expects of an envelope
+ * only the probes of the set it reports, so a page left open across a deploy, still running
+ * the previous bundle, is judged against the probes that bundle actually has. A body without
+ * the marker is judged against set 1, the bundle that predates it.
+ *
+ * Not a version of the envelope SHAPE (`FINGERPRINT_VERSION`): an added probe is an added
+ * key, which every server version already reads.
+ */
+export const PROBE_SET = 3;
+
+/** Which half of one visit an envelope carries. The token is redeemable once per slot. */
+export type EnvelopeSlot = 'tier1' | 'tier2';
 
 /**
  * Why a collection is running.
@@ -33,23 +54,13 @@ export const FINGERPRINT_VERSION = 2;
  * global one. The surfaces are deliberately few and chosen so a collection only ever
  * runs where a real decision is being made - see DESIGN.md task 3.1 for why the
  * catalogue pages are excluded.
+ *
+ * The collector does not know the list: each host configures its own purposes server-side
+ * (the challenge endpoint refuses any other), and the host passes the one it wants as a plain
+ * string (`collectAndSend('signin')`, `data-fingerprint-purpose="vote"`). A name the server
+ * does not know only produces a refused challenge, never a wrong collection.
  */
-export type CollectionPurpose =
-    | 'signin'
-    | 'register'
-    | 'password_reset'
-    | 'checkout'
-    | 'account_security'
-    | 'vote';
-
-export const COLLECTION_PURPOSES: readonly CollectionPurpose[] = [
-    'signin',
-    'register',
-    'password_reset',
-    'checkout',
-    'account_security',
-    'vote',
-];
+export type CollectionPurpose = string;
 
 /**
  * What the server issues, and what the envelope must echo back.
@@ -87,15 +98,73 @@ export interface Challenge {
     /** Echoed back so the client can confirm it was not issued for a different surface. */
     readonly purpose: CollectionPurpose;
     readonly expiresAt: number;
+    /**
+     * The operator's method policy: probe names the collector must skip, from the challenge
+     * response's `disabled_probes` (mapped by `fetchChallenge`). Absent means "run all".
+     * Never trusted as-is: `effectiveDisabled()` drops anything that is not a string and every
+     * core name before it is used.
+     */
+    readonly disabledProbes?: readonly string[];
+}
+
+/**
+ * The probes that can never be switched off, whatever a policy says (CONTRACT-2 §N).
+ *
+ * They feed `browser_key` / `hardware_key`, or they are the two integrity probes the design
+ * calls the most important in the system, or (`resistance`) they decide which components
+ * the server may trust at all. The server never sends them in a policy
+ * (`ProbeRegistry`); the client drops them anyway, so a tampered or mistaken policy cannot
+ * re-key every device or switch tamper detection off.
+ */
+export const CORE_PROBES: readonly string[] = [
+    'environment', 'uaClientHints', 'dateParsing', 'codecs', 'esFeatures', 'objectShape',
+    'removedApiBoundary', 'cssMedia', 'architecture', 'audioRealtime', 'audioHardware',
+    'wrongReceiver', 'descriptorIntegrity',
+    // Core since the five-review round: it gates the server's per-component trust projection
+    // (a component measured under Brave/RFP/Tor is not trusted), so switching it off would
+    // silently make noised components count as identity.
+    'resistance',
+    // Core since round 4: the engine marks are the evidence that lets the server honour a
+    // resistFingerprinting/Tor report at all. Switched off, every honest RFP/Tor visitor was
+    // linked to its whole cohort by the shared browser key again.
+    'engineIdentity',
+];
+
+/**
+ * A policy list as the collector applies it: strings only, trimmed, de-duplicated, core
+ * names removed. Anything that is not an array is "no policy". Unknown names survive and
+ * are harmless — they match no probe — so a server that knows a newer probe than this
+ * bundle does not break it.
+ */
+export function effectiveDisabled(names: unknown): string[] {
+    if (!Array.isArray(names)) {
+        return [];
+    }
+
+    const out = new Set<string>();
+    for (const name of names) {
+        if (typeof name !== 'string') continue;
+        const trimmed = name.trim();
+        if (trimmed !== '' && !CORE_PROBES.includes(trimmed)) out.add(trimmed);
+    }
+
+    return [...out];
 }
 
 /** Why the collector produced no claims. A closed set the server recognises. */
 export type DeclineReason = 'blocked' | 'unavailable' | 'unsupported' | 'precondition_failed';
 
-/** One tamper finding. Evidence about the environment, never a device value. */
+/**
+ * One tamper finding: a code from integrity.ts `INTEGRITY_CODES`, and nothing else.
+ * Evidence about the environment, never a device value.
+ *
+ * There is no `detail` field. Clients before 2026-10-05 also sent an English sentence per
+ * finding; the server never read it (it lifts findings by `code`, counts entries, and writes
+ * its own sentence), so it was dropped from the wire. The server still accepts a finding
+ * that carries one, because a cached old bundle keeps sending it.
+ */
 export interface IntegrityFinding {
     readonly code: string;
-    readonly detail: string;
 }
 
 export interface TimingReport {
@@ -123,14 +192,24 @@ export interface CollectedClaims {
 export interface Envelope {
     readonly v: number;
     /**
-     * The single-use token from the challenge, which the server redeems exactly once.
+     * The token from the challenge, which the server redeems once per slot.
      *
      * Sent as `nonce` rather than `token` to match the field the server's envelope parser
      * reads first; the parser accepts either name, because a rolling deploy has to accept
      * a client bundle that is still in somebody's browser cache.
      */
     readonly nonce: string;
-    /** Keyed hash of the canonical claims, recorded for debugging and never trusted. */
+    /** `tier1` for the synchronous half, `tier2` for the deferred half of the same visit. */
+    readonly slot: EnvelopeSlot;
+    /**
+     * The bundle's probe set (`PROBE_SET`). Optional on the type only so a body built by an
+     * older bundle still type-checks in tests; every current envelope carries it.
+     */
+    readonly probes?: number;
+    /**
+     * Unkeyed SHA-256 of the canonical claims, for debugging only and never trusted.
+     * Empty when the page has no SubtleCrypto (an insecure context).
+     */
     readonly digest: string;
     /** The claims themselves, so a decision can be explained after the fact. */
     readonly claims: CollectedClaims;

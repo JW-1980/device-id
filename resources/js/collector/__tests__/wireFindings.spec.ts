@@ -12,10 +12,10 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { collect, collectForIdentity, collectTier2 } from '@device-id/v3/index';
-import { INTEGRITY_CODES } from '@device-id/v3/integrity';
-import type { Challenge } from '@device-id/v3/protocol';
-import { buildEnvelope } from '@device-id/v3/transport';
+import { collect, collectForIdentity, collectTier2 } from '@device-id/collector/index';
+import { INTEGRITY_CODES } from '@device-id/collector/integrity';
+import type { Challenge } from '@device-id/collector/protocol';
+import { buildEnvelope } from '@device-id/collector/transport';
 
 const undos: Array<() => void> = [];
 afterEach(() => {

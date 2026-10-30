@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { canonicalise, probe, probeAsync, claimDigest, sha256Hex, ok, failed, fnv1a32 } from '@device-id/v3/canonical';
+import { canonicalise, probe, probeAsync, claimDigest, sha256Hex, ok, failed, fnv1a32 } from '@device-id/collector/canonical';
 import {
     collectIntegrity,
     wrongReceiver,
@@ -26,7 +26,7 @@ import {
     canvasDual,
     domBlockers,
     INTEGRITY_CODES,
-} from '@device-id/v3/integrity';
+} from '@device-id/collector/integrity';
 import {
     VALUE_PROBES,
     TIER,
@@ -62,11 +62,11 @@ import {
     EMOJI_SAMPLE,
     webgpuAdapter,
     resetWebgpuAdapterForTests,
-} from '@device-id/v3/value-probes';
-import { releaseShared } from '@device-id/v3/shared';
-import { collect, collectTier2, scheduleTier2, collectAndSend, collectAndSendDetailed, requestChallenge, BUDGET_MS } from '@device-id/v3/index';
-import { buildEnvelope, buildDecline, sendClaims, payloadBytes, TRANSPORT_LIMITS } from '@device-id/v3/transport';
-import { FINGERPRINT_VERSION, PROBE_SET, type Challenge } from '@device-id/v3/protocol';
+} from '@device-id/collector/value-probes';
+import { releaseShared } from '@device-id/collector/shared';
+import { collect, collectTier2, scheduleTier2, collectAndSend, collectAndSendDetailed, requestChallenge, BUDGET_MS } from '@device-id/collector/index';
+import { buildEnvelope, buildDecline, sendClaims, payloadBytes, TRANSPORT_LIMITS } from '@device-id/collector/transport';
+import { FINGERPRINT_VERSION, PROBE_SET, type Challenge } from '@device-id/collector/protocol';
 
 /** The shape `FingerprintChallengeController` issues: `{ token, purpose, expires_at }`. */
 const CHALLENGE: Challenge = {
