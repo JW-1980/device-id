@@ -2518,7 +2518,7 @@ function renderGpuMath(): GpuMathValue {
 export const FONT_FACE_FAMILIES = {
     windows: ['Segoe UI', 'Segoe UI Emoji', 'Calibri', 'Cambria', 'Consolas', 'Tahoma', 'MS UI Gothic', 'Bahnschrift', 'Segoe Fluent Icons', 'Ink Free'],
     mac: ['Helvetica Neue', 'Menlo', 'Monaco', 'Geneva', 'Avenir Next', 'SF Pro', 'Apple Color Emoji', 'PingFang SC', 'Hiragino Sans', 'Baskerville'],
-    linux: ['DejaVu Sans', 'Liberation Sans', 'Noto Color Emoji', 'Ubuntu', 'Cantarell', 'Nimbus Sans'],
+    linux: ['DejaVu Sans', 'Liberation Sans', 'Noto Color Emoji', 'Ubuntu', 'Cantarell', 'Nimbus Sans', 'Noto Sans', 'Bitstream Vera Sans', 'Source Sans 3', 'Fira Sans'],
     android: ['Roboto', 'Noto Sans CJK JP', 'Droid Sans Mono'],
     chromeos: ['Google Sans'],
 } as const;

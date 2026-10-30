@@ -180,6 +180,12 @@ final class EnvironmentConsistency
         // The same two findings when every lied API is a read-back surface: a noise
         // extension, i.e. the honest visitor the read-back codes weight at 4. 6, soft.
         'lie_battery_noise_tool' => 6,
+        // The lie battery alone, on identity getters only (Navigator, Screen, Date/Intl time zone),
+        // in the page realm only (the worker disagrees) and with no other conformance tell: a
+        // User-Agent switcher or JShelter-class extension. It is still a lie, so it keeps a
+        // weight (15), but it is not scored as the fraud-tool footprint (35) and stacked with
+        // `worker_vs_window_*` into `block`.
+        'lie_battery_privacy_tool' => 15,
         'realm_tostring_noise_tool' => 6,
         'domrect_inconsistent' => 25,
         'svg_text_inconsistent' => 20,
@@ -533,6 +539,12 @@ final class EnvironmentConsistency
                     : null,
             ],
             [
+                'code' => 'lie_battery_privacy_tool',
+                'rule' => fn (mixed $c, TransportIntegrityResult $t): ?string => $this->liedApiClass($c, 'lie_battery_failed', ['integrity', 'data', 'lieBattery', 'lied']) === 'privacy'
+                    ? 'Navigator, Screen or time-zone getters are wrapped in the page only (the worker disagrees) and nothing else about the environment is patched: the footprint of a privacy or User-Agent-switcher extension.'
+                    : null,
+            ],
+            [
                 'code' => 'lie_battery_noise_tool',
                 'rule' => fn (mixed $c, TransportIntegrityResult $t): ?string => $this->liedApiClass($c, 'lie_battery_failed', ['integrity', 'data', 'lieBattery', 'lied']) === 'noise'
                     ? 'A native function on a read-back surface (canvas, WebGL, audio buffers or element rectangles) is wrapped, the footprint of a noise extension.'
@@ -605,8 +617,28 @@ final class EnvironmentConsistency
 
                     $ua = $this->value($c, 'tier1', 'environment', 'identity', 'userAgent');
                     $high = $this->value($c, 'tier1', 'uaClientHints', 'high', 'uaFullVersion');
+                    $list = $this->value($c, 'tier1', 'uaClientHints', 'high', 'fullVersionList');
 
-                    if (! is_string($ua) || ! is_string($high)) {
+                    if (! is_string($ua)) {
+                        return null;
+                    }
+
+                    // Opera, Samsung Internet, Yandex and the rest report their OWN version as
+                    // `uaFullVersion` and carry the Chromium version in the `Chrome/` token, so
+                    // the two honestly differ. The `Chromium` entry of the version list is the
+                    // engine version in every Chromium browser: the same comparison the header
+                    // rule (`checkFullVersionList`) makes. Without that entry the rule falls
+                    // back to `uaFullVersion` for a plain Chrome UA only.
+                    $chromiumMajor = self::chromiumMajorFromVersionList($list);
+                    if ($chromiumMajor !== null) {
+                        $tokenMajor = preg_match('/Chrome\/(\d+)/', $ua, $m) === 1 ? (int) $m[1] : null;
+
+                        return ($tokenMajor !== null && $tokenMajor !== $chromiumMajor)
+                            ? 'The Chrome version in navigator.userAgent disagrees with the Chromium entry of getHighEntropyValues fullVersionList.'
+                            : null;
+                    }
+
+                    if (! is_string($high) || preg_match('/(?:OPR|SamsungBrowser|YaBrowser|Vivaldi|UCBrowser|Edg\w*)\//', $ua) === 1) {
                         return null;
                     }
 
@@ -674,6 +706,16 @@ final class EnvironmentConsistency
                     // in-app browser is a real user on a real device, and this is the
                     // check that put it in band `challenge`.
                     if (str_contains($ua, '; wv') || str_contains($ua, 'Version/4.0')) {
+                        return null;
+                    }
+
+                    // Android Chrome and iOS Chrome have no PDF plugin set at all, and a desktop
+                    // Chrome whose built-in PDF viewer is switched off (policy, or "download PDFs")
+                    // reports `pdfViewerEnabled === false` with an empty list. Both are honest.
+                    // What is left is a desktop Chrome that claims a PDF viewer (or never says)
+                    // and lists nothing.
+                    if (str_contains($ua, 'Mobile') || str_contains($ua, 'Android')
+                        || $this->value($c, 'tier1', 'environment', 'identity', 'pdfViewerEnabled') === false) {
                         return null;
                     }
 
@@ -916,6 +958,17 @@ final class EnvironmentConsistency
                         return null;
                     }
 
+                    // Hybrid graphics: a laptop with an integrated and a discrete GPU exposes both,
+                    // and `requestAdapter()` with no preference may pick a different one from
+                    // WebGL's default context. Intel, AMD and NVIDIA are the vendors that ship in
+                    // such pairs (Intel+NVIDIA, AMD+NVIDIA, Intel+AMD, AMD+AMD), so a disagreement
+                    // among them is a laptop, not a lie. What stays impossible on one machine is
+                    // everything else: Apple, Qualcomm, Arm or PowerVR next to a PC GPU vendor.
+                    $hybrid = ['intel', 'amd', 'nvidia'];
+                    if (in_array($fromWebgpu, $hybrid, true) && in_array($fromWebgl, $hybrid, true)) {
+                        return null;
+                    }
+
                     return 'The WebGPU adapter vendor and the WebGL renderer name belong to different GPU vendor families.';
                 },
             ],
@@ -1151,12 +1204,22 @@ final class EnvironmentConsistency
                     }
 
                     $uaFamily = self::uaOsFamily($ua);
-                    $platformFamily = $this->platformOsFamily($platform);
                     $hintFamily = $hintPlatform === null ? null : $this->platformOsFamily(trim($hintPlatform, '"'));
+
+                    // An ARM suffix (`Linux armv8l`, `Linux aarch64`) is Android only when the
+                    // browser says so elsewhere; a Raspberry Pi or an Asahi laptop reports the
+                    // same suffix and is an honest Linux.
+                    $platformFamily = $this->platformOsFamily($platform, $uaFamily === 'android' || $hintFamily === 'android');
 
                     if ($uaFamily === null || $platformFamily === null) {
                         return null;
                     }
+
+                    // ChromeOS reports a Linux `navigator.platform` by design (and a Chrome OS
+                    // Sec-CH-UA-Platform), so the two are one family for this comparison.
+                    $uaFamily = $uaFamily === 'chromeos' ? 'linux' : $uaFamily;
+                    $platformFamily = $platformFamily === 'chromeos' ? 'linux' : $platformFamily;
+                    $hintFamily = $hintFamily === 'chromeos' ? 'linux' : $hintFamily;
 
                     // Client-Hints is authoritative where it exists, because it is what
                     // the browser reported about itself rather than a string it chose.
@@ -1720,6 +1783,14 @@ final class EnvironmentConsistency
                         return null;
                     }
 
+                    // Brave Balanced snaps `screen` to a few sizes and reports CSS device-width as
+                    // the viewport plus a small random amount, so both honestly miss. Silent only
+                    // when the engine evidence agrees with the client-reported Brave flag (the gate
+                    // `canvas_realm_mismatch` uses), so a forged flag buys nothing on Gecko/WebKit.
+                    if (self::engineEvidence($c, $t)['chromium'] && $this->value($c, 'integrity', 'data', 'resistance', 'brave') === true) {
+                        return null;
+                    }
+
                     return (! $width && ! $height)
                         ? 'screen.width and screen.height both differ from the device size the CSS media path reports.'
                         : null;
@@ -1869,13 +1940,61 @@ final class EnvironmentConsistency
             return 'identity';
         }
 
+        $allNoise = true;
+        $allPrivacy = true;
         foreach ($apis as $api) {
             if (! self::isNoiseSurface($api)) {
-                return 'identity';
+                $allNoise = false;
+            }
+            if (! self::isPrivacyToolSurface($api)) {
+                $allPrivacy = false;
             }
         }
 
-        return 'noise';
+        if ($allNoise) {
+            return 'noise';
+        }
+
+        // Only the lie battery itself (`lie_battery_failed`) can be a privacy-tool footprint; a
+        // patched `toString` in a pristine realm is a spoofer hiding its work.
+        return ($finding === 'lie_battery_failed' && $allPrivacy && $this->isPageOnlyPatch($claims)) ? 'privacy' : 'identity';
+    }
+
+    /**
+     * The identity getters a privacy or User-Agent-switcher extension wraps. NOT
+     * `Navigator.webdriver` (hiding it is an automation evasion), `Permissions.query`, `Math`,
+     * `Function.toString` or any canvas/WebGL surface.
+     */
+    private static function isPrivacyToolSurface(string $api): bool
+    {
+        return (str_starts_with($api, 'Navigator.') && $api !== 'Navigator.webdriver')
+            || str_starts_with($api, 'Screen.')
+            || $api === 'Date.getTimezoneOffset'
+            || $api === 'Intl.DateTimeFormat.resolvedOptions';
+    }
+
+    /**
+     * Whether the patch is confined to the page realm and hides nothing: the dedicated worker
+     * disagrees with the page about an identity field, and none of the other conformance
+     * findings (closure getter, patched descriptor, shadowing, a patched `toString` seen from a
+     * pristine realm, `Math` lookup tables) fired. A spoofer that covers its tracks trips at
+     * least one of them; a plain extension trips none.
+     *
+     * @param  array<array-key, mixed>  $claims
+     */
+    private function isPageOnlyPatch(mixed $claims): bool
+    {
+        if ($this->workerDisagreements($claims, ['userAgent', 'platform', 'hardwareConcurrency', 'deviceMemory', 'language', 'languages', 'timeZone', 'tzOffset', 'uaPlatform', 'uaMobile', 'uaBrands']) === []) {
+            return false;
+        }
+
+        foreach (['wrong_receiver_did_not_throw', 'descriptor_patched', 'descriptor_unstable', 'descriptor_has_setter', 'descriptor_shadowed', 'descriptor_missing', 'realm_tostring_mismatch', 'math_pf_mismatch'] as $code) {
+            if ($this->fromIntegrity($claims, $code) !== null) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -2184,6 +2303,26 @@ final class EnvironmentConsistency
         return $effective;
     }
 
+    /**
+     * The major version of the `Chromium` entry of a `fullVersionList`, or null when the list
+     * has no such entry (not Chromium, or a hostile body).
+     */
+    private static function chromiumMajorFromVersionList(mixed $list): ?int
+    {
+        if (! is_array($list)) {
+            return null;
+        }
+
+        foreach ($list as $entry) {
+            if (is_array($entry) && ($entry['brand'] ?? null) === 'Chromium' && is_string($entry['version'] ?? null)
+                && preg_match('/^(\d+)/', $entry['version'], $m) === 1) {
+                return (int) $m[1];
+            }
+        }
+
+        return null;
+    }
+
     private function majorFromUserAgent(string $userAgent): ?int
     {
         // Ordered most-specific first: Chrome's token also appears in Edge's and
@@ -2485,14 +2624,15 @@ final class EnvironmentConsistency
      * generic `linux` arm because Chromium on Android reports `Linux armv8l` /
      * `Linux aarch64` while Sec-CH-UA-Platform says `Android`.
      */
-    private function platformOsFamily(string $platform): ?string
+    private function platformOsFamily(string $platform, bool $androidContext = true): ?string
     {
         $needle = strtolower($platform);
 
         // Android's deliberately-chosen platform strings, before the generic `linux`
         // arm can claim them. `Linux armv8l` is the one Chromium emits on Android;
-        // `Linux aarch64` is what an Android WebView build reports.
-        if (preg_match('/\barmv?\d*l?\b|aarch64\b/', $needle) === 1) {
+        // `Linux aarch64` is what an Android WebView build reports. Read as Android only in
+        // an Android context (the default keeps the other callers' behaviour).
+        if ($androidContext && preg_match('/\barmv?\d*l?\b|aarch64\b/', $needle) === 1) {
             return 'android';
         }
 

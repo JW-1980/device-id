@@ -225,11 +225,15 @@ final class TransportIntegrity
         }
 
         if ($get('sec-ch-ua') !== null && $get('sec-ch-ua-mobile') === null) {
-            $findings[] = TransportFinding::hard(
-                'sec_ch_partial_default_set',
-                'Sec-CH-UA is present without Sec-CH-UA-Mobile. The RFC 8941 default low-entropy set always travels together, '
-                    .'so one without the other means the headers were assembled by hand.',
-            );
+            // The default low-entropy set travels together from a browser, but a proxy or WAF
+            // that strips one hint and forwards the other produces the same request for every
+            // Chromium visitor behind it. Hard only when the headers are the client's own frame
+            // (the D4 lesson: a header check behind an edge judges the edge).
+            $detail = 'Sec-CH-UA is present without Sec-CH-UA-Mobile. The RFC 8941 default low-entropy set always travels together, '
+                .'so one without the other means the headers were assembled by hand or a proxy dropped one.';
+            $findings[] = $facts->headersAreClientFrame
+                ? TransportFinding::hard('sec_ch_partial_default_set', $detail)
+                : TransportFinding::soft('sec_ch_partial_default_set', $detail);
         }
 
         $versionMismatch = $this->checkFullVersionList($get('sec-ch-ua-full-version-list'), $get('user-agent'));

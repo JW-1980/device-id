@@ -279,11 +279,33 @@ final class TransportIntegrityTest extends TestCase
     }
 
     #[Test]
-    public function sec_ch_ua_without_mobile_is_a_hard_finding(): void
+    public function sec_ch_ua_without_mobile_is_hard_only_when_the_headers_are_the_clients_own_frame(): void
     {
         $headers = [['sec-ch-ua', '"Chromium";v="141"']];
 
-        self::assertSame(['sec_ch_partial_default_set'], $this->hardCodes($headers));
+        self::assertSame(['sec_ch_partial_default_set'], $this->hardCodes($headers, new TransportRequestFacts(headersAreClientFrame: true)));
+    }
+
+    /**
+     * A proxy or WAF that strips `Sec-CH-UA-Mobile` but forwards `Sec-CH-UA` produced this request
+     * for every Chromium visitor behind it; as a hard finding it put all of them in `challenge`.
+     */
+    #[Test]
+    public function sec_ch_ua_without_mobile_behind_an_edge_is_only_soft(): void
+    {
+        $headers = [['sec-ch-ua', '"Chromium";v="141"']];
+
+        self::assertSame([], $this->hardCodes($headers));
+        self::assertContains('sec_ch_partial_default_set', $this->codes($headers), 'still recorded, so an operator can see the edge');
+    }
+
+    #[Test]
+    public function a_complete_default_client_hint_set_is_silent_in_both_frames(): void
+    {
+        $headers = [['sec-ch-ua', '"Chromium";v="141"'], ['sec-ch-ua-mobile', '?0']];
+
+        self::assertNotContains('sec_ch_partial_default_set', $this->codes($headers));
+        self::assertNotContains('sec_ch_partial_default_set', $this->codes($headers, new TransportRequestFacts(headersAreClientFrame: true)));
     }
 
     // ---------------------------------------------------------------------

@@ -125,6 +125,20 @@ describe('fontFaces', () => {
         await expect(fontFaces()).resolves.toEqual({ state: 'unavailable', reason: 'check-dishonest' });
     });
 
+    it('counts a minimal Linux (Noto Sans only, Wine fonts installed) as Linux, so fonts_vs_ua_os has no honest firing', async () => {
+        // A container or kiosk without DejaVu/Liberation/Ubuntu/Cantarell/Nimbus, with Wine's
+        // Windows clones installed: before the list gained Noto Sans, Bitstream Vera Sans,
+        // Source Sans 3 and Fira Sans this read as linux 0 / windows >= 4.
+        const installed = new Set(['Noto Sans', 'Segoe UI', 'Calibri', 'Cambria', 'Consolas', 'Tahoma']);
+        installFontFace((family) => installed.has(family));
+
+        const result = await fontFaces();
+        expect(result.state).toBe('ok');
+        if (result.state !== 'ok') return;
+        expect(result.value.linux).toBe(1);
+        expect(result.value.windows).toBe(5);
+    });
+
     it('loads every family through local() and reports only the total and per-OS counts', async () => {
         const installed = new Set(['Segoe UI', 'Calibri', 'DejaVu Sans', 'Liberation Sans', 'Noto Color Emoji', 'Roboto', 'Google Sans']);
         const fake = installFontFace((family) => installed.has(family));
