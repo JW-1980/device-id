@@ -156,3 +156,23 @@ describe('behavior', () => {
         expect(json).not.toMatch(/null|Infinity|NaN/);
     });
 });
+
+describe('behavior payload size', () => {
+    beforeEach(() => resetBehaviorForTests());
+    afterEach(() => resetBehaviorForTests());
+
+    it('stays inside the body budget when every statistic is populated (measured 1 879 B in Chromium)', () => {
+        startBehaviorCollection();
+        for (let i = 0; i < 400; i++) {
+            window.dispatchEvent(new MouseEvent('pointermove', { clientX: i * 3, clientY: i * 2 }));
+            window.dispatchEvent(new KeyboardEvent('keydown', { code: `Key${String.fromCharCode(65 + (i % 26))}`, location: i % 4 }));
+            window.dispatchEvent(new KeyboardEvent('keyup', { code: `Key${String.fromCharCode(65 + (i % 26))}` }));
+            window.dispatchEvent(new WheelEvent('wheel', { deltaY: i * 1.37, deltaX: i * 0.11, deltaMode: i % 3 }));
+        }
+
+        const bytes = new TextEncoder().encode(JSON.stringify(snapshotValue())).byteLength;
+        // The transport ceiling is 24 KiB for a whole envelope; the whole behaviour block must
+        // stay a small fraction of it, whatever the visitor did.
+        expect(bytes).toBeLessThan(3000);
+    });
+});

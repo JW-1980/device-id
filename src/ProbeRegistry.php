@@ -116,6 +116,13 @@ final class ProbeRegistry
         'parallelism' => [self::TIER_HARDWARE, false, 'device', 'Measured parallel capacity from timed workers, compared with the reported core count; a CDP or Brave override of hardwareConcurrency cannot change the measurement. Costs CPU; off by default.'],
         'keyboardLayout' => [self::TIER_HARDWARE, false, 'device', 'A hash of the physical keyboard layout map (Chromium desktop only).'],
         'gpuMath' => [self::TIER_HARDWARE, false, 'device', 'How the GPU rounds transcendental arithmetic in a shader, read back as pixels; the same across browsers on the same driver, so a cross-browser matcher component. Absent on software renderers.'],
+        // --- Tier 2, merged in from the second host's collector (probe set 3) ---------
+        // Neither feeds a key. `webrtc` moves with the browser build (a codec list changes at
+        // a browser update), so it is no device fact; `behavior` is session data that differs
+        // on every visit. `DeviceKeyDeriver` keeps the whole tier-2 block out of `browser_key`
+        // and `DeviceComponents` has no component for either.
+        'webrtc' => [self::TIER_TWO, false, 'engine', 'Audio and video codecs, RTCP feedback and RTP header extensions from a local WebRTC offer; no ICE gathering, no address. A browser-build signal, in no key.'],
+        'behavior' => [self::TIER_TWO, false, 'environment', 'Passive aggregates of pointer, keyboard, wheel, touch and motion input on the page (counts, timing statistics, a hash of the physical key codes; no coordinates, no typed characters). Session data, in no key; unavailable when the visitor has not touched the page.'],
     ];
 
     /**
@@ -125,7 +132,7 @@ final class ProbeRegistry
      * ({@see PROBE_SET_ADDED}); without that, an honest page left open across a deploy reads
      * as a client that dropped every probe added since.
      */
-    public const PROBE_SET = 2;
+    public const PROBE_SET = 3;
 
     /**
      * The probe set a body WITHOUT a `probes` marker is judged against: the collector on
@@ -157,6 +164,8 @@ final class ProbeRegistry
         'parallelism' => 2,
         'keyboardLayout' => 2,
         'gpuMath' => 2,
+        'webrtc' => 3,
+        'behavior' => 3,
     ];
 
     /**

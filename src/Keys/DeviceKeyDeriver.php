@@ -47,11 +47,7 @@ final class DeviceKeyDeriver
 
     /**
      * Tier-1 probes excluded from `browser_key`: user preferences, window state, the
-     * raw stack depth, the hardware probe, and the engine-identity marks.
-     *
-     * The client no longer collects `stackDepth` (round 2), but a page cached before that
-     * deploy still sends it; excluding it keeps those browsers on the same key as after
-     * their next page load.
+     * hardware probe, and the engine-identity marks.
      *
      * `engineIdentity` is excluded for two reasons. It is a consistency input (the rule
      * `ua_vs_engine` compares it with the User-Agent), not a device fact: every V8 on
@@ -62,7 +58,7 @@ final class DeviceKeyDeriver
      *
      * @var list<string>
      */
-    private const EXCLUDED_TIER1_PROBES = ['cssMedia', 'stackDepth', 'architecture', 'engineIdentity'];
+    private const EXCLUDED_TIER1_PROBES = ['cssMedia', 'architecture', 'engineIdentity'];
 
     /**
      * Logical paths inside `tier1.environment` excluded from `browser_key`.

@@ -101,11 +101,9 @@ final class CheckRegistry
         'touch_vs_pointer_media' => [6, 'environment', 'A touch screen is reported while no media query matches a coarse pointer.'],
         'tz_vs_lang_region' => [4, 'environment', 'The timezone is not one of the regions the language list implies.'],
 
-        // --- Opt-in: shipped at 0, a host enables them through its weights ------------
-        'renderer_vs_limits' => [0, 'environment', 'A WebGL limit is below the published WebGL 1.0/2.0 specification minimum, which no hardware implementation reports.'],
-        'ch_platform_vs_gpu' => [0, 'environment', 'The WebGL renderer names a GPU family that cannot exist on the claimed operating system (for example an Apple GPU on Windows).'],
-        'storage_quota_round' => [0, 'environment', 'The storage quota is an exact power of two, which no browser reports.'],
-        'stack_depth_anomalous' => [0, 'environment', 'The probe stack depth is outside the range a real page load produces.'],
+        // --- WebGL: the renderer and its limits against the claimed platform ----------
+        'renderer_vs_limits' => [12, 'environment', 'A WebGL limit is below the published WebGL 1.0/2.0 specification minimum, which no hardware implementation reports.'],
+        'ch_platform_vs_gpu' => [10, 'environment', 'The WebGL renderer names a GPU family that cannot exist on the claimed operating system (for example an Apple GPU on Windows or Direct3D on macOS).'],
         'ua_vs_engine' => [30, 'environment', 'The User-Agent names one browser engine while the JavaScript engine identifies itself as another (V8, SpiderMonkey or JavaScriptCore, read from error-object shape).'],
         'ua_vs_feature_version' => [25, 'environment', 'The User-Agent version disagrees with the ECMAScript and web features the engine actually exposes, by three or more releases.'],
         'worker_vs_window_navigator' => [30, 'environment', 'A dedicated worker reports a different user agent, platform, core count, memory, Client-Hints platform/mobile/brands, engine or ICU build than the page, so the page values are patched.'],

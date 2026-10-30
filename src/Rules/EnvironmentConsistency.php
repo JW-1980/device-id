@@ -302,22 +302,21 @@ final class EnvironmentConsistency
         // Removed: `audio_unavailable_but_reported` (fired on an absent probe; weight 0
         // since notes/07).
 
-        // OPT-IN rules, shipped at weight 0 (silenced) so a host whose collector does not
-        // send their inputs, or that has not measured them on its own traffic, is not
-        // affected. A host enables one by setting a weight in
-        // `fingerprint.constraint_weights`. WelZoLekker runs all four (renderer_vs_limits 12,
-        // ch_platform_vs_gpu 10, storage_quota_round 10, stack_depth_anomalous 6).
-        //
-        // `renderer_vs_limits` compares the WebGL limits with the PUBLISHED specification
-        // minima only, so unlike a renderer-family table it cannot go stale.
-        // `ch_platform_vs_gpu` uses only GPU families that cannot coexist with the claimed
-        // OS (an Apple GPU on Windows). `storage_quota_round` reads
-        // `tier2.storageEstimate` and `stack_depth_anomalous` reads `tier1.stackDepth`,
-        // which only some collectors send.
-        'renderer_vs_limits' => 0,
-        'ch_platform_vs_gpu' => 0,
-        'storage_quota_round' => 0,
-        'stack_depth_anomalous' => 0,
+        // WebGL limits below the PUBLISHED specification minima: no hardware implementation
+        // reports them, and the minima are the spec's, not a vendor table, so the rule cannot go
+        // stale with a new GPU model. It fires only on a context that lies about its own limits,
+        // which is rare and unambiguous: 12, between `gpu_webgpu_vs_webgl` (10) and
+        // `gpu_webgl_params_mismatch` (20). Read from `tier2.gpu.webgl.limits`.
+        'renderer_vs_limits' => 12,
+        // A renderer family that cannot exist on the claimed OS (Direct3D on macOS, an Apple GPU
+        // on Windows). The one rule here that can be wrong for a real visitor (Windows 11 ARM in
+        // a VM, an exotic Mesa build), so it sits at 10, below `lied_os` (20), and the pairs it
+        // fires on are an explicit table (see `contradictingGpuFamilies`). Weights of this rule
+        // and the one above are reasoned from the failure cases, not measured on traffic.
+        'ch_platform_vs_gpu' => 10,
+        // Removed: `storage_quota_round` (no collector sends `storageEstimate`, and a round quota
+        // is a plausible real answer, so the rule had no input and weak evidence) and
+        // `stack_depth_anomalous` (the stackDepth probe is gone: a constant in V8).
 
         // Prior art, ported from fingerprintjs2's hasLied* family.
         'lied_languages' => 15,
@@ -1519,26 +1518,29 @@ final class EnvironmentConsistency
             // A WebGL context that reports less than the specification's minimum limits is
             // not a hardware implementation. This is not a renderer-family table: it uses
             // only the published WebGL minima, so it cannot go stale with a new GPU model.
+            // Read from `tier2.gpu.webgl` (renderer, limits, webgl2), the shape the collector
+            // sends; the software rasterisers are skipped because their limits are chosen by
+            // the software, not by hardware.
             [
                 'code' => 'renderer_vs_limits',
                 'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
-                    $gpu = $this->value($c, 'tier2', 'gpu');
+                    $webgl = $this->value($c, 'tier2', 'gpu', 'webgl');
 
-                    if (! is_array($gpu) || ($gpu['software'] ?? false) === true) {
+                    if (! is_array($webgl) || self::isSoftwareRenderer($webgl['renderer'] ?? null)) {
                         return null;
                     }
 
-                    $limits = $gpu['limits'] ?? null;
+                    $limits = $webgl['limits'] ?? null;
                     if (! is_array($limits)) {
                         return null;
                     }
 
-                    // The minima are the published WebGL 1.0/2.0 specification floors,
-                    // not a measured vendor table. A real implementation cannot report
-                    // below them, so this rule cannot go stale with a new GPU model. The
-                    // WebGL2 floors are higher for every checked limit, not just vertex
-                    // attribs; using the WebGL1 floor under a WebGL2 context would let a
-                    // spoofed context under-report the other limits without firing.
+                    // The minima are the published WebGL 1.0 (OpenGL ES 2.0) and WebGL 2.0
+                    // (OpenGL ES 3.0) floors, not a measured vendor table. A real
+                    // implementation cannot report below them. The WebGL2 floors are higher for
+                    // every checked limit, not just vertex attribs; using the WebGL1 floor under
+                    // a WebGL2 context would let a spoofed context under-report the other
+                    // limits without firing.
                     $minimums = [
                         'MAX_VERTEX_ATTRIBS' => 8,
                         'MAX_VERTEX_UNIFORM_VECTORS' => 128,
@@ -1548,7 +1550,7 @@ final class EnvironmentConsistency
                         'MAX_TEXTURE_IMAGE_UNITS' => 8,
                     ];
 
-                    if (($gpu['webgl2'] ?? false) === true) {
+                    if (($webgl['webgl2'] ?? false) === true) {
                         $minimums = [
                             'MAX_VERTEX_ATTRIBS' => 16,
                             'MAX_VERTEX_UNIFORM_VECTORS' => 256,
@@ -1562,6 +1564,8 @@ final class EnvironmentConsistency
                     foreach ($minimums as $name => $minimum) {
                         $value = $limits[$name] ?? null;
 
+                        // The collector writes -1 for a limit that did not read as a number;
+                        // that is "unknown", never "below the minimum".
                         if ((is_int($value) || is_float($value)) && $value >= 0 && $value < $minimum) {
                             return sprintf(
                                 'The WebGL %s limit is %s, below the specification minimum of %d.',
@@ -1576,21 +1580,18 @@ final class EnvironmentConsistency
                 },
             ],
 
-            // A renderer family that cannot exist on the claimed OS. The markers are limited
-            // to unambiguous ones: Apple GPUs on Windows/Linux, Direct3D on macOS/Android, and
-            // mobile GPUs on Apple desktops. Windows-on-ARM Adreno and Linux Mali are real, so
-            // those combinations are deliberately silent.
+            // A renderer family that cannot exist on the claimed OS. The pairs are an explicit
+            // table (`contradictingGpuFamilies`), limited to unambiguous ones; the real-world
+            // combinations that look odd (Windows-on-ARM Adreno, Linux boards with Mali, Apple
+            // GPUs under Asahi Linux, Chromebooks with Mali/Adreno, Mesa under Android-x86, the
+            // Direct3D-backed Mesa of WSL) are deliberately silent. Read from
+            // `tier2.gpu.webgl.renderer`, the unmasked renderer where the browser exposes it.
             [
                 'code' => 'ch_platform_vs_gpu',
                 'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
-                    $gpu = $this->value($c, 'tier2', 'gpu');
+                    $rendererValue = $this->value($c, 'tier2', 'gpu', 'webgl', 'renderer');
 
-                    if (! is_array($gpu) || ($gpu['software'] ?? false) === true) {
-                        return null;
-                    }
-
-                    $renderer = is_string($gpu['renderer'] ?? null) ? strtolower($gpu['renderer']) : '';
-                    if ($renderer === '') {
+                    if (! is_string($rendererValue) || $rendererValue === '' || self::isSoftwareRenderer($rendererValue)) {
                         return null;
                     }
 
@@ -1606,23 +1607,8 @@ final class EnvironmentConsistency
                         return null;
                     }
 
-                    $gpuFamily = $this->gpuPlatformFamily($renderer);
-                    if ($gpuFamily === null || $gpuFamily === $family) {
-                        return null;
-                    }
-
-                    // Apple GPUs are macOS and iOS GPUs; the family name differs but the
-                    // hardware family does not.
-                    if ($gpuFamily === 'apple' && in_array($family, ['macos', 'ios'], true)) {
-                        return null;
-                    }
-
-                    // Windows-on-ARM uses Adreno; Linux boards use Mali/PowerVR. Neither is
-                    // a contradiction. ChromeOS is Mesa-based, so its renderer reads Linux.
-                    if ($gpuFamily === 'mobile' && in_array($family, ['windows', 'linux', 'android'], true)) {
-                        return null;
-                    }
-                    if ($gpuFamily === 'linux' && $family === 'chromeos') {
+                    $gpuFamily = $this->gpuPlatformFamily(strtolower($rendererValue));
+                    if ($gpuFamily === null || ! in_array($family, self::contradictingGpuFamilies($gpuFamily, $rendererValue), true)) {
                         return null;
                     }
 
@@ -1631,46 +1617,6 @@ final class EnvironmentConsistency
                         $gpuFamily,
                         $family,
                     );
-                },
-            ],
-
-            // A storage quota that is an exact power of two is a synthetic answer. The
-            // research measured real quotas landing on odd values. Needs a real
-            // StorageManager, so it fires rarely; kept because it is nearly free.
-            [
-                'code' => 'storage_quota_round',
-                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
-                    $quota = $this->value($c, 'tier2', 'storageEstimate', 'quota');
-
-                    if (! is_int($quota) && ! is_float($quota)) {
-                        return null;
-                    }
-
-                    $quota = (int) $quota;
-
-                    return ($quota > 0 && ($quota & ($quota - 1)) === 0)
-                        ? sprintf('The reported storage quota %d is an exact power of two.', $quota)
-                        : null;
-                },
-            ],
-
-            // stackDepth: the raw frame count is only 0.78 stable in-page, so it is
-            // compared as the *bucket* the client recorded. A bucket outside any range
-            // the collector has seen means the probe was invoked from a different call
-            // chain than a real page load produces.
-            [
-                'code' => 'stack_depth_anomalous',
-                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
-                    $bucketed = $this->value($c, 'tier1', 'stackDepth', 'bucketed');
-                    $inner = $this->value($c, 'tier1', 'stackDepth', 'innerDepth');
-
-                    if (! is_int($bucketed) || ! is_int($inner)) {
-                        return null;
-                    }
-
-                    return ($inner > $bucketed * 4 + 12)
-                        ? sprintf('The probe stack depth is %d frames inside a call chain whose outer depth buckets to %d.', $inner, $bucketed)
-                        : null;
                 },
             ],
 
@@ -2456,6 +2402,46 @@ final class EnvironmentConsistency
     }
 
     /**
+     * Whether a WebGL renderer string names a software rasteriser (SwiftShader, llvmpipe,
+     * softpipe, lavapipe, WARP / Basic Render, Mesa's offscreen paths): the same list the
+     * collector's `isSoftwareRenderer` uses, so the server never judges a software context by
+     * hardware rules.
+     */
+    public static function isSoftwareRenderer(mixed $renderer): bool
+    {
+        return is_string($renderer)
+            && preg_match('/swiftshader|llvmpipe|softpipe|lavapipe|\bwarp\b|basic render|software rasterizer|mesa offscreen/i', $renderer) === 1;
+    }
+
+    /**
+     * The OS families a GPU family cannot coexist with (`gpuPlatformFamily`'s result against
+     * `uaOsFamily`/`platformOsFamily`'s). An explicit table so every combination that is left
+     * silent is a decision, not an accident:
+     *
+     * - `apple`: Windows, Android, ChromeOS. NOT Linux: Asahi Linux runs on Apple Silicon and
+     *   reports the Apple GPU.
+     * - `windows` (Direct3D): macOS, iOS, Android, ChromeOS, and Linux except the Direct3D-backed
+     *   Mesa of WSL, whose renderer reads `D3D12 (…)`.
+     * - `mobile` (Adreno, Mali, PowerVR): macOS, iOS. Windows-on-ARM, Linux boards, Android and
+     *   Chromebooks all ship these.
+     * - `linux` (Mesa, X.Org): Windows, macOS, iOS. Android-x86 and Waydroid use Mesa.
+     *
+     * @return list<string>
+     */
+    private static function contradictingGpuFamilies(string $gpuFamily, string $renderer): array
+    {
+        return match ($gpuFamily) {
+            'apple' => ['windows', 'android', 'chromeos'],
+            'windows' => preg_match('/^\s*d3d12 \(/i', $renderer) === 1
+                ? ['macos', 'ios', 'android', 'chromeos']
+                : ['macos', 'ios', 'android', 'chromeos', 'linux'],
+            'mobile' => ['macos', 'ios'],
+            'linux' => ['windows', 'macos', 'ios'],
+            default => [],
+        };
+    }
+
+    /**
      * The OS a WebGL renderer string names, using only unambiguous families.
      *
      * Deliberately not a renderer-model table. `ANGLE (NVIDIA ...)` is intentionally
@@ -2517,7 +2503,8 @@ final class EnvironmentConsistency
             // string for a desktop Safari and must not be read as iOS.
             str_contains($needle, 'iphone'), str_contains($needle, 'ipad'), str_contains($needle, 'ipod') => 'ios',
             str_contains($needle, 'mac') => 'macos',
-            str_contains($needle, 'cros') => 'chromeos',
+            // `navigator.platform` is `CrOS x86_64`; Sec-CH-UA-Platform is `Chrome OS` (with a space).
+            str_contains($needle, 'cros'), str_contains($needle, 'chrome os') => 'chromeos',
             str_contains($needle, 'linux'), str_contains($needle, 'x11') => 'linux',
             default => null,
         };

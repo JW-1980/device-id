@@ -54,35 +54,43 @@ Composer then needs **read access to this repository**:
 ## Per-application configuration
 
 The engine reads everything through `Support\Config` (`Config::use()` with an array, or
-`Config::resolveWith()` with a live resolver). Two settings exist because each application runs
-its own browser collector:
+`Config::resolveWith()` with a live resolver). Two settings are worth knowing:
 
 | Key | Purpose |
 |---|---|
-| `fingerprint.constraint_weights` | Rule weights over the shipped table. A weight of 0 silences a rule. Four rules ship **opt-in** at 0: `renderer_vs_limits` (WebGL limits below the published spec minima), `ch_platform_vs_gpu` (GPU family impossible on the claimed OS), `storage_quota_round`, `stack_depth_anomalous`. |
-| `fingerprint.confidence_probes` | The probe catalogue for the confidence number: `'tier:probe' => ['weight' => int, 'charge' => float]`. When set it **replaces** the shipped list, so an application whose collector sends a different probe set is not charged for probes it never runs. |
+| `fingerprint.constraint_weights` | Rule weights over the shipped table. A weight of 0 silences a rule. Every shipped rule is on by default, including `renderer_vs_limits` (WebGL limits below the published spec minima, 12) and `ch_platform_vs_gpu` (a GPU family impossible on the claimed OS, 10). |
+| `fingerprint.confidence_probes` | An optional probe catalogue for the confidence number: `'tier:probe' => ['weight' => int, 'charge' => float]`. When set it **replaces** the shipped list. The shipped list is exactly the probe set of the one collector in this package (`tests/Unit/ProbeSetTest` keeps them equal), so a host needs no override; it exists for a host that ships a modified collector. |
 
-NutriCompare uses the shipped defaults (its admin screen writes `constraint_weights`).
-WelZoLekker enables the four opt-in rules and supplies its own catalogue (`config/fingerprint.php`
-there).
+## Browser collector
 
-## Browser collectors
+One collector runs in the visitor's browser, shipped as TypeScript sources under
+`resources/js/collector/`. The application's bundler compiles it, so nothing is published to npm.
+It speaks envelope version 3 (`{ v, nonce, slot, digest, claims, probes }`, two slots per challenge:
+`tier1` at once, `tier2` after tier 1 was answered 2xx). `resources/js/shared/xsrf.ts` reads the
+Laravel `X-XSRF-TOKEN` value.
 
-The collectors that run in the visitor's browser ship in this package too, as TypeScript
-sources under `resources/js/`. The application's bundler compiles them, so nothing is
-published to npm.
+| Entry | Exports / use |
+|---|---|
+| `@device-id/collector` (`index.ts`) | `collectAndSend(purpose, challengeUrl?, claimsUrl?)`, `collectAndSendDetailed` (says what happened), `collectAndConfirm` (resolves once tier 1 was accepted: a guest vote), `collectForIdentity` (both tiers in one claim set, no challenge), `reportDeclined`, `FINGERPRINT_VERSION`, diagnostics (`measureProbes`, ...) |
+| `@device-id/collector/boot` | `initFingerprint(options?)` for pages without a SPA. Reads `<body data-fingerprint-purpose="signin" data-fingerprint-challenge-url="..." data-fingerprint-claims-url="...">`; no purpose attribute, no collection; once per tab per purpose. |
 
-| Directory | Protocol | Used by | Notes |
-|---|---|---|---|
-| `resources/js/v3/` | envelope v3 (two slots, one nonce) | NutriCompare | worker/realm cross-checks, lie battery, integrity findings; Vitest suite in `v3/__tests__/` |
-| `resources/js/v2/` | envelope v2 | WelZoLekker | WebRTC, speech voices, passive behaviour probes; `boot.ts` starts collection |
-| `resources/js/shared/` | — | both | `xsrf.ts`: the Laravel `X-XSRF-TOKEN` header value |
+The purpose is any string your challenge endpoint accepts; the URLs default to
+`/security/fingerprint/challenge` and `/security/fingerprint/claims`. An operator can switch
+non-core probes off (`ProbeRegistry`, `disabled_probes`); the challenge response carries the list.
 
-Both are moved here unchanged. They are two collectors, not one: switching an application to
-the other one changes the claims it sends and therefore every device key it derives, so that
-is a migration (with key carry-over) and is not done by moving files.
+The collector is the merge of two collectors that had drifted apart. What was kept, by probe:
 
-A host maps `@device-id` to the installed package and imports a collector by version:
+| Part | Decision |
+|---|---|
+| Integrity probes, lie battery, phantom realm, worker/realm cross-checks, tier system, scheduler, canonicalisation, transport, protocol | NutriCompare's collector only: a strict superset of WelZoLekker's and the only one with tests |
+| `voices`, `permissions` (incl. `Notification.permission`), `gpu`, `uaClientHints`, `environment`, ... | NutriCompare's: same measurement as WelZoLekker's plus the fixes that one lacked (empty list is `unavailable`, listener cleanup, error names, WebGPU, WebGL1/2 agreement) |
+| `webrtc` (codec/extension hashes of a local offer) | ported from WelZoLekker's collector, changed: no `setLocalDescription` (no ICE gathering, no address can leak), locale-independent ordering; tier 2, no key |
+| `behavior` (passive input aggregates) | ported from WelZoLekker's collector, changed: listener lifecycle (stopped after the tier-2 snapshot), handlers cannot raise page errors; tier 2, `late`, no key (session data) |
+| `collectAndConfirm`, `boot.ts` | ported from WelZoLekker's collector; boot made host-configurable, retries after a transient failure |
+| `stackDepth` | **not ported**: a constant in V8, call-site dependent elsewhere, removed from NutriCompare's collector on evidence |
+| third "behaviour" envelope on page hide | **not ported**: the challenge store has two slots; behaviour rides in tier 2 |
+
+A host maps `@device-id` to the installed package and imports the collector:
 
 ```js
 // vite.config.js
@@ -98,7 +106,8 @@ export default defineConfig({
 ```
 
 ```js
-const { collectAndSend } = await import('@device-id/v3');
+const { collectAndSend } = await import('@device-id/collector');
+// or, on a Blade page:  import('@device-id/collector/boot').then(({ initFingerprint }) => initFingerprint());
 ```
 
 TypeScript hosts add `"@device-id/*": ["./vendor/jw-1980/device-id/resources/js/*"]` to
@@ -174,7 +183,7 @@ and the application depends on it.
 | Ingest orchestration (`FingerprintIngest`, `IngestOutcome`, `IngestContext`, `DeviceIdentityResolver`) | no — persistence and HTTP | yes |
 | `BotRiskScorer` | no — anti-scraping, not this engine | — |
 | Storage (device and observation rows), HTTP endpoints, admin screens | no | yes |
-| Client collectors (browser TypeScript) | **yes**: `resources/js/v3/` and `resources/js/v2/` (see "Browser collectors") | the bundler alias and the HTTP endpoints |
+| Client collectors (browser TypeScript) | **yes**: `resources/js/collector/` (see "Browser collector") | the bundler alias and the HTTP endpoints |
 
 ## How NutriCompare (Laravel) depends on it
 

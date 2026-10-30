@@ -53,6 +53,14 @@ import {
  * renderer, voice and font evidence; a body over this ceiling is never sent, which would be
  * a silent loss of identification, so the ceiling keeps about 1.6x headroom over that.
  *
+ * Re-measured for the merged collector on 2026-10-30 (headless Chromium 153, Linux container,
+ * software WebGL): tier-1 envelope 8 051 B, tier-2 envelope 7 393 B, the identify claim set
+ * (both tiers in one body) 13 854 B. The two probes the merge added are small: `webrtc` is about
+ * 150 B, and `behavior` is 917 B as sent in that run and 1 879 B with every pointer, key,
+ * wheel and motion statistic populated (the worst case, asserted in behavior.spec.ts). The
+ * largest realistic single body therefore stays under 16 KB; the former second collector's
+ * 32 KiB ceiling is not needed and is not adopted.
+ *
  * A CONSTANT that mirrors the DEFAULT of `security.fingerprint.max_body_bytes` (24576, env
  * `SECURITY_FINGERPRINT_MAX_BODY`); the page is not told the effective server value (round-3
  * CL3-9). So the env value must not be set BELOW 24576 without changing this constant in the

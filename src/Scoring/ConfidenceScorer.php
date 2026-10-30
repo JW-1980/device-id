@@ -46,6 +46,10 @@ final class ConfidenceScorer
         // never fails on a real engine, so its weight only has to make "the collector
         // did not send it" visible in `missing`.
         'tier1:engineIdentity' => ['weight' => 100, 'charge' => 1.0],
+        // Own-property counts and removed-API boundary: engine facts the collector sends on
+        // every load (the first also feeds `browser_key`). Nominal weights, unmeasured.
+        'tier1:objectShape' => ['weight' => 200, 'charge' => 1.0],
+        'tier1:removedApiBoundary' => ['weight' => 200, 'charge' => 1.0],
 
         // Tier 2 — deferred to idle time.
         'tier2:textMetrics' => ['weight' => 654, 'charge' => 0.25],
@@ -69,6 +73,17 @@ final class ConfidenceScorer
         'tier2:fontFaces' => ['weight' => 200, 'charge' => 0.25],
         'tier2:parallelism' => ['weight' => 100, 'charge' => 0.25],
         'tier2:gpuMath' => ['weight' => 100, 'charge' => 0.25],
+        // The ICU/tzdata build sizes (an engine build fact; moved from tier 1 in the collector).
+        'tier2:buildFingerprint' => ['weight' => 100, 'charge' => 0.25],
+        // Default-disabled in the registry like `parallelism`: excused by the policy, so the
+        // weight only matters to an operator who switches it on.
+        'tier2:keyboardLayout' => ['weight' => 50, 'charge' => 0.25],
+        // Merged in with probe set 3. Nominal, unmeasured. `behavior` is `unavailable` for a
+        // visitor who has not touched the page yet, which is common and honest, so it is
+        // weighted low enough that this never moves the coverage number by more than ~1 point;
+        // `webrtc` is `unavailable` where WebRTC is disabled (Tor, some privacy settings).
+        'tier2:webrtc' => ['weight' => 150, 'charge' => 0.25],
+        'tier2:behavior' => ['weight' => 100, 'charge' => 0.25],
 
         // Tier 2 — hardware probes (v3). Nominal weights, unmeasured.
         'tier2:fontMetrics' => ['weight' => 700, 'charge' => 0.25],
@@ -83,10 +98,10 @@ final class ConfidenceScorer
     /**
      * The probe catalogue: the shipped `WEIGHTS`, or the host's own list.
      *
-     * Each host runs its own collector, and a collector that does not send a probe the
-     * shipped list expects would be charged for it on every visit. A host whose collector
-     * sends a different probe set therefore supplies its catalogue in
-     * `fingerprint.confidence_probes` (`'tier:probe' => ['weight' => int, 'charge' => float]`),
+     * The shipped list is exactly the probe set of the one collector in this package
+     * (`tests/Unit/ProbeSetTest` keeps the two equal), so a host needs no override. The
+     * override stays for a host that ships a modified collector or wants other weights:
+     * it supplies its catalogue in `fingerprint.confidence_probes` (`'tier:probe' => ['weight' => int, 'charge' => float]`),
      * which REPLACES the shipped list. Malformed entries are skipped; an empty or absent
      * setting keeps the shipped list.
      *

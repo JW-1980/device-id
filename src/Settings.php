@@ -131,6 +131,11 @@ final class Settings
      * the collector's own `MAX_PAYLOAD_BYTES`, so a body the client agrees to send is one the
      * server agrees to read. 16 KiB until notes/22, when the identify body measured 15.1 KB
      * in a bare container.
+     *
+     * Re-measured for the merged collector (2026-10-30, headless Chromium 153): tier-1 envelope
+     * 8 051 B, tier-2 envelope 7 393 B, identify claim set 13 854 B; the largest `behavior`
+     * snapshot with every statistic populated is 1 879 B. No realistic body reaches 16 KB, so
+     * the former second collector's 32 KiB is not adopted.
      */
     public function maxBodyBytes(): int
     {

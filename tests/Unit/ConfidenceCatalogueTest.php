@@ -9,16 +9,16 @@ use NutriCompare\Fingerprint\Support\Config;
 use PHPUnit\Framework\TestCase;
 
 /**
- * A host-supplied probe catalogue (`fingerprint.confidence_probes`). The catalogue below is
- * WelZoLekker's: its collector sends `stackDepth`, `webrtc` and `behavior`, and does not
- * send the worker/realm probes the shipped list expects.
+ * A host-supplied probe catalogue (`fingerprint.confidence_probes`): the override mechanism
+ * stays, although the shipped list is exactly the probe set of the one collector in this
+ * package (see ProbeSetTest). The catalogue below is a small host list that drops most probes.
  */
 final class ConfidenceCatalogueTest extends TestCase
 {
     private const CATALOGUE = [
         'tier1:environment' => ['weight' => 1100, 'charge' => 1.0],
         'tier1:dateParsing' => ['weight' => 1014, 'charge' => 1.0],
-        'tier1:stackDepth' => ['weight' => 736, 'charge' => 1.0],
+        'tier1:codecs' => ['weight' => 617, 'charge' => 1.0],
         'tier2:voices' => ['weight' => 200, 'charge' => 0.25],
         'tier2:gpu' => ['weight' => 500, 'charge' => 0.25],
         'tier2:webrtc' => ['weight' => 250, 'charge' => 0.25],
@@ -55,7 +55,9 @@ final class ConfidenceCatalogueTest extends TestCase
         Config::reset();
 
         $this->assertArrayHasKey('tier1:engineIdentity', ConfidenceScorer::catalogue());
-        $this->assertArrayNotHasKey('tier2:webrtc', ConfidenceScorer::catalogue());
+        $this->assertArrayHasKey('tier2:webrtc', ConfidenceScorer::catalogue());
+        $this->assertArrayHasKey('tier2:behavior', ConfidenceScorer::catalogue());
+        $this->assertArrayNotHasKey('tier1:stackDepth', ConfidenceScorer::catalogue());
     }
 
     public function test_malformed_catalogue_entries_are_skipped(): void
