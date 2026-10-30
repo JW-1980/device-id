@@ -300,7 +300,8 @@ final class DeviceMatcher
      *   nothing (Firefox ETP-strict/private differ by 6, measured), above 6 disagrees.
      * - `gpu`: a WebGL class (`webgl:<engine>:<hash>`) is engine-conditioned, so two
      *   classes from different engines are neutral; WebGPU `vendor/architecture` compares
-     *   across engines.
+     *   whole within one engine and by vendor alone across engines (the architecture string is
+     *   each engine's own vocabulary); a WebGPU class against a WebGL class is neutral.
      * - `fonts`: Jaccard of the keyed pair-token sets; at or above `fonts_agree_jaccard`
      *   agrees, below `fonts_disagree_jaccard` disagrees, in between is neutral.
      *   Cross-engine Jaccard on one Linux machine measured 0.8 (8 of 10 pairs shared;
@@ -346,6 +347,33 @@ final class DeviceMatcher
             }
         }
 
+        if ($component === 'gpu') {
+            $mineKind = explode(':', $mine, 2)[0];
+            $otherKind = explode(':', $other, 2)[0];
+
+            // A WebGPU class against a WebGL class (one browser exposes WebGPU, the other does not:
+            // Firefox on Linux, older Safari) describes the same GPU in two vocabularies.
+            if ($mineKind !== $otherKind) {
+                return null;
+            }
+
+            // `webgpu:<vendor>/<architecture>`. Across engines only the vendor is comparable:
+            // Firefox returns empty strings, WebKit repeats the vendor word as the architecture
+            // and Chromium reports Dawn's own architecture name, so one Mac seen through Safari
+            // and Chrome differs in the architecture and always agrees on the vendor. Within one
+            // engine the architecture still separates two GPUs of one vendor.
+            if ($mineKind === 'webgpu') {
+                if ($myEngine !== null && $myEngine === $theirEngine) {
+                    return $mine === $other;
+                }
+
+                $mineVendor = explode('/', substr($mine, 7), 2)[0];
+                $otherVendor = explode('/', substr($other, 7), 2)[0];
+
+                return ($mineVendor === '' || $otherVendor === '') ? null : $mineVendor === $otherVendor;
+            }
+        }
+
         if ($component === 'fonts') {
             $similarity = DeviceComponents::fontsSimilarity($mine, $other);
             if ($similarity === null) {
@@ -353,6 +381,13 @@ final class DeviceMatcher
             }
             if ($similarity >= $settings['fonts_agree_jaccard']) {
                 return true;
+            }
+
+            // WebKit does not expose user-installed fonts (Safari's advanced protection), so its
+            // set is a subset of any other engine's on the same machine by construction: a
+            // difference across that boundary says nothing. Within one engine it still vetoes.
+            if ($myEngine !== $theirEngine && ($myEngine === 'webkit' || $theirEngine === 'webkit')) {
+                return null;
             }
 
             return $similarity < $settings['fonts_disagree_jaccard'] ? false : null;
