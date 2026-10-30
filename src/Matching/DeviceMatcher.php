@@ -257,6 +257,14 @@ final class DeviceMatcher
                 continue;
             }
 
+            // `keyboard` is agree-only for the same reason: a person adds a layout or switches
+            // input language, which must never read as another device. `gpuCaps` is agree-only
+            // because a driver update changes a feature list. (`codecsHw` is exact: a
+            // hardware-codec bit changes with the hardware or an OS media update.)
+            if (in_array($name, ['keyboard', 'gpuCaps'], true) && $agreement !== true) {
+                continue;
+            }
+
             if ($agreement === null) {
                 continue;
             }
@@ -327,6 +335,13 @@ final class DeviceMatcher
             $mineEngine = explode(':', $mine, 3)[1] ?? '';
             $otherEngine = explode(':', $other, 3)[1] ?? '';
             if ($mineEngine !== $otherEngine) {
+                return null;
+            }
+        }
+
+        if ($component === 'gpuCaps' && str_starts_with($mine, 'caps:') && str_starts_with($other, 'caps:')) {
+            // `caps:<engine>:<class>`: lists from different engines say nothing.
+            if ((explode(':', $mine, 3)[1] ?? '') !== (explode(':', $other, 3)[1] ?? '')) {
                 return null;
             }
         }

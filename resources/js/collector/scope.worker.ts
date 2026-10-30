@@ -39,6 +39,7 @@ import {
     CANVAS_REALM_HEIGHT,
     CANVAS_REALM_WIDTH,
     canvasRealmHash,
+    renderGpuMathOn,
     SCOPE_REPLY_KIND,
     SPIN_REPLY_KIND,
     scopeSnapshot,
@@ -66,9 +67,9 @@ const scope = self as unknown as WorkerScopeLike;
  * realms ask for the same adapter. The context is lost explicitly once read; the worker is
  * terminated right after anyway.
  */
-function workerWebGl(): WebGlIdentity {
+function workerWebGl(): { readonly identity: WebGlIdentity; readonly gpuMath: { readonly hash: string; readonly precision: string } | null } {
     if (typeof OffscreenCanvas !== 'function') {
-        return { vendor: null, renderer: null };
+        return { identity: { vendor: null, renderer: null }, gpuMath: null };
     }
 
     const attributes: WebGLContextAttributes = { failIfMajorPerformanceCaveat: false };
@@ -87,13 +88,28 @@ function workerWebGl(): WebGlIdentity {
     }
 
     const identity = unmaskedWebGl(gl);
+
+    // The same shader render the page runs (`gpuMath`), on this realm's own context: a hook on
+    // the page's `readPixels`/`getParameter` that passes the lie battery cannot reach it.
+    let gpuMath: { readonly hash: string; readonly precision: string } | null = null;
+    if (gl) {
+        try {
+            const rendered = renderGpuMathOn(gl);
+            gpuMath = { hash: rendered.hash, precision: rendered.precision };
+        } catch {
+            // An unavailable render (no shader support, randomised read-back) is silence for
+            // the comparison, and nothing else is worth failing the snapshot for.
+            gpuMath = null;
+        }
+    }
+
     try {
         gl?.getExtension('WEBGL_lose_context')?.loseContext();
     } catch {
         /* a context that cannot be lost goes with the terminated worker */
     }
 
-    return identity;
+    return { identity, gpuMath };
 }
 
 /** Arithmetic steps between two clock reads in `spin`. */
@@ -153,7 +169,8 @@ scope.addEventListener('message', (event) => {
 
     let snapshot = null;
     try {
-        snapshot = scopeSnapshot(workerWebGl(), workerCanvasHash());
+        const webgl = workerWebGl();
+        snapshot = scopeSnapshot(webgl.identity, workerCanvasHash(), webgl.gpuMath);
     } catch {
         // `scopeSnapshot` guards every field and cannot throw; this is the belt to that
         // pair of braces. A null snapshot is rejected by the window as malformed.

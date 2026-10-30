@@ -112,6 +112,9 @@ export const INTEGRITY_CODES = {
     REALM_TOSTRING_MISMATCH: 'realm_tostring_mismatch',
     DOMRECT_INCONSISTENT: 'domrect_inconsistent',
     SVG_TEXT_INCONSISTENT: 'svg_text_inconsistent',
+    CANVAS_PATTERN_PERTURBED: 'canvas_pattern_perturbed',
+    AUTOMATION_GLOBAL_PRESENT: 'automation_global_present',
+    HEADLESS_SHELL_GEOMETRY: 'headless_shell_geometry',
 } as const;
 
 /**
@@ -700,6 +703,168 @@ export function canvasFill(): ProbeResult<CanvasFillValue> {
 }
 
 // ---------------------------------------------------------------------------
+// Probe 7b — canvasPattern: a read-back against a two-colour pattern with edges
+// ---------------------------------------------------------------------------
+
+/** What `canvasPattern` reports. */
+export interface CanvasPatternValue {
+    /** Every pixel reads exactly the colour that was drawn there. */
+    readonly exact: boolean;
+    /** How many of the 64×64 pixels do not. */
+    readonly deviations: number;
+    /** Two consecutive reads of the same canvas agree byte for byte. False means per-read randomisation. */
+    readonly stable: boolean;
+}
+
+/** Block size (px) of the checkerboard; the canvas is `PATTERN_BLOCKS` blocks square. */
+const PATTERN_BLOCK = 8;
+const PATTERN_BLOCKS = 8;
+const PATTERN_COLOURS: ReadonlyArray<readonly [number, number, number]> = [
+    [10, 20, 30],
+    [200, 100, 50],
+];
+
+/**
+ * Probe 7b — the same known-answer read-back as `canvasFill`, over a pattern with edges.
+ *
+ * `canvasFill` is one uniform colour, and the engines' own fingerprinting protections leave
+ * uniform regions exact: Firefox's canvas noise skips a uniform image (`nsRFPService.cpp`) and
+ * WebKit's offset is zero between equal neighbours (`CanvasNoiseInjection.cpp`), so Firefox
+ * Private/Strict and Safari's advanced protection pass `canvasFill` while noising everything
+ * else. A checkerboard of two opaque colours in pixel-aligned 8×8 blocks has no anti-aliasing
+ * and no premultiplication loss, so the specified answer is the drawn colour at every pixel,
+ * and it has edges for the noise to act on. Read twice: a randomised read-back shows in
+ * `stable`.
+ *
+ * Never a tamper verdict (a privacy tool produces it as well as a spoofer): weight 4 on the
+ * server, and the trust projection stops matching the canvas-measured components. No 2D
+ * context → `unavailable('no-2d-context')`.
+ */
+export function canvasPattern(): ProbeResult<CanvasPatternValue> {
+    const measured = probe('canvasPattern', (): CanvasPatternValue | typeof NO_2D_CONTEXT => {
+        const size = PATTERN_BLOCK * PATTERN_BLOCKS;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) return NO_2D_CONTEXT;
+
+        const colourAt = (blockX: number, blockY: number): readonly [number, number, number] =>
+            PATTERN_COLOURS[(blockX + blockY) % 2] as readonly [number, number, number];
+        for (let by = 0; by < PATTERN_BLOCKS; by++) {
+            for (let bx = 0; bx < PATTERN_BLOCKS; bx++) {
+                const [r, g, b] = colourAt(bx, by);
+                context.fillStyle = `rgb(${r},${g},${b})`;
+                context.fillRect(bx * PATTERN_BLOCK, by * PATTERN_BLOCK, PATTERN_BLOCK, PATTERN_BLOCK);
+            }
+        }
+
+        const first = context.getImageData(0, 0, size, size).data;
+        const second = context.getImageData(0, 0, size, size).data;
+
+        let deviations = 0;
+        let stable = first.length === second.length;
+        const available = Math.min(size * size, Math.floor(first.length / 4));
+        for (let pixel = 0; pixel < available; pixel++) {
+            const i = pixel * 4;
+            const [r, g, b] = colourAt(Math.floor((pixel % size) / PATTERN_BLOCK), Math.floor(pixel / size / PATTERN_BLOCK));
+            if (first[i] !== r || first[i + 1] !== g || first[i + 2] !== b || first[i + 3] !== 255) deviations++;
+            if (first[i] !== second[i] || first[i + 1] !== second[i + 1] || first[i + 2] !== second[i + 2] || first[i + 3] !== second[i + 3]) stable = false;
+        }
+        // A short read is a deviation too: the missing pixels were not read back as drawn.
+        deviations += size * size - available;
+
+        return { exact: deviations === 0, deviations, stable };
+    });
+
+    if (measured.state !== 'ok') return measured;
+
+    return measured.value === NO_2D_CONTEXT ? unavailable('no-2d-context') : { state: 'ok', value: measured.value };
+}
+
+// ---------------------------------------------------------------------------
+// Probe 7c — automationMarks
+// ---------------------------------------------------------------------------
+
+/** What `automationMarks` reports. Counts and booleans only: the property names are page-controlled strings and never leave the page. */
+export interface AutomationMarksValue {
+    /** Own `window`/`document` property names that match a driver or automation mark (other than the three `domBlockers` already reports). */
+    readonly globals: number;
+    /** A ChromeDriver `$cdc_…` property was among them. */
+    readonly cdc: boolean;
+    /** A Playwright binding or init-script global was among them. */
+    readonly pw: boolean;
+    /** Desktop browser window whose outer size equals its inner size; null where the comparison means nothing (mobile, WebKit, an app window, no window chrome to measure). */
+    readonly outerEqualsInner: boolean | null;
+    /** `history.length`; null when unreadable. */
+    readonly historyLength: number | null;
+}
+
+/**
+ * The automation marks (`automationMarks`): names the drivers leave on `window` and
+ * `document`. Each pattern is a name some automation stack defines and no site does:
+ * ChromeDriver's `$cdc_…` and `$chrome_asyncScriptInfo`, Playwright's `__playwright…` and
+ * `__pwInitScripts`, Selenium/Watir/FirefoxDriver and PhantomJS globals, the Chrome
+ * `domAutomation` controller. `__webdriver_evaluate`, `__selenium_evaluate` and `__nightmare`
+ * are `domBlockers`' and are excluded here so one global is never scored twice.
+ */
+const AUTOMATION_NAME =
+    /^\$?cdc_|^\$chrome_asyncScriptInfo$|^__playwright|^__pwInitScripts$|^__(?:webdriver|selenium|fxdriver|lastWatir)|^__driver(?:_|Unwrapped)|^(?:callPhantom|_phantom|domAutomation|domAutomationController|_Selenium_IDE_Recorder)$/i;
+
+/** The names `domBlockers` reports (`windowWebdriverEvaluate` etc.), not counted again here. */
+const COVERED_BY_DOM_BLOCKERS: ReadonlySet<string> = new Set(['__webdriver_evaluate', '__selenium_evaluate', '__nightmare']);
+
+/**
+ * Probe 7c — automation marks and the headless shell geometry.
+ *
+ * Synchronous, under 0.2 ms (one regex over the own property names of two objects), no DOM
+ * mutation, no permission. `outerEqualsInner` is a headless-shell tell (a windowed desktop
+ * browser has chrome around its viewport, a headless one does not) and is reported only where
+ * it can mean that: a fine-pointer desktop in `display-mode: browser`, not JavaScriptCore (WebKit; Safari's
+ * advanced protection sets outer = inner), not a window of zero outer size.
+ */
+export function automationMarks(): ProbeResult<AutomationMarksValue> {
+    return probe('automationMarks', (): AutomationMarksValue => {
+        const namesOf = (target: object): string[] => {
+            try {
+                return Object.getOwnPropertyNames(target);
+            } catch {
+                return [];
+            }
+        };
+        const hits = [...namesOf(window), ...namesOf(document)].filter(
+            (name) => !COVERED_BY_DOM_BLOCKERS.has(name) && AUTOMATION_NAME.test(name),
+        );
+
+        let outerEqualsInner: boolean | null = null;
+        try {
+            const media = (query: string): boolean => typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+            const desktopWindow = media('(display-mode: browser)') && !media('(pointer: coarse)');
+            if (desktopWindow && classifyEngine(engineMarks()) !== 'jsc' && window.outerWidth > 0 && window.outerHeight > 0) {
+                outerEqualsInner = window.outerWidth === window.innerWidth && window.outerHeight === window.innerHeight;
+            }
+        } catch {
+            outerEqualsInner = null;
+        }
+
+        let historyLength: number | null = null;
+        try {
+            historyLength = typeof history.length === 'number' ? history.length : null;
+        } catch {
+            historyLength = null;
+        }
+
+        return {
+            globals: hits.length,
+            cdc: hits.some((name) => /cdc_/i.test(name)),
+            pw: hits.some((name) => /^__playwright|^__pwInitScripts$/.test(name)),
+            outerEqualsInner,
+            historyLength,
+        };
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Probe 8 — the lie battery
 // ---------------------------------------------------------------------------
 
@@ -985,6 +1150,8 @@ export function collectIntegrity(disabled: readonly string[] = []): IntegrityRep
     // Not a registry name: no policy can skip it.
     const webdriverResult = webdriverPresence();
     const canvasFillResult = run('canvasFill', canvasFill);
+    const canvasPatternResult = run('canvasPattern', canvasPattern);
+    const automationResult = run('automationMarks', automationMarks);
     const lieBatteryResult = run('lieBattery', () => lieBattery());
     const resistanceResult = run('resistance', resistance);
 
@@ -1081,6 +1248,19 @@ export function collectIntegrity(disabled: readonly string[] = []): IntegrityRep
         findings.push({ code: INTEGRITY_CODES.CANVAS_READBACK_PERTURBED });
     }
 
+    if (canvasPatternResult?.state === 'ok' && !canvasPatternResult.value.exact) {
+        findings.push({ code: INTEGRITY_CODES.CANVAS_PATTERN_PERTURBED });
+    }
+
+    if (automationResult?.state === 'ok') {
+        if (automationResult.value.globals > 0) {
+            findings.push({ code: INTEGRITY_CODES.AUTOMATION_GLOBAL_PRESENT });
+        }
+        if (automationResult.value.outerEqualsInner === true && automationResult.value.historyLength === 1) {
+            findings.push({ code: INTEGRITY_CODES.HEADLESS_SHELL_GEOMETRY });
+        }
+    }
+
     if (lieBatteryResult?.state === 'ok') {
         // Every lie code counts (coordinator decision, superseding contract §I1's `to_string`
         // exclusion), so any api in `lied` raises the finding. Which apis lied, and how, is in
@@ -1100,6 +1280,8 @@ export function collectIntegrity(disabled: readonly string[] = []): IntegrityRep
         ['domBlockers', blockersResult],
         ['webdriverPresence', webdriverResult],
         ['canvasFill', canvasFillResult],
+        ['canvasPattern', canvasPatternResult],
+        ['automationMarks', automationResult],
         ['lieBattery', lieBatteryResult],
         ['resistance', resistanceResult],
     ];
@@ -1122,10 +1304,11 @@ export function collectIntegrity(disabled: readonly string[] = []): IntegrityRep
  * 1. `phantomRealm` — findings (`realm_tostring_mismatch`, `domrect_inconsistent`,
  *    `svg_text_inconsistent`) and data, exactly as it reported in the synchronous phase before.
  * 2. `resistance` — data only; it never raises a finding.
- * 3. `canvasFill` AGAIN — data only, and deliberately NO finding: the synchronous phase already
- *    raised `canvas_readback_perturbed`, and raising it twice would double-count one fact.
+ * 3. `canvasFill` and `canvasPattern` AGAIN — data only, and deliberately NO finding: the
+ *    synchronous phase already raised `canvas_readback_perturbed` / `canvas_pattern_perturbed`,
+ *    and raising either twice would double-count one fact.
  *
- * `resistance` and `canvasFill` are re-measured (≈1-3 ms in idle time) because the server
+ * `resistance`, `canvasFill` and `canvasPattern` are re-measured (≈1-3 ms in idle time) because the server
  * scores each envelope on its own: the tier-2 envelope carries the font, emoji and script
  * values, and deciding which of those components to trust needs `resistance` (a privacy
  * tool) and `canvasFill.exact` (a perturbed read-back) present in THAT envelope.
@@ -1140,6 +1323,7 @@ export function collectDeferredIntegrity(disabled: readonly string[] = []): Inte
     const phantomResult = run('phantomRealm', () => phantomRealm());
     const resistanceResult = run('resistance', resistance);
     const canvasFillResult = run('canvasFill', canvasFill);
+    const canvasPatternResult = run('canvasPattern', canvasPattern);
 
     const findings: IntegrityFinding[] = phantomResult?.state === 'ok' ? phantomFindings(phantomResult.value) : [];
     // No canvas_readback_perturbed here: see the docblock (raised once, by the sync phase).
@@ -1150,6 +1334,7 @@ export function collectDeferredIntegrity(disabled: readonly string[] = []): Inte
             ['phantomRealm', phantomResult],
             ['resistance', resistanceResult],
             ['canvasFill', canvasFillResult],
+            ['canvasPattern', canvasPatternResult],
         ],
         started,
     );

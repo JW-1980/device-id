@@ -441,9 +441,9 @@ describe('resistance', () => {
 
 const SYNC_KEYS = [
     'wrongReceiver', 'descriptorIntegrity', 'mathDual', 'canvasDual', 'domBlockers', 'webdriverPresence', 'canvasFill',
-    'lieBattery', 'resistance',
+    'canvasPattern', 'automationMarks', 'lieBattery', 'resistance',
 ];
-const DEFERRED_KEYS = ['phantomRealm', 'resistance', 'canvasFill'];
+const DEFERRED_KEYS = ['phantomRealm', 'resistance', 'canvasFill', 'canvasPattern'];
 const PHANTOM_CODES: string[] = [
     INTEGRITY_CODES.REALM_TOSTRING_MISMATCH, INTEGRITY_CODES.DOMRECT_INCONSISTENT, INTEGRITY_CODES.SVG_TEXT_INCONSISTENT,
 ];
@@ -454,7 +454,7 @@ describe('collectIntegrity(disabled): the synchronous phase', () => {
     });
 
     it('skips each toggleable probe by its registry name: absent from data', () => {
-        for (const name of ['mathDual', 'canvasDual', 'domBlockers', 'canvasFill', 'lieBattery']) {
+        for (const name of ['mathDual', 'canvasDual', 'domBlockers', 'canvasFill', 'canvasPattern', 'automationMarks', 'lieBattery']) {
             expect(Object.keys(collectIntegrity([name]).data), name).toEqual(SYNC_KEYS.filter((key) => key !== name));
         }
     });
@@ -523,7 +523,7 @@ describe('collectIntegrity(disabled): the synchronous phase', () => {
 });
 
 describe('collectDeferredIntegrity(disabled): the deferred phase', () => {
-    it('runs phantomRealm, resistance and canvasFill, in that order, and nothing else', () => {
+    it('runs phantomRealm, resistance, canvasFill and canvasPattern, in that order, and nothing else', () => {
         const report = collectDeferredIntegrity();
 
         expect(Object.keys(report.data)).toEqual(DEFERRED_KEYS);

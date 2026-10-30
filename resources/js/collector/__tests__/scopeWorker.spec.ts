@@ -36,6 +36,8 @@ describe('scope.worker', () => {
         expect(snapshot?.userAgent).toBe(navigator.userAgent);
         expect(snapshot?.engine).toBe('v8');
         expect(snapshot?.webglVendor).toBeNull(); // no OffscreenCanvas in jsdom
+        expect(snapshot?.gpuMathHash).toBeNull(); // so no WebGL render either: silence, not a hash
+        expect(snapshot?.gpuMathPrecision).toBeNull();
     });
 
     it('does not throw out of the handler when posting the reply fails', async () => {

@@ -346,6 +346,29 @@ describe('gpuMath (M1)', () => {
         expect(gpuMath()).toEqual(result);
     });
 
+    it('renders once per context: the window snapshot and the probe share one render', () => {
+        const fake = installGpuMathGl();
+
+        gpuMath();
+        gpuMath();
+        expect(fake.log.filter((line) => line.startsWith('draw'))).toHaveLength(1);
+    });
+
+    it('puts the page render into the scope snapshot beside the worker, and the server compares the two', () => {
+        const snapshot = scopeSnapshot({ vendor: null, renderer: null }, null, { hash: 'deadbeef', precision: 'highp:23' });
+        expect(snapshot).toMatchObject({ gpuMathHash: 'deadbeef', gpuMathPrecision: 'highp:23' });
+        expect(scopeSnapshot({ vendor: null, renderer: null }, null)).toMatchObject({ gpuMathHash: null, gpuMathPrecision: null });
+    });
+
+    it('sanitiseReply keeps only an 8-hex hash and a short lowercase precision class from the worker', () => {
+        const good = { ...scopeSnapshot({ vendor: null, renderer: null }, null, { hash: 'cafe0123', precision: 'mediump:10' }) };
+        expect(sanitiseReply({ kind: SCOPE_REPLY_KIND, snapshot: good })).toMatchObject({ gpuMathHash: 'cafe0123', gpuMathPrecision: 'mediump:10' });
+        for (const bad of [{ gpuMathHash: 'DEADBEEF' }, { gpuMathHash: 'nothex!!' }, { gpuMathHash: 42 }, { gpuMathPrecision: 'HIGHP:23' }, { gpuMathPrecision: 'x'.repeat(40) }, { gpuMathPrecision: '<script>' }]) {
+            const cleaned = sanitiseReply({ kind: SCOPE_REPLY_KIND, snapshot: { ...good, ...bad } });
+            expect(cleaned?.gpuMathHash === null || cleaned?.gpuMathPrecision === null, JSON.stringify(bad)).toBe(true);
+        }
+    });
+
     it('renders all four channels as amplified functions of BOTH coordinates', () => {
         const fake = installGpuMathGl();
         gpuMath();

@@ -8,6 +8,7 @@ use NutriCompare\Fingerprint\Canonicaliser;
 use NutriCompare\Fingerprint\Keys\DeviceKeyDeriver;
 use NutriCompare\Fingerprint\ProbeRegistry;
 use NutriCompare\Fingerprint\Scoring\ConfidenceScorer;
+use NutriCompare\Fingerprint\Scoring\ProbeOmission;
 use NutriCompare\Fingerprint\Support\Config;
 use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
 use PHPUnit\Framework\TestCase;
@@ -136,6 +137,39 @@ final class ProbeSetTest extends TestCase
             $this->assertArrayHasKey($name, ProbeRegistry::methods(3));
             $this->assertArrayNotHasKey($name, ProbeRegistry::methods(2), 'a probe-set-2 bundle never sent '.$name);
         }
+    }
+
+    public function test_the_integrity_probes_added_in_set_four_are_switchable_and_judged_only_for_bundles_that_have_them(): void
+    {
+        foreach (['canvasPattern', 'automationMarks'] as $name) {
+            $this->assertSame(4, ProbeRegistry::PROBE_SET_ADDED[$name]);
+            $this->assertFalse(ProbeRegistry::isCore($name), $name.' must be switchable by the operator');
+            $this->assertSame(ProbeRegistry::TIER_INTEGRITY, ProbeRegistry::methods(4)[$name]['tier']);
+            $this->assertArrayNotHasKey($name, ProbeRegistry::methods(3), 'a probe-set-3 bundle never sent '.$name);
+            $this->assertContains('integrity:'.$name, ProbeOmission::expectedFor(ProbeOmission::SLOT_TIER1, [], 4));
+            $this->assertNotContains('integrity:'.$name, ProbeOmission::expectedFor(ProbeOmission::SLOT_TIER1, [], 3), 'an older bundle is not charged for a probe it does not have');
+            $this->assertNotContains('integrity:'.$name, ProbeOmission::expectedFor(ProbeOmission::SLOT_TIER1, [$name], 4), 'a switched-off probe is not expected');
+        }
+
+        // The deferred phase re-measures the canvas pattern for the tier-2 envelope's trust decision.
+        $this->assertContains('integrity:canvasPattern', ProbeOmission::expectedFor(ProbeOmission::SLOT_TIER2, [], 4));
+        $this->assertNotContains('integrity:automationMarks', ProbeOmission::expectedFor(ProbeOmission::SLOT_TIER2, [], 4));
+    }
+
+    public function test_the_client_findings_of_the_new_probes_are_dropped_with_their_probe(): void
+    {
+        $claims = [
+            'integrity' => [
+                'findings' => [['code' => 'canvas_pattern_perturbed'], ['code' => 'automation_global_present'], ['code' => 'headless_shell_geometry'], ['code' => 'lie_battery_failed']],
+                'data' => ['canvasPattern' => ['state' => 'ok', 'value' => ['exact' => false, 'deviations' => 2, 'stable' => true]], 'automationMarks' => ['state' => 'ok', 'value' => ['globals' => 1]]],
+            ],
+        ];
+
+        $stripped = ProbeRegistry::stripDisabled($claims, ['canvasPattern', 'automationMarks']);
+
+        $this->assertSame([['code' => 'lie_battery_failed']], $stripped['integrity']['findings']);
+        $this->assertArrayNotHasKey('canvasPattern', $stripped['integrity']['data']);
+        $this->assertArrayNotHasKey('automationMarks', $stripped['integrity']['data']);
     }
 
     /**

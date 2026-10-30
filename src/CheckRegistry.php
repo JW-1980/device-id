@@ -65,6 +65,9 @@ final class CheckRegistry
         'dom_blocker_present' => [30, 'integrity', 'A global that only an automation driver injects (Selenium, WebDriver, Nightmare) is present.'],
         'dom_blocker_threw' => [6, 'integrity', 'Reading an ordinary global threw, which suggests a blocker or extension intercepts property access.'],
         'webdriver_missing' => [25, 'integrity', 'navigator.webdriver is absent; every shipping engine defines it, and deleting it is the classic stealth evasion.'],
+        'canvas_pattern_perturbed' => [4, 'integrity', 'A two-colour canvas pattern read back with pixels that differ from what was drawn: canvas noise that leaves a uniform fill exact (Firefox Private/Strict, Safari advanced protection). An honest privacy tool; the canvas-measured components are not matched.'],
+        'automation_global_present' => [30, 'integrity', 'A global that only a driver or automation framework defines (ChromeDriver, Playwright, Selenium, PhantomJS, the Chrome automation controller) exists on window or document.'],
+        'headless_shell_geometry' => [8, 'integrity', 'A desktop browser window without chrome around its viewport (outer size equals inner size) and a one-entry history: the geometry of a headless shell. Not WebKit, where the protection sets it.'],
         'canvas_readback_perturbed' => [4, 'integrity', 'A solid canvas fill read back with pixels that differ from the fill colour, so canvas values are noised (farbling or a noise extension) and cannot identify the device.'],
         'lie_battery_failed' => [35, 'integrity', 'A native function failed a conformance invariant (constructible, extra own properties, survives a cyclic prototype), so it is a Proxy or a closure standing in for the real one.'],
         'realm_tostring_mismatch' => [35, 'integrity', 'A pristine Function.prototype.toString from a fresh same-origin realm describes a page function differently from the page\'s own toString, so the page\'s toString is patched.'],
@@ -98,6 +101,11 @@ final class CheckRegistry
         'plugins_vs_pdfviewer' => [20, 'environment', 'The PDF plugin set is reported while the PDF viewer is disabled.'],
         'cores_vs_memory' => [8, 'environment', 'The core count and the reported device memory are not a pair any device ships.'],
         'arch_vs_ch_arch' => [15, 'transport', 'The CPU architecture from the NaN-sign probe differs from the Sec-CH-UA-Arch header.'],
+        'device_memory_vs_ch' => [15, 'transport', 'navigator.deviceMemory differs from the Sec-CH-Device-Memory header the browser sent (needs the host\'s Accept-CH).'],
+        'ch_bitness_vs_js' => [15, 'transport', 'getHighEntropyValues bitness differs from the Sec-CH-UA-Bitness header (needs the host\'s Accept-CH).'],
+        'ch_model_vs_js' => [15, 'transport', 'getHighEntropyValues model differs from the Sec-CH-UA-Model header (needs the host\'s Accept-CH).'],
+        'dpr_vs_ch' => [8, 'transport', 'window.devicePixelRatio differs from the Sec-CH-DPR header (needs the host\'s Accept-CH).'],
+        'viewport_vs_ch' => [6, 'transport', 'window.innerWidth differs from the Sec-CH-Viewport-Width header beyond a scrollbar and resize tolerance (needs the host\'s Accept-CH; silent on touch devices).'],
         'gpu_webgpu_vs_webgl' => [10, 'environment', 'The WebGPU adapter vendor and the WebGL renderer name belong to different GPU vendor families.'],
         'touch_vs_pointer_media' => [6, 'environment', 'A touch screen is reported while no media query matches a coarse pointer.'],
         'tz_vs_lang_region' => [4, 'environment', 'The timezone is not one of the regions the language list implies.'],
@@ -120,6 +128,7 @@ final class CheckRegistry
         'cores_vs_measured_parallelism' => [10, 'environment', 'The measured parallel capacity (timed workers) is well above the reported core count; a low measurement is load, not evidence.'],
         'resistance_vs_engine' => [30, 'environment', 'The client reports a privacy mode (Firefox resistFingerprinting, Tor, Brave) that the engine marks, the User-Agent or the headers contradict; faking it would otherwise reduce what the matcher sees.'],
         'canvas_realm_mismatch' => [4, 'environment', 'The page and its worker rasterised the same geometry differently, so the page\'s canvas read-back is noised by something the worker realm does not see.'],
+        'gpu_realm_mismatch' => [4, 'environment', 'The page and its dedicated worker rendered the same shader to different pixels at the same precision, so the page\'s WebGL read-back is hooked (a page-only readPixels or getParameter patch).'],
     ];
 
     /**

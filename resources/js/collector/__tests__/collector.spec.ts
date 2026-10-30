@@ -46,6 +46,7 @@ import {
     gpu,
     audioHardware,
     decoders,
+    webglCapabilities,
     voices,
     permissions,
     intl,
@@ -676,9 +677,44 @@ describe('hardware probes', () => {
             },
         });
         try {
-            expect(await decoders()).toEqual(ok({ h264: '110', vp9: '100', av1: 'err' }));
+            const result = await decoders();
+            expect(result.state).toBe('ok');
+            if (result.state !== 'ok') return;
+            expect(result.value).toMatchObject({ h264: '110', vp9: '100', av1: 'err', hevc: '100', vp9_2: '100', h264_4k: '110', av1_10: 'err' });
+            // No encodingInfo and no RTCRtpSender here: the extras are `err` / null, never a throw.
+            expect(result.value.enc).toEqual({ h264: 'err', vp9: 'err', av1: 'err' });
+            expect(result.value.rtc).toBeNull();
         } finally {
             undo();
+        }
+    });
+
+    it('decoders reports the hardware-decode and encode bits that identify the SoC generation, and the RTP codec families', async () => {
+        const undoCapabilities = defineOwn(navigator, 'mediaCapabilities', {
+            decodingInfo: async ({ video }: { video: { contentType: string; width: number } }) => ({
+                supported: true,
+                smooth: true,
+                // Hardware HEVC Main 10 and 4K AV1, nothing else.
+                powerEfficient: video.contentType.includes('hvc1.2.4') || (video.contentType.includes('av01.0.12M.10') && video.width === 3840),
+            }),
+            encodingInfo: async ({ type, video }: { type: string; video: { contentType: string } }) => ({
+                supported: type === 'webrtc',
+                powerEfficient: video.contentType === 'video/h264',
+            }),
+        });
+        const undoSender = defineOwn(globalThis, 'RTCRtpSender', {
+            getCapabilities: () => ({ codecs: [{ mimeType: 'video/VP8' }, { mimeType: 'video/H264' }, { mimeType: 'video/H264' }, { mimeType: 'video/rtx' }, { mimeType: 'video/AV1' }] }),
+        });
+        try {
+            const result = await decoders();
+            expect(result.state).toBe('ok');
+            if (result.state !== 'ok') return;
+            expect(result.value).toMatchObject({ h264: '110', hevc: '110', hevc10: '111', av1_10: '111', vp9_2: '110', h264_4k: '110' });
+            expect(result.value.enc).toEqual({ h264: '11', vp9: '10', av1: '10' });
+            expect(result.value.rtc).toBe('AV1,H264,RTX,VP8');
+        } finally {
+            undoSender();
+            undoCapabilities();
         }
     });
 
@@ -828,6 +864,66 @@ describe('hardware probes', () => {
             resetWebgpuAdapterForTests();
             undo();
         }
+    });
+
+    it('gpu reports the WebGPU capability class: sorted features, log2-bucketed limits, subgroup sizes, canvas format', async () => {
+        const undo = defineOwn(navigator, 'gpu', {
+            requestAdapter: () => Promise.resolve({
+                info: { vendor: 'nvidia', architecture: 'ada', device: '', description: '', isFallbackAdapter: false, subgroupMinSize: 32, subgroupMaxSize: 32 },
+                features: new Set(['timestamp-query', 'texture-compression-bc', 'shader-f16']),
+                limits: { maxBufferSize: 2 ** 32, maxStorageBufferBindingSize: 2 ** 27 + 5, maxComputeWorkgroupStorageSize: 32768, maxTextureDimension2D: 16384 },
+            }),
+            getPreferredCanvasFormat: () => 'bgra8unorm',
+        });
+        try {
+            resetWebgpuAdapterForTests();
+            const result = await gpu();
+            expect(result.state).toBe('ok');
+            if (result.state !== 'ok') return;
+            expect(result.value.webgpu).toMatchObject({
+                features: 'shader-f16,texture-compression-bc,timestamp-query',
+                limits: '32,27,15,14',
+                subgroups: '32/32',
+                canvasFormat: 'bgra8unorm',
+                vendor: 'nvidia',
+            });
+        } finally {
+            resetWebgpuAdapterForTests();
+            releaseShared();
+            undo();
+        }
+    });
+
+    it('gpu leaves the capability fields null where the adapter does not offer them, without failing the probe', async () => {
+        const undo = defineOwn(navigator, 'gpu', {
+            requestAdapter: () => Promise.resolve({ info: { vendor: 'apple', architecture: '', device: '', description: '' } }),
+        });
+        try {
+            resetWebgpuAdapterForTests();
+            const result = await gpu();
+            expect(result.state).toBe('ok');
+            if (result.state !== 'ok') return;
+            expect(result.value.webgpu).toMatchObject({ features: null, limits: null, subgroups: null, canvasFormat: null, vendor: 'apple' });
+        } finally {
+            resetWebgpuAdapterForTests();
+            releaseShared();
+            undo();
+        }
+    });
+
+    it('webglCapabilities names the compressed-texture families, the MSAA sample counts and MAX_SAMPLES', () => {
+        const gl2 = {
+            RENDERBUFFER: 1, RGBA8: 2, SAMPLES: 3, MAX_SAMPLES: 4,
+            getSupportedExtensions: () => ['WEBGL_compressed_texture_s3tc', 'WEBGL_compressed_texture_bptc', 'WEBKIT_WEBGL_compressed_texture_etc', 'OES_texture_float'],
+            getInternalformatParameter: () => Int32Array.from([8, 4]),
+            getParameter: () => 8,
+        };
+        expect(webglCapabilities(gl2 as unknown as WebGL2RenderingContext, true)).toEqual({ compressed: 's3tc,etc,bptc', samples: '8,4', maxSamples: 8 });
+        // WebGL 1 has no multisample query: the fields are null, the families are still read.
+        expect(webglCapabilities(gl2 as unknown as WebGLRenderingContext, false)).toEqual({ compressed: 's3tc,etc,bptc', samples: null, maxSamples: null });
+        // A context that throws costs a field, never the probe.
+        const broken = { getSupportedExtensions: () => { throw new Error('lost'); } };
+        expect(webglCapabilities(broken as unknown as WebGLRenderingContext, false)).toEqual({ compressed: null, samples: null, maxSamples: null });
     });
 
     it('gpu reads isFallbackAdapter from adapter.info first (round-2 STD-25)', async () => {

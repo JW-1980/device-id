@@ -240,7 +240,7 @@ describe('deferred integrity phase (CONTRACT-2 addendum)', () => {
         const tier1 = await collect(challenge(), 'signin');
         const tier2 = await collectTier2(challenge(), 'signin');
 
-        expect(Object.keys(tier2.claims.integrity.data).sort()).toEqual(['canvasFill', 'phantomRealm', 'resistance']);
+        expect(Object.keys(tier2.claims.integrity.data).sort()).toEqual(['canvasFill', 'canvasPattern', 'phantomRealm', 'resistance']);
         expect(Array.isArray(tier2.claims.integrity.findings)).toBe(true);
         expect(typeof tier2.claims.integrity.elapsedMs).toBe('number');
         expect(tier1.claims.integrity.data).not.toHaveProperty('phantomRealm');
@@ -249,7 +249,7 @@ describe('deferred integrity phase (CONTRACT-2 addendum)', () => {
     });
 
     it('applies the policy to the deferred phase too, but never to the core resistance', async () => {
-        const tier2 = await collectTier2(challenge(['phantomRealm', 'canvasFill', 'resistance']), 'signin');
+        const tier2 = await collectTier2(challenge(['phantomRealm', 'canvasFill', 'canvasPattern', 'resistance']), 'signin');
 
         expect(Object.keys(tier2.claims.integrity.data)).toEqual(['resistance']);
     });

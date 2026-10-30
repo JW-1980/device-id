@@ -99,6 +99,9 @@ final class IntegrityFindings
         'realm_tostring_mismatch',
         'domrect_inconsistent',
         'svg_text_inconsistent',
+        'canvas_pattern_perturbed',
+        'automation_global_present',
+        'headless_shell_geometry',
     ];
 
     /** Entries walked per collection; see the class docblock. */
@@ -190,6 +193,8 @@ final class IntegrityFindings
         self::domBlockers($claims, $found);
         self::webdriver($claims, $found);
         self::canvasFill($claims, $found);
+        self::canvasPattern($claims, $found);
+        self::automationMarks($claims, $found);
         self::lieBattery($claims, $found);
         self::phantomRealm($claims, $found);
 
@@ -399,6 +404,50 @@ final class IntegrityFindings
         $deviations = $fill['deviations'] ?? null;
         if (self::jsFalsy($fill['exact'] ?? null) || (self::isNumber($deviations) && (float) $deviations !== 0.0)) {
             $found['canvas_readback_perturbed'] = true;
+        }
+    }
+
+    /**
+     * `collectIntegrity`: `!canvasPattern.exact`, or `deviations` not zero (the same test as
+     * `canvasFill`, over a two-colour pattern with edges).
+     *
+     * @param  array<array-key, mixed>  $claims
+     * @param  array<string, true>  $found
+     */
+    private static function canvasPattern(array $claims, array &$found): void
+    {
+        $pattern = self::probe($claims, 'canvasPattern');
+        if (! is_array($pattern)) {
+            return;
+        }
+
+        $deviations = $pattern['deviations'] ?? null;
+        if (self::jsFalsy($pattern['exact'] ?? null) || (self::isNumber($deviations) && (float) $deviations !== 0.0)) {
+            $found['canvas_pattern_perturbed'] = true;
+        }
+    }
+
+    /**
+     * `collectIntegrity`: `automationMarks.globals > 0`, and `outerEqualsInner === true` with
+     * `historyLength === 1`. The server rule adds the operating-system and engine gates.
+     *
+     * @param  array<array-key, mixed>  $claims
+     * @param  array<string, true>  $found
+     */
+    private static function automationMarks(array $claims, array &$found): void
+    {
+        $marks = self::probe($claims, 'automationMarks');
+        if (! is_array($marks)) {
+            return;
+        }
+
+        $globals = $marks['globals'] ?? null;
+        if (self::isNumber($globals) && $globals > 0) {
+            $found['automation_global_present'] = true;
+        }
+
+        if (($marks['outerEqualsInner'] ?? null) === true && ($marks['historyLength'] ?? null) === 1) {
+            $found['headless_shell_geometry'] = true;
         }
     }
 

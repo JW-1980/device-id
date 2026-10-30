@@ -105,6 +105,9 @@ final class EnvironmentConsistency
 
     private const FEATURE_VERSION_MIN_PRESENT = 10;
 
+    /** CSS px `viewport_vs_ch` allows between `innerWidth` and `Sec-CH-Viewport-Width` (scrollbar, resize). */
+    private const VIEWPORT_HEADER_TOLERANCE = 24;
+
     /** Families of ANOTHER operating system that must be present for `fonts_vs_ua_os`. */
     private const FONTS_OTHER_OS_MIN = 4;
 
@@ -167,6 +170,16 @@ final class EnvironmentConsistency
         // the input the per-component trust projection (notes/21 §2 item 7) needs, and
         // far too little to move a band on its own.
         'canvas_readback_perturbed' => 4,
+        // The same fact over a two-colour pattern with edges: noise that leaves a uniform fill
+        // exact (Firefox Private/Strict, Safari advanced protection). An honest privacy tool.
+        'canvas_pattern_perturbed' => 4,
+        // A driver global (the ChromeDriver `cdc_` property, Playwright binding, Selenium, PhantomJS) that
+        // no site defines: as certain as `dom_blocker_present`, which it extends, and weighted
+        // the same.
+        'automation_global_present' => 30,
+        // Outer size equals inner size and a one-entry history on a desktop browser that is not
+        // WebKit: a headless shell. Weak on its own (kiosk modes exist), so it stays small.
+        'headless_shell_geometry' => 8,
         // Contract 2 integrity codes. The lie battery and the cross-realm toString are the
         // CreepJS `lies` module re-done without tables: a native function that is
         // constructible, owns a property other than length/name, or survives a cyclic
@@ -225,6 +238,14 @@ final class EnvironmentConsistency
         'touch_vs_ch_mobile' => 15,
         // The NaN-sign architecture probe against the Sec-CH-UA-Arch header.
         'arch_vs_ch_arch' => 15,
+        // The device-hint request headers against what the page claims (README, "Per-application
+        // configuration", lists the `Accept-CH` a host must send). Both-present only, so
+        // Firefox and Safari, which send none of them, are never judged.
+        'device_memory_vs_ch' => 15,
+        'ch_bitness_vs_js' => 15,
+        'ch_model_vs_js' => 15,
+        'dpr_vs_ch' => 8,
+        'viewport_vs_ch' => 6,
         'cores_vs_memory' => 8,
         // Two GPU identities from one page (WebGPU adapter vs WebGL renderer) naming
         // different vendors.
@@ -299,6 +320,12 @@ final class EnvironmentConsistency
         // and dual-construction checks both miss for free-form scenes. 4, like the other
         // read-back codes: noise is a privacy tool first and a spoofer second.
         'canvas_realm_mismatch' => 4,
+        // The same comparison for the WebGL shader render (`gpuMath`): the page's read-back
+        // against the worker's own context. A page-only `readPixels`/`getParameter` hook that
+        // passes the lie battery is the one thing that splits them. Weight 4 for the same
+        // reason as the canvas: GPU-versus-CPU raster differences between a window and a worker
+        // are unverified on hardware.
+        'gpu_realm_mismatch' => 4,
         // A privacy-mode flag that the engine evidence contradicts: `rfp`/`tor` are
         // Gecko-only, `brave` is Chromium-only, and the engine marks, the User-Agent and
         // the Sec-CH-UA header each say which family this is. Faking the flag is the one
@@ -521,6 +548,36 @@ final class EnvironmentConsistency
             [
                 'code' => 'canvas_readback_perturbed',
                 'rule' => fn (mixed $c, TransportIntegrityResult $t): ?string => $this->fromIntegrity($c, 'canvas_readback_perturbed'),
+            ],
+            [
+                'code' => 'canvas_pattern_perturbed',
+                'rule' => fn (mixed $c, TransportIntegrityResult $t): ?string => $this->fromIntegrity($c, 'canvas_pattern_perturbed'),
+            ],
+            [
+                'code' => 'automation_global_present',
+                'rule' => fn (mixed $c, TransportIntegrityResult $t): ?string => $this->fromIntegrity($c, 'automation_global_present'),
+            ],
+            // Gated beyond the client's own test, because the client cannot know the claimed
+            // operating system and an engine whose protection sets outer = inner (WebKit) is no
+            // headless shell.
+            [
+                'code' => 'headless_shell_geometry',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    if ($this->fromIntegrity($c, 'headless_shell_geometry') === null) {
+                        return null;
+                    }
+
+                    $marks = $this->value($c, 'tier1', 'engineIdentity');
+                    $ua = $this->value($c, 'tier1', 'environment', 'identity', 'userAgent');
+                    $engine = is_array($marks) ? self::engineFromMarks($marks) : null;
+                    $family = is_string($ua) ? self::uaOsFamily($ua) : null;
+
+                    if ($engine === 'webkit' || ! in_array($family, ['windows', 'macos', 'linux'], true)) {
+                        return null;
+                    }
+
+                    return 'The browser window has no chrome around its viewport and a one-entry history, the geometry of a headless shell.';
+                },
             ],
             // Contract 2 (notes/21 §2 items 5, 6, 11): the lie battery, the cross-realm
             // toString, and the layout-arithmetic invariants.
@@ -932,6 +989,77 @@ final class EnvironmentConsistency
                     return $claimed === $hinted
                         ? null
                         : 'The CPU architecture from the NaN-sign probe differs from the Sec-CH-UA-Arch header.';
+                },
+            ],
+
+            // Device-hint headers against the page's claims. A browser sends these only when the
+            // host's `Accept-CH` asked for them, and Firefox and Safari never do, so absence is
+            // silence. The header is what the browser put on the wire; a JavaScript spoof of the
+            // claim does not change it. Every detail names the field, never a value.
+            [
+                'code' => 'device_memory_vs_ch',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $claimed = $this->value($c, 'tier1', 'environment', 'identity', 'deviceMemory');
+                    $header = self::numericHeader($t->witnessString('sec_ch_device_memory'));
+
+                    if ((! is_int($claimed) && ! is_float($claimed)) || $header === null) {
+                        return null;
+                    }
+
+                    return abs((float) $claimed - $header) < 0.001
+                        ? null
+                        : 'navigator.deviceMemory differs from the Sec-CH-Device-Memory header the browser sent.';
+                },
+            ],
+            [
+                'code' => 'ch_bitness_vs_js',
+                'rule' => fn (mixed $c, TransportIntegrityResult $t): ?string => self::hintStringsDiffer($this->value($c, 'tier1', 'uaClientHints', 'high', 'bitness'), $t->witnessString('sec_ch_ua_bitness'))
+                    ? 'getHighEntropyValues bitness differs from the Sec-CH-UA-Bitness header the browser sent.'
+                    : null,
+            ],
+            [
+                'code' => 'ch_model_vs_js',
+                'rule' => fn (mixed $c, TransportIntegrityResult $t): ?string => self::hintStringsDiffer($this->value($c, 'tier1', 'uaClientHints', 'high', 'model'), $t->witnessString('sec_ch_ua_model'))
+                    ? 'getHighEntropyValues model differs from the Sec-CH-UA-Model header the browser sent.'
+                    : null,
+            ],
+            // Page zoom is part of both values (same document, same moment), so a difference
+            // beyond rounding is a patched `devicePixelRatio`.
+            [
+                'code' => 'dpr_vs_ch',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $claimed = $this->value($c, 'tier1', 'environment', 'viewport', 'devicePixelRatio');
+                    $header = self::numericHeader($t->witnessString('sec_ch_dpr'));
+
+                    if ((! is_int($claimed) && ! is_float($claimed)) || $header === null) {
+                        return null;
+                    }
+
+                    return abs((float) $claimed - $header) <= 0.01
+                        ? null
+                        : 'window.devicePixelRatio differs from the Sec-CH-DPR header the browser sent.';
+                },
+            ],
+            // The header is the layout viewport; `innerWidth` includes a classic scrollbar (up to
+            // 17 px) and a window can be resized between navigation and collection, so the
+            // tolerance is generous. Silent on touch devices, where pinch-zoom moves `innerWidth`
+            // and not the layout viewport.
+            [
+                'code' => 'viewport_vs_ch',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $claimed = $this->value($c, 'tier1', 'environment', 'viewport', 'innerWidth');
+                    $header = self::numericHeader($t->witnessString('sec_ch_viewport_width'));
+                    $touch = $this->value($c, 'tier1', 'environment', 'identity', 'maxTouchPoints');
+                    $mobile = $t->witnessString('sec_ch_ua_mobile');
+
+                    if ((! is_int($claimed) && ! is_float($claimed)) || $header === null
+                        || (is_int($touch) && $touch > 0) || ($mobile !== null && trim($mobile) === '?1')) {
+                        return null;
+                    }
+
+                    return abs((float) $claimed - $header) <= self::VIEWPORT_HEADER_TOLERANCE
+                        ? null
+                        : 'window.innerWidth differs from the Sec-CH-Viewport-Width header the browser sent.';
                 },
             ],
 
@@ -1537,11 +1665,35 @@ final class EnvironmentConsistency
                         return null;
                     }
 
-                    if ($this->value($c, 'integrity', 'data', 'canvasFill', 'exact') === false) {
+                    if ($this->value($c, 'integrity', 'data', 'canvasFill', 'exact') === false
+                        || $this->value($c, 'integrity', 'data', 'canvasPattern', 'exact') === false) {
                         return null;
                     }
 
                     return 'The page and its worker rasterised the same geometry differently, so the page\'s canvas read-back is noised.';
+                },
+            ],
+
+            // gpu_realm_mismatch: see the weight table. Silent under the same protections and
+            // read-back findings as `canvas_realm_mismatch`: the same honest visitor, scored once.
+            [
+                'code' => 'gpu_realm_mismatch',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    if (! self::gpuRealmsDisagree($c)) {
+                        return null;
+                    }
+
+                    if (self::protectedGecko($c, $t)
+                        || (self::engineEvidence($c, $t)['chromium'] && $this->value($c, 'integrity', 'data', 'resistance', 'brave') === true)) {
+                        return null;
+                    }
+
+                    if ($this->value($c, 'integrity', 'data', 'canvasFill', 'exact') === false
+                        || $this->value($c, 'integrity', 'data', 'canvasPattern', 'exact') === false) {
+                        return null;
+                    }
+
+                    return 'The page and its worker rendered the same shader to different pixels, so the page\'s WebGL read-back is hooked.';
                 },
             ],
 
@@ -2301,6 +2453,50 @@ final class EnvironmentConsistency
         $this->effectiveMemo = ['claims' => $claims, 'effective' => $effective];
 
         return $effective;
+    }
+
+    /**
+     * Whether the page's and the worker's `gpuMath` render both exist, ran at the same shader
+     * precision, and differ. Shared with `DeviceComponents::untrusted()`: a page whose
+     * read-back disagrees with its worker's does not offer a trustworthy `gpuMath` hash.
+     */
+    public static function gpuRealmsDisagree(mixed $claims): bool
+    {
+        $page = self::read($claims, 'tier2', 'workerScope', 'window', 'gpuMathHash');
+        $worker = self::read($claims, 'tier2', 'workerScope', 'worker', 'gpuMathHash');
+        $pagePrecision = self::read($claims, 'tier2', 'workerScope', 'window', 'gpuMathPrecision');
+        $workerPrecision = self::read($claims, 'tier2', 'workerScope', 'worker', 'gpuMathPrecision');
+
+        return is_string($page) && is_string($worker) && $page !== '' && $worker !== '' && $page !== $worker
+            && is_string($pagePrecision) && $pagePrecision !== '' && $pagePrecision === $workerPrecision;
+    }
+
+    /**
+     * A numeric client-hint header value ("8", "1.5"; quotes tolerated), or null.
+     */
+    private static function numericHeader(?string $header): ?float
+    {
+        if ($header === null) {
+            return null;
+        }
+
+        $value = trim($header, "\" \t");
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    /**
+     * Whether a JavaScript client-hint string and the header carrying the same hint are both
+     * present and differ. The header is an RFC 8941 string (`"64"`), so quotes and blanks are
+     * stripped from it; the claim is compared exactly.
+     */
+    private static function hintStringsDiffer(mixed $claimed, ?string $header): bool
+    {
+        if (! is_string($claimed) || $header === null) {
+            return false;
+        }
+
+        return $claimed !== trim($header, "\" \t");
     }
 
     /**

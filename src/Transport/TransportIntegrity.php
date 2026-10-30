@@ -319,6 +319,13 @@ final class TransportIntegrity
             'sec_ch_ua_model' => $get('sec-ch-ua-model'),
             'sec_ch_ua_bitness' => $get('sec-ch-ua-bitness'),
             'sec_ch_ua_full_version_list' => $get('sec-ch-ua-full-version-list'),
+            // The device hints a host asks for with `Accept-CH` (README, "Per-application
+            // configuration"). A JavaScript spoof of `deviceMemory`, the pixel ratio or
+            // `userAgentData` does not change what the browser put on the wire; each is read by
+            // one rule in EnvironmentConsistency, both-present only.
+            'sec_ch_device_memory' => $get('sec-ch-device-memory'),
+            'sec_ch_dpr' => $get('sec-ch-dpr'),
+            'sec_ch_viewport_width' => $get('sec-ch-viewport-width'),
             'sec_fetch_mode' => $protocol,
             'sec_fetch_dest' => $dest,
             'sec_fetch_user' => $user,

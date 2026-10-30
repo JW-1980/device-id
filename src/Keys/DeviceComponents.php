@@ -46,7 +46,7 @@ final class DeviceComponents
      *
      * @var list<string>
      */
-    public const SOFT = ['cores', 'aspect', 'panel', 'display', 'audio', 'fonts', 'emoji', 'scripts', 'gpu', 'voices', 'decoders', 'memory', 'osVersion', 'gpuMath'];
+    public const SOFT = ['cores', 'aspect', 'panel', 'display', 'audio', 'fonts', 'emoji', 'scripts', 'gpu', 'voices', 'decoders', 'memory', 'osVersion', 'gpuMath', 'keyboard', 'gpuCaps', 'codecsHw'];
 
     /**
      * Auxiliary values stored beside the components but never scored or keyed: the font
@@ -62,12 +62,24 @@ final class DeviceComponents
      * protection rather than of the device: the spoofed screen (`aspect`, `display`, `panel`),
      * core count, touch, User-Agent OS (`os`, `osVersion`), WebGL (`gpu`, `memory`), the
      * randomised canvas path (`fonts`, `emoji`, `scripts`, `fontsCount`) and the read-back
-     * shader class (`gpuMath`). `audio`, `arch`, `decoders` and `voices` stay. With `os` and
+     * shader class (`gpuMath`), the capability classes (`gpuCaps`: RFP clamps limits and reports fixed subgroup sizes; `codecsHw`: RFP spoofs MediaCapabilities) and the sample rate (`audio`, pinned to 44100 by RFP). `arch`, `decoders` and `voices` stay. With `os` and
      * `touch` absent no `hardware_key` is derived from a protection's constants.
      *
      * @var list<string>
      */
-    public const PROTECTED_UNTRUSTED = ['fonts', 'emoji', 'scripts', 'fontsCount', 'os', 'osVersion', 'cores', 'touch', 'aspect', 'display', 'panel', 'gpu', 'memory', 'gpuMath'];
+    public const PROTECTED_UNTRUSTED = ['fonts', 'emoji', 'scripts', 'fontsCount', 'os', 'osVersion', 'cores', 'touch', 'aspect', 'display', 'panel', 'gpu', 'memory', 'gpuMath', 'audio', 'gpuCaps', 'codecsHw'];
+
+    /**
+     * The components Brave's default ("Balanced") farbling makes a property of the session and
+     * site rather than of the device: `hardwareConcurrency` (random in [4, real]),
+     * `deviceMemory`, the voice list (plus one invented voice), the screen (snapped to a few
+     * sizes, which moves `aspect` and `panel`), the canvas-measured fonts and emoji, and since
+     * Brave 1.93 the WebGL renderer string (one generic value for everyone) and extension list
+     * (random per session). `gpuMath` is added by the read-back rule in {@see untrusted()}.
+     *
+     * @var list<string>
+     */
+    public const BRAVE_UNTRUSTED = ['gpu', 'cores', 'memory', 'voices', 'panel', 'aspect', 'fonts', 'emoji', 'fontsCount', 'keyboard', 'gpuCaps'];
 
     /**
      * Every hard component must be known for `hardware_key` (G-D2i: a null is never hashed,
@@ -163,6 +175,9 @@ final class DeviceComponents
             'decoders' => self::decoders($claims),
             'memory' => self::memory(EnvironmentConsistency::read($claims, 'tier1', 'environment', 'identity', 'deviceMemory')),
             'gpuMath' => self::gpuMath($claims, $secret),
+            'keyboard' => self::keyboard($claims, $secret),
+            'gpuCaps' => self::gpuCaps($claims, $engine, $secret),
+            'codecsHw' => self::codecsHw($claims),
             'fontsCount' => self::int(EnvironmentConsistency::read($claims, 'tier2', 'fontMetrics', 'count')),
             'engine' => $engine,
         ];
@@ -248,7 +263,9 @@ final class DeviceComponents
         // The finding is raised by the synchronous phase (tier-1 envelope); the deferred
         // phase re-measures the fill and reports it as data only, so the tier-2 envelope
         // — the one that carries the canvas-measured components — can be judged on its own.
-        $canvasNoised = isset($codes['canvas_readback_perturbed']) || $canvasWrapped
+        $patternNoised = isset($codes['canvas_pattern_perturbed'])
+            || EnvironmentConsistency::read($claims, 'integrity', 'data', 'canvasPattern', 'exact') === false;
+        $canvasNoised = isset($codes['canvas_readback_perturbed']) || $canvasWrapped || $patternNoised
             || EnvironmentConsistency::read($claims, 'integrity', 'data', 'canvasFill', 'exact') === false;
 
         $untrusted = [];
@@ -259,12 +276,20 @@ final class DeviceComponents
             array_push($untrusted, ...self::PROTECTED_UNTRUSTED);
         }
         if ($brave) {
-            $untrusted[] = 'gpu';
+            array_push($untrusted, ...self::BRAVE_UNTRUSTED);
+        }
+        // Firefox Private/Strict (fingerprinting protection) noises the canvas but leaves a
+        // uniform fill exact, so only the pattern read-back shows it, and it also tiers
+        // `hardwareConcurrency` to 4 or 8: a Gecko whose pattern was noised and which is not
+        // under RFP/Tor reports a protection's core count, not the device's.
+        if ($patternNoised && $geckoEvidence && ! $protected) {
+            $untrusted[] = 'cores';
         }
         // The shader-arithmetic class reads pixels back, and every one of these noises
         // read-back (Brave farbles readPixels; RFP and Tor randomise canvas reads, which
-        // PROTECTED_UNTRUSTED already covers).
-        if ($brave || $webglWrapped) {
+        // PROTECTED_UNTRUSTED already covers; a noised canvas pattern is the same engine
+        // protection reaching WebGL read-back).
+        if ($brave || $webglWrapped || $patternNoised || EnvironmentConsistency::gpuRealmsDisagree($claims)) {
             $untrusted[] = 'gpuMath';
         }
         if ($webglWrapped) {
@@ -348,6 +373,105 @@ final class DeviceComponents
         }
 
         return 'gpumath:'.self::keyed('gpuMath', $precision.'|'.$hash, $secret);
+    }
+
+    /**
+     * The physical keyboard layout (`keyboardLayout`: a hash of what 17 physical keys produce)
+     * as a keyed class. An operating-system setting shared by every Chromium browser on the
+     * device, so it agrees across Chrome, Edge and Opera on one machine; absent in Firefox and
+     * Safari (no Keyboard Map API) and under Brave (removed). An empty map (`size` 0) is the
+     * headless-Chromium answer and not a layout, so it is absent rather than one shared constant
+     * that every headless machine would agree on. Soft, agree-only: a person changes layouts.
+     *
+     * @param  array<array-key, mixed>  $claims
+     */
+    private static function keyboard(array $claims, ?string $secret): ?string
+    {
+        $hash = EnvironmentConsistency::read($claims, 'tier2', 'keyboardLayout', 'hash');
+        $size = self::int(EnvironmentConsistency::read($claims, 'tier2', 'keyboardLayout', 'size'));
+
+        if ($secret === null || ! is_string($hash) || preg_match('/^[0-9a-f]{8}$/', $hash) !== 1 || $size === null || $size < 1) {
+            return null;
+        }
+
+        return 'keyboard:'.self::keyed('keyboard', $hash, $secret);
+    }
+
+    /**
+     * What the GPU can do, as an engine-conditioned keyed class (research M5, collect-only):
+     * the WebGL compressed-texture families and multisample counts, and the WebGPU features,
+     * bucketed limits, subgroup sizes and canvas format. Renderer strings are being neutralised
+     * by every vendor; capabilities are what survives. Engine-conditioned like `gpu`'s WebGL
+     * class (`caps:<engine>:<hash>`): two engines' lists are incomparable until a three-engine
+     * capture on one machine shows them identical, so cross-engine pairs are neutral.
+     * Soft and agree-only, and a matcher weight is the host's decision (none by default). Null
+     * without a secret or when the client sent no capability field.
+     *
+     * @param  array<array-key, mixed>  $claims
+     */
+    private static function gpuCaps(array $claims, ?string $engine, ?string $secret): ?string
+    {
+        if ($secret === null) {
+            return null;
+        }
+
+        $parts = [];
+        $any = false;
+        foreach ([
+            ['webgl', 'caps', 'compressed'], ['webgl', 'caps', 'samples'], ['webgl', 'caps', 'maxSamples'],
+            ['webgpu', 'features'], ['webgpu', 'limits'], ['webgpu', 'subgroups'], ['webgpu', 'canvasFormat'],
+        ] as $path) {
+            $value = EnvironmentConsistency::read($claims, 'tier2', 'gpu', ...$path);
+            if (is_int($value) && $value >= 0 && $value <= 64) {
+                $value = (string) $value;
+            }
+            if ($value !== null && (! is_string($value) || strlen($value) > 600 || preg_match('/^[A-Za-z0-9_,\/.\-]*$/', $value) !== 1)) {
+                return null;
+            }
+            $any = $any || ($value !== null && $value !== '');
+            $parts[] = implode('.', $path).'='.($value ?? '~');
+        }
+
+        if (! $any) {
+            return null;
+        }
+
+        return 'caps:'.($engine ?? 'unknown').':'.self::keyed('gpuCaps', ($engine ?? 'unknown').'|'.implode(';', $parts), $secret);
+    }
+
+    /**
+     * The hardware-codec class (research M6, collect-only): the `powerEfficient` bit of every
+     * decode query (H.264, VP9, AV1, HEVC Main and Main 10, AV1 10-bit 4K, VP9 profile 2,
+     * H.264 4K60) and of three WebRTC encoders. Hardware decoders and encoders belong to the
+     * SoC or GPU generation and the OS media stack, so they are the same in every browser on a
+     * device that uses the platform's codecs; `supported` and `smooth` move with the browser
+     * build and are deliberately left out. A query the browser refused (`err`) makes the class
+     * unknown rather than a guess: null unless the client sent the extended probe and every
+     * query answered.
+     *
+     * @param  array<array-key, mixed>  $claims
+     */
+    private static function codecsHw(array $claims): ?string
+    {
+        $bits = '';
+        foreach (['h264', 'vp9', 'av1', 'hevc', 'hevc10', 'av1_10', 'vp9_2', 'h264_4k'] as $codec) {
+            $value = EnvironmentConsistency::read($claims, 'tier2', 'decoders', $codec);
+            if (! is_string($value) || preg_match('/^[01]{3}$/', $value) !== 1) {
+                return null;
+            }
+            $bits .= $value[2];
+        }
+
+        $encoders = '';
+        foreach (['h264', 'vp9', 'av1'] as $codec) {
+            $value = EnvironmentConsistency::read($claims, 'tier2', 'decoders', 'enc', $codec);
+            if (! is_string($value) || preg_match('/^[01]{2}$/', $value) !== 1) {
+                return null;
+            }
+            $encoders .= $value[1];
+        }
+
+        return 'hw:'.$bits.'|enc:'.$encoders;
     }
 
     /**
@@ -466,7 +590,9 @@ final class DeviceComponents
         // Legitimately absent on every software renderer and wherever WebGL is off, which
         // is a large honest population; expecting it would read as missing coverage on
         // every one of them. It is a bonus where it exists, never a gap where it does not.
-        return array_values(array_filter($names, static fn (string $n): bool => $n !== 'gpuMath'));
+        // The same holds for `keyboard`: the Keyboard Map API exists in desktop Chromium only
+        // (not Android, Firefox, Safari or Brave) and an empty map is absent.
+        return array_values(array_filter($names, static fn (string $n): bool => ! in_array($n, ['gpuMath', 'keyboard', 'gpuCaps', 'codecsHw'], true)));
     }
 
     /**

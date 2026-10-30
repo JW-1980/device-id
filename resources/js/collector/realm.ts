@@ -83,6 +83,14 @@ export interface ScopeSnapshot {
      * disagree (a randomised read-back).
      */
     readonly canvasHash: string | null;
+    /**
+     * `fnv1a32` of the `gpuMath` shader render (`renderGpuMathOn`) as this realm's WebGL
+     * context reads it back, and the fragment-shader precision class it ran at; null when the
+     * realm has no WebGL, the shader would not build or the two reads disagree. The server
+     * compares the hashes only within one precision class.
+     */
+    readonly gpuMathHash: string | null;
+    readonly gpuMathPrecision: string | null;
 }
 
 /** The unmasked WebGL identity strings, or nulls. */
@@ -304,7 +312,7 @@ interface RealmNavigator {
  * changes at every DST transition, which would make the claim differ between two loads a
  * day apart for a reason unrelated to the device.
  */
-export function scopeSnapshot(webgl: WebGlIdentity, canvasHash: string | null): ScopeSnapshot {
+export function scopeSnapshot(webgl: WebGlIdentity, canvasHash: string | null, gpuMath: { readonly hash: string; readonly precision: string } | null = null): ScopeSnapshot {
     const nav = guarded(() => (globalThis as { navigator?: RealmNavigator }).navigator ?? null);
     const resolved = guarded(() => Intl.DateTimeFormat().resolvedOptions());
     const uad = guarded(() => nav?.userAgentData ?? null);
@@ -333,6 +341,8 @@ export function scopeSnapshot(webgl: WebGlIdentity, canvasHash: string | null): 
         ),
         engine: guarded(() => classifyEngine(engineMarks())) ?? 'unknown',
         canvasHash,
+        gpuMathHash: gpuMath?.hash ?? null,
+        gpuMathPrecision: gpuMath?.precision ?? null,
     };
 }
 
@@ -375,6 +385,8 @@ export function sanitiseReply(reply: unknown): ScopeSnapshot | null {
         currencyCount: asNumber(s.currencyCount),
         engine,
         canvasHash: typeof s.canvasHash === 'string' && /^[0-9a-f]{8}$/.test(s.canvasHash) ? s.canvasHash : null,
+        gpuMathHash: typeof s.gpuMathHash === 'string' && /^[0-9a-f]{8}$/.test(s.gpuMathHash) ? s.gpuMathHash : null,
+        gpuMathPrecision: typeof s.gpuMathPrecision === 'string' && /^[a-z0-9:]{1,32}$/.test(s.gpuMathPrecision) ? s.gpuMathPrecision : null,
     };
 }
 
@@ -464,5 +476,156 @@ export function canvasRealmHash(context: RealmContext2D | null | undefined): str
         return fnv1a32Bytes(first);
     } catch {
         return null;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// gpuMath render (shared by the page probe and the worker snapshot)
+// ---------------------------------------------------------------------------
+
+/** `tier2.gpuMath` on the wire (moved to realm.ts so the worker renders the same thing). */
+export interface GpuMathValue {
+    /** `fnv1a32` of the 64 RGBA bytes of the 4×4 render. */
+    readonly hash: string;
+    /** The fragment-shader precision the render ran at, e.g. `highp:23`; compare hashes only within one class. */
+    readonly precision: string;
+    /** The renderer names a software rasteriser; the server then marks the component absent. */
+    readonly software: boolean;
+}
+
+/** Renderer strings of software rasterisers (SwiftShader, llvmpipe, softpipe, WARP / Basic Render, lavapipe, Mesa's software paths). */
+const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|lavapipe|\bwarp\b|basic render|software rasterizer|mesa offscreen/i;
+
+/** Whether a renderer string names a software rasteriser. */
+export function isSoftwareRenderer(renderer: string): boolean {
+    return SOFTWARE_RENDERER.test(renderer);
+}
+
+const GPU_MATH_VERTEX = 'attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }';
+
+/**
+ * Four channels of amplified transcendental output, each varying in BOTH coordinates
+ * (notes/22 review: at 8 bits only an amplified, two-dimensional function carries bits).
+ */
+const GPU_MATH_FRAGMENT = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+void main() {
+    float x = gl_FragCoord.x / 4.0;
+    float y = gl_FragCoord.y / 4.0;
+    gl_FragColor = vec4(
+        fract(sin(x * 7.0 + y * 3.0) * 43758.5453),
+        fract(exp(x * 3.0 + y) * 1013.0),
+        fract(pow(x + 0.5, 2.2 + y) * 611.0),
+        fract(log(x + y + 1.5) * 997.0)
+    );
+}`;
+
+/** Thrown inside the render to settle the probe as `unavailable(reason)`. Never on the wire. */
+export class GpuMathUnavailable extends Error {
+    constructor(readonly reason: string) {
+        super(reason);
+    }
+}
+
+/**
+ * The render behind `gpuMath`, on any WebGL context: the page's shared one and the worker's
+ * `OffscreenCanvas` one run THIS function, so a difference between the two is a difference in
+ * what the realms' read-back returns, not in the code. Throws `GpuMathUnavailable` for the
+ * expected failures.
+ */
+export function renderGpuMathOn(gl: WebGLRenderingContext | WebGL2RenderingContext): GpuMathValue {
+
+    const highp = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+    const precision = highp && highp.precision > 0
+        ? `highp:${highp.precision}`
+        : `mediump:${gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.MEDIUM_FLOAT)?.precision ?? 0}`;
+    const identity = unmaskedWebGl(gl);
+    const renderer = identity.renderer ?? String(gl.getParameter(gl.RENDERER));
+
+    const created: Array<() => void> = [];
+    const ditherWas = gl.isEnabled(gl.DITHER);
+    const previousFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+    const previousProgram = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram | null;
+    const previousBuffer = gl.getParameter(gl.ARRAY_BUFFER_BINDING) as WebGLBuffer | null;
+    const previousTexture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
+    const previousViewport = gl.getParameter(gl.VIEWPORT) as Int32Array | null;
+    let attribute = -1;
+
+    try {
+        const compile = (type: number, source: string): WebGLShader => {
+            const shader = gl.createShader(type);
+            if (!shader) throw new GpuMathUnavailable('compile-failed');
+            created.push(() => gl.deleteShader(shader));
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new GpuMathUnavailable('compile-failed');
+            return shader;
+        };
+        const program = gl.createProgram();
+        if (!program) throw new GpuMathUnavailable('compile-failed');
+        created.push(() => gl.deleteProgram(program));
+        gl.attachShader(program, compile(gl.VERTEX_SHADER, GPU_MATH_VERTEX));
+        gl.attachShader(program, compile(gl.FRAGMENT_SHADER, GPU_MATH_FRAGMENT));
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new GpuMathUnavailable('compile-failed');
+
+        const texture = gl.createTexture();
+        const framebuffer = gl.createFramebuffer();
+        const buffer = gl.createBuffer();
+        if (!texture || !framebuffer || !buffer) throw new GpuMathUnavailable('incomplete-framebuffer');
+        created.push(() => gl.deleteTexture(texture), () => gl.deleteFramebuffer(framebuffer), () => gl.deleteBuffer(buffer));
+
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 4, 4, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new GpuMathUnavailable('incomplete-framebuffer');
+
+        gl.disable(gl.DITHER);
+        gl.viewport(0, 0, 4, 4);
+        gl.useProgram(program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+        attribute = gl.getAttribLocation(program, 'p');
+        gl.enableVertexAttribArray(attribute);
+        gl.vertexAttribPointer(attribute, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+        const first = new Uint8Array(64);
+        const second = new Uint8Array(64);
+        gl.readPixels(0, 0, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, first);
+        gl.readPixels(0, 0, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, second);
+        for (let i = 0; i < 64; i++) {
+            if (first[i] !== second[i]) throw new GpuMathUnavailable('randomised');
+        }
+
+        return { hash: fnv1a32Bytes(first), precision, software: isSoftwareRenderer(renderer) };
+    } finally {
+        try {
+            if (attribute >= 0) gl.disableVertexAttribArray(attribute);
+            if (ditherWas) gl.enable(gl.DITHER);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, previousFramebuffer);
+            gl.useProgram(previousProgram);
+            gl.bindBuffer(gl.ARRAY_BUFFER, previousBuffer);
+            gl.bindTexture(gl.TEXTURE_2D, previousTexture);
+            if (previousViewport && previousViewport.length === 4) {
+                gl.viewport(previousViewport[0] as number, previousViewport[1] as number, previousViewport[2] as number, previousViewport[3] as number);
+            }
+        } catch {
+            /* a lost context has no state left to restore */
+        }
+        for (const dispose of created.reverse()) {
+            try {
+                dispose();
+            } catch {
+                /* already gone with the context */
+            }
+        }
     }
 }

@@ -61,6 +61,53 @@ The engine reads everything through `Support\Config` (`Config::use()` with an ar
 | `fingerprint.constraint_weights` | Rule weights over the shipped table. A weight of 0 silences a rule. Every shipped rule is on by default, including `renderer_vs_limits` (WebGL limits below the published spec minima, 12) and `ch_platform_vs_gpu` (a GPU family impossible on the claimed OS, 10). |
 | `fingerprint.confidence_probes` | An optional probe catalogue for the confidence number: `'tier:probe' => ['weight' => int, 'charge' => float]`. When set it **replaces** the shipped list. The shipped list is exactly the probe set of the one collector in this package (`tests/Unit/ProbeSetTest` keeps them equal), so a host needs no override; it exists for a host that ships a modified collector. |
 
+### Device-hint request headers (the host sends `Accept-CH`)
+
+Five rules compare what the page claims with a header the browser put on the wire, which a
+JavaScript spoof cannot change: `device_memory_vs_ch` (15), `ch_bitness_vs_js` (15),
+`ch_model_vs_js` (15), `dpr_vs_ch` (8) and `viewport_vs_ch` (6). The engine already reads the
+witnesses; **the host has to ask the browser for them**, because a Chromium browser sends a
+high-entropy hint only after a response named it in `Accept-CH`. Send this on the HTML document
+responses of every page that runs the collector (HTTPS or localhost only):
+
+```
+Accept-CH: Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Model, Sec-CH-Device-Memory, Sec-CH-DPR, Sec-CH-Viewport-Width
+```
+
+| Header | Read by | Without it |
+|---|---|---|
+| `Sec-CH-UA-Full-Version-List` | `sec_ch_full_version_mismatch` (45), `ua_vs_ch_major` | those two checks see nothing |
+| `Sec-CH-UA-Platform-Version` | the `osVersion` matcher component | the component is absent |
+| `Sec-CH-UA-Arch` | `arch_vs_ch_arch` (15), the `arch` hard component | the component falls back to the NaN-sign probe |
+| `Sec-CH-UA-Bitness`, `Sec-CH-UA-Model` | `ch_bitness_vs_js`, `ch_model_vs_js` | rule silent |
+| `Sec-CH-Device-Memory` | `device_memory_vs_ch` | rule silent |
+| `Sec-CH-DPR` | `dpr_vs_ch` | rule silent |
+| `Sec-CH-Viewport-Width` | `viewport_vs_ch` | rule silent |
+
+Rules and limits worth knowing:
+
+- Every rule is both-present only. Firefox and Safari send none of these headers and are never
+  judged; a proxy or WAF that strips a header only silences the rule. A proxy that **rewrites** one
+  would make the rule fire for everyone behind it, so keep these headers untouched at the edge.
+- Do **not** add them to `Critical-CH`: that makes the browser repeat the first navigation to
+  obtain them, which doubles the first page load. `Accept-CH` is enough, because the claims
+  request is a later same-origin request.
+- `Sec-CH-DPR`, `Sec-CH-Viewport-Width` and `Sec-CH-Device-Memory` are marked experimental; if a
+  browser stops sending one, the matching rule goes silent rather than wrong.
+- `sec_ch_partial_default_set` (`Sec-CH-UA` without `Sec-CH-UA-Mobile`) is a hard finding only when
+  the headers PHP sees are the client's own frame (`headersAreClientFrame`); behind a proxy it is
+  recorded as soft, because a proxy that drops one of the pair produces it for every visitor.
+
+### Matcher components added with probe set 4
+
+`keyboard` (Chromium keyboard layout, keyed), `gpuCaps` (WebGL/WebGPU capability class, keyed and
+engine-conditioned) and `codecsHw` (hardware decode/encode bits) are stored soft components. The
+engine ships **no weight** for any of them (matcher weights are the host's `fingerprint.matcher.weights`),
+so they change no match until a host sets one. `keyboard` and `gpuCaps` are agree-only (a disagreement
+never counts against a link); none of the three is part of `browser_key` or `hardware_key`
+(`hardware_key` stays `os|arch|touch`), and none counts towards coverage. Give `gpuCaps` and
+`codecsHw` a weight only after a three-engine capture on one real machine shows they agree.
+
 ## Browser collector
 
 One collector runs in the visitor's browser, shipped as TypeScript sources under

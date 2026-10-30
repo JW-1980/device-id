@@ -117,12 +117,12 @@ final class ProbeOmission
 
     /**
      * Integrity probes the deferred phase reports in the tier-2 envelope (integrity.ts
-     * `collectDeferredIntegrity`: `phantomRealm`, plus `resistance` and `canvasFill`
-     * re-measured for that envelope's own trust decisions).
+     * `collectDeferredIntegrity`: `phantomRealm`, plus `resistance`, `canvasFill` and
+     * `canvasPattern` re-measured for that envelope's own trust decisions).
      *
      * @var list<string>
      */
-    public const DEFERRED_INTEGRITY = ['phantomRealm', 'resistance', 'canvasFill'];
+    public const DEFERRED_INTEGRITY = ['phantomRealm', 'resistance', 'canvasFill', 'canvasPattern'];
 
     public const SLOT_TIER1 = 'tier1';
 

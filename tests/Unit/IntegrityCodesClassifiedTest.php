@@ -34,7 +34,7 @@ final class IntegrityCodesClassifiedTest extends TestCase
         if (preg_match('/export const INTEGRITY_CODES = \{(.*?)\} as const;/s', $source, $block) !== 1) {
             self::fail('INTEGRITY_CODES not found in integrity.ts');
         }
-        self::assertSame(19, preg_match_all("/:\\s*'([a-z_]+)'/", $block[1], $codes), 'the INTEGRITY_CODES block changed size; re-run the derivability inventory (HOW-IT-WORKS §3.3)');
+        self::assertSame(22, preg_match_all("/:\\s*'([a-z_]+)'/", $block[1], $codes), 'the INTEGRITY_CODES block changed size; re-run the derivability inventory (HOW-IT-WORKS §3.3)');
 
         foreach ($codes[1] as $code) {
             self::assertTrue(

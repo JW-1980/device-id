@@ -66,7 +66,7 @@ describe('the merged probe registry', () => {
     it('reports probe set 3 on the wire, next to envelope version 3', () => {
         const envelope = buildEnvelope({ challenge: CHALLENGE, slot: 'tier2', digest: '', claims: {} as never });
         expect(envelope.probes).toBe(PROBE_SET);
-        expect(PROBE_SET).toBe(3);
+        expect(PROBE_SET).toBe(4);
         expect(envelope.v).toBe(FINGERPRINT_VERSION);
         expect(FINGERPRINT_VERSION).toBe(3);
     });

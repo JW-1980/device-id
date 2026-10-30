@@ -41,7 +41,7 @@ function defineOwn(target: object, name: string, descriptor: PropertyDescriptor)
 const SNAPSHOT_KEYS = [
     'userAgent', 'platform', 'hardwareConcurrency', 'deviceMemory', 'language', 'languages',
     'timeZone', 'locale', 'tzOffset', 'uaPlatform', 'uaMobile', 'uaBrands', 'webglVendor',
-    'webglRenderer', 'currencyCount', 'engine', 'canvasHash',
+    'webglRenderer', 'currencyCount', 'engine', 'canvasHash', 'gpuMathHash', 'gpuMathPrecision',
 ];
 
 describe('classifyEngine', () => {

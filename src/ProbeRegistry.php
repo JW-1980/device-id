@@ -66,6 +66,8 @@ final class ProbeRegistry
         'canvasDual' => [self::TIER_INTEGRITY, false, 'integrity', 'Rasterises the same shape two ways and tests the fill-rule distinction; a stub canvas diverges.'],
         'domBlockers' => [self::TIER_INTEGRITY, false, 'integrity', 'Reads automation and extension footprints (driver globals, chrome.runtime, getEventListeners) and whether navigator.webdriver was deleted.'],
         'canvasFill' => [self::TIER_INTEGRITY, false, 'integrity', 'A solid fill read back pixel by pixel; any deviation is read-side noise (farbling or a noise extension), so canvas values cannot identify the device.'],
+        'canvasPattern' => [self::TIER_INTEGRITY, false, 'integrity', 'A two-colour pixel-aligned checkerboard read back twice; any deviation is read-side noise, including the noise that leaves a uniform fill exact (Firefox Private/Strict, Safari advanced protection).'],
+        'automationMarks' => [self::TIER_INTEGRITY, false, 'integrity', 'Counts the automation globals drivers leave on window and document (the ChromeDriver cdc_ property, Playwright bindings, Selenium, PhantomJS) and reports the headless-shell geometry (outer size equals inner size). Counts and booleans only; no property name is sent.'],
         'lieBattery' => [self::TIER_INTEGRITY, false, 'integrity', 'Native-function invariants (not constructible, own keys exactly length and name, native source, cyclic-prototype TypeError) on ~25 fingerprinting-relevant functions; a Proxy or closure fails several.'],
         'phantomRealm' => [self::TIER_INTEGRITY, false, 'integrity', 'A transient same-origin iframe: a pristine Function.prototype.toString applied to page functions, DOMRect and SVG text arithmetic, CSS-path screen size, and the OS system fonts and colours.'],
         // Core since the five-review round: it gates DeviceComponents::untrusted(), the
@@ -114,7 +116,7 @@ final class ProbeRegistry
         'voices' => [self::TIER_HARDWARE, false, 'device', 'Speech voices that ship with the operating system.'],
         'fontFaces' => [self::TIER_HARDWARE, false, 'device', 'document.fonts.check over OS-indicative families; the OS the fonts imply is compared with the User-Agent.'],
         'parallelism' => [self::TIER_HARDWARE, false, 'device', 'Measured parallel capacity from timed workers, compared with the reported core count; a CDP or Brave override of hardwareConcurrency cannot change the measurement. Costs CPU; off by default.'],
-        'keyboardLayout' => [self::TIER_HARDWARE, false, 'device', 'A hash of the physical keyboard layout map (Chromium desktop only).'],
+        'keyboardLayout' => [self::TIER_HARDWARE, false, 'device', 'A hash of the physical keyboard layout map (Chromium desktop only): the agree-only `keyboard` matcher component. An empty map (headless Chromium) and Brave (no navigator.keyboard) read as absent.'],
         'gpuMath' => [self::TIER_HARDWARE, false, 'device', 'How the GPU rounds transcendental arithmetic in a shader, read back as pixels; the same across browsers on the same driver, so a cross-browser matcher component. Absent on software renderers.'],
         // --- Tier 2, merged in from the second host's collector (probe set 3) ---------
         // Neither feeds a key. `webrtc` moves with the browser build (a codec list changes at
@@ -132,7 +134,7 @@ final class ProbeRegistry
      * ({@see PROBE_SET_ADDED}); without that, an honest page left open across a deploy reads
      * as a client that dropped every probe added since.
      */
-    public const PROBE_SET = 3;
+    public const PROBE_SET = 4;
 
     /**
      * The probe set a body WITHOUT a `probes` marker is judged against: the collector on
@@ -166,17 +168,19 @@ final class ProbeRegistry
         'gpuMath' => 2,
         'webrtc' => 3,
         'behavior' => 3,
+        'canvasPattern' => 4,
+        'automationMarks' => 4,
     ];
 
     /**
      * Methods switched off when the operator has never chosen: measured-parallelism costs
-     * real CPU on every visit and is an experiment until measured; the keyboard layout has
-     * no server consumer yet, and data nothing reads is not collected (CLAUDE.md, data
-     * minimisation — security review).
+     * real CPU on every visit and is an experiment until measured. The keyboard layout used to
+     * be here for want of a consumer; it is now the agree-only `keyboard` matcher component
+     * (`DeviceComponents`), so the data is read and the probe runs.
      *
      * @var list<string>
      */
-    public const DEFAULT_DISABLED = ['parallelism', 'keyboardLayout'];
+    public const DEFAULT_DISABLED = ['parallelism'];
 
     /**
      * Which method raises each client-side integrity finding, so a switched-off method's
@@ -192,6 +196,9 @@ final class ProbeRegistry
         'dom_blocker_threw' => 'domBlockers',
         'dom_blocker_present' => 'domBlockers',
         'canvas_readback_perturbed' => 'canvasFill',
+        'canvas_pattern_perturbed' => 'canvasPattern',
+        'automation_global_present' => 'automationMarks',
+        'headless_shell_geometry' => 'automationMarks',
         'lie_battery_failed' => 'lieBattery',
         'realm_tostring_mismatch' => 'phantomRealm',
         'domrect_inconsistent' => 'phantomRealm',

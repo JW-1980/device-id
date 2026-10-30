@@ -182,6 +182,12 @@ final class IntegrityFindingsTest extends TestCase
         yield 'canvas fill not exact' => ['canvasFill', [[['exact'], false], [['deviations'], 12]], 'canvas_readback_perturbed'];
         yield 'canvas fill deviations under exact true' => ['canvasFill', [[['deviations'], 3844]], 'canvas_readback_perturbed'];
 
+        yield 'canvas pattern not exact' => ['canvasPattern', [[['exact'], false], [['deviations'], 9]], 'canvas_pattern_perturbed'];
+        yield 'canvas pattern deviations under exact true' => ['canvasPattern', [[['deviations'], 4]], 'canvas_pattern_perturbed'];
+
+        yield 'automation global present' => ['automationMarks', [[['globals'], 1]], 'automation_global_present'];
+        yield 'headless shell geometry' => ['automationMarks', [[['outerEqualsInner'], true], [['historyLength'], 1]], 'headless_shell_geometry'];
+
         yield 'lie battery lied' => ['lieBattery', [[['lied'], ['Navigator.userAgent' => 'to_string']]], 'lie_battery_failed'];
 
         yield 'realm toString mismatch' => ['phantomRealm', [[['nativeToString', 'mismatched'], ['Navigator.userAgent']]], 'realm_tostring_mismatch'];

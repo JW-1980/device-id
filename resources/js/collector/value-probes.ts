@@ -71,7 +71,10 @@ import {
     CANVAS_REALM_WIDTH,
     canvasRealmHash,
     engineIdentityOf,
-    fnv1a32Bytes,
+    GpuMathUnavailable,
+    isSoftwareRenderer,
+    renderGpuMathOn,
+    type GpuMathValue,
     sanitiseReply,
     spinIterations,
     scopeSnapshot,
@@ -1081,7 +1084,7 @@ export function workerScope(): Promise<ProbeResult<WorkerScopeValue>> {
                     return;
                 }
                 const elapsedMs = Math.round((nowMs() - started) * 1000) / 1000;
-                const fromWindow = scopeSnapshot(unmaskedWebGl(sharedWebGl()?.context), windowCanvasHash());
+                const fromWindow = scopeSnapshot(unmaskedWebGl(sharedWebGl()?.context), windowCanvasHash(), pageGpuMathOrNull());
                 finish(ok({ workerType: 'dedicated', window: fromWindow, worker: fromWorker, elapsedMs }));
             });
             worker.addEventListener('messageerror', () => finish(unavailable('malformed')));
@@ -1875,6 +1878,7 @@ export function gpu(): Promise<ProbeResult<Record<string, unknown>>> {
             if (adapter) {
                 const info = (adapter as { info?: Partial<GPUAdapterInfo> & { isFallbackAdapter?: boolean } }).info;
                 webgpu = {
+                    ...webgpuCapabilities(adapter),
                     vendor: info?.vendor ?? null,
                     architecture: info?.architecture ?? null,
                     device: info?.device ?? null,
@@ -1920,6 +1924,7 @@ export function gpu(): Promise<ProbeResult<Record<string, unknown>>> {
                     limits,
                     extCount: (gl.getSupportedExtensions() ?? []).length,
                     webgl2: shared.webgl2,
+                    caps: webglCapabilities(gl, shared.webgl2),
                 };
             }
         } catch {
@@ -1935,6 +1940,95 @@ export function gpu(): Promise<ProbeResult<Record<string, unknown>>> {
 
         return { webgpu, webgl, mirroredParamsAgree };
     });
+}
+
+/** The WebGPU limits `webgpuCapabilities` reports, as `floor(log2)` buckets, in this order. */
+const WEBGPU_LIMIT_NAMES = ['maxBufferSize', 'maxStorageBufferBindingSize', 'maxComputeWorkgroupStorageSize', 'maxTextureDimension2D'] as const;
+
+/**
+ * What the WebGPU adapter can do, as a class (research M5, collect-only): the sorted feature
+ * names, four limits as `floor(log2)` buckets, the subgroup size range (Chrome 134+), and the
+ * canvas format the platform prefers. Features and limits move with the GPU and driver, not
+ * with a preference; the strings are bounded so a hostile adapter cannot inflate the body.
+ * Every read is guarded alone; an absent one is null.
+ */
+function webgpuCapabilities(adapter: GPUAdapter): Record<string, unknown> {
+    let features: string | null = null;
+    try {
+        features = [...(adapter.features as unknown as Iterable<string>)].filter((name) => typeof name === 'string').sort().join(',').slice(0, 600);
+    } catch {
+        features = null;
+    }
+
+    let limits: string | null = null;
+    try {
+        const source = adapter.limits as unknown as Record<string, unknown>;
+        limits = WEBGPU_LIMIT_NAMES.map((name) => {
+            const value = source[name];
+            return typeof value === 'number' && value > 0 ? String(Math.floor(Math.log2(value))) : '';
+        }).join(',');
+    } catch {
+        limits = null;
+    }
+
+    let subgroups: string | null = null;
+    try {
+        const info = (adapter as { info?: { subgroupMinSize?: unknown; subgroupMaxSize?: unknown } }).info;
+        if (typeof info?.subgroupMinSize === 'number' && typeof info.subgroupMaxSize === 'number') {
+            subgroups = `${info.subgroupMinSize}/${info.subgroupMaxSize}`;
+        }
+    } catch {
+        subgroups = null;
+    }
+
+    let canvasFormat: string | null = null;
+    try {
+        const format = (navigator as { gpu?: { getPreferredCanvasFormat?: () => unknown } }).gpu?.getPreferredCanvasFormat?.();
+        canvasFormat = typeof format === 'string' ? format.slice(0, 24) : null;
+    } catch {
+        canvasFormat = null;
+    }
+
+    return { features, limits, subgroups, canvasFormat };
+}
+
+/** The compressed-texture extension families `webglCapabilities` looks for. */
+const COMPRESSED_TEXTURE_FAMILIES = ['s3tc', 's3tc_srgb', 'astc', 'etc', 'etc1', 'bptc', 'rgtc', 'pvrtc'] as const;
+
+/**
+ * What the WebGL context can do beyond its strings (research M5, collect-only): which
+ * compressed-texture families exist (BC on desktop, ASTC on Apple silicon and mobile, ETC2 on
+ * mobile), the multisample counts the context offers for an RGBA8 renderbuffer, and
+ * `MAX_SAMPLES`. Synchronous, no state change. Under Brave 1.93 the extension LIST is
+ * randomised per session, so the server treats this as untrusted there.
+ */
+export function webglCapabilities(gl: WebGLRenderingContext | WebGL2RenderingContext, webgl2: boolean): Record<string, unknown> {
+    let compressed: string | null = null;
+    try {
+        const extensions = new Set(gl.getSupportedExtensions() ?? []);
+        compressed = COMPRESSED_TEXTURE_FAMILIES
+            .filter((family) => extensions.has(`WEBGL_compressed_texture_${family}`) || extensions.has(`WEBKIT_WEBGL_compressed_texture_${family}`))
+            .join(',');
+    } catch {
+        compressed = null;
+    }
+
+    let samples: string | null = null;
+    let maxSamples: number | null = null;
+    if (webgl2) {
+        try {
+            const gl2 = gl as WebGL2RenderingContext;
+            const counts = gl2.getInternalformatParameter(gl2.RENDERBUFFER, gl2.RGBA8, gl2.SAMPLES) as Int32Array | null;
+            samples = counts ? Array.from(counts).slice(0, 12).join(',') : null;
+            const max: unknown = gl2.getParameter(gl2.MAX_SAMPLES);
+            maxSamples = typeof max === 'number' ? max : null;
+        } catch {
+            samples = null;
+            maxSamples = null;
+        }
+    }
+
+    return { compressed, samples, maxSamples };
 }
 
 /** The page's one `requestAdapter()` call, settled or in flight; `undefined` until first asked. */
@@ -2070,19 +2164,27 @@ export function audioHardware(): ProbeResult<{ sampleRate: number; maxChannelCou
 /**
  * Hardware decoding of the three mainstream codecs at 1080p30, as `supported`,
  * `smooth`, `powerEfficient` bits. `powerEfficient` is the hardware-decoder signal.
+ *
+ * Collected beside them, for the `codecsHw` class (research M6): the codecs whose hardware
+ * support tells the SoC or GPU generation apart (HEVC Main and Main 10, AV1 Main 10-bit, VP9
+ * profile 2, H.264 at 4K60), the same bits for three WebRTC encoders, and the codec families
+ * `RTCRtpSender.getCapabilities('video')` lists (a static list: no peer connection, no ICE, no
+ * address). Every one is a `MediaCapabilities` or capability read: no permission, no prompt.
+ * Each extra is guarded alone (`err` / null), so an engine without one still reports the
+ * original three. `powerEfficient` is the only bit the server compares across engines.
  */
-export function decoders(): Promise<ProbeResult<{ h264: string; vp9: string; av1: string }>> {
+export function decoders(): Promise<ProbeResult<DecodersValue>> {
     return probeAsync('decoders', async () => {
         const capabilities = navigator.mediaCapabilities;
         if (!capabilities || typeof capabilities.decodingInfo !== 'function') {
             throw new Error('no mediaCapabilities');
         }
 
-        const query = async (contentType: string): Promise<string> => {
+        const query = async (contentType: string, width = 1920, height = 1080, framerate = 30): Promise<string> => {
             try {
                 const info = await capabilities.decodingInfo({
                     type: 'file',
-                    video: { contentType, width: 1920, height: 1080, bitrate: 4_000_000, framerate: 30 },
+                    video: { contentType, width, height, bitrate: 4_000_000, framerate },
                 });
                 return `${info.supported ? 1 : 0}${info.smooth ? 1 : 0}${info.powerEfficient ? 1 : 0}`;
             } catch {
@@ -2090,14 +2192,65 @@ export function decoders(): Promise<ProbeResult<{ h264: string; vp9: string; av1
             }
         };
 
-        const [h264, vp9, av1] = await Promise.all([
+        // `supported` and `powerEfficient` of a WebRTC encoder. Absent `encodingInfo` is `err`.
+        const encode = async (contentType: string): Promise<string> => {
+            try {
+                if (typeof capabilities.encodingInfo !== 'function') return 'err';
+                const info = await capabilities.encodingInfo({
+                    type: 'webrtc',
+                    video: { contentType, width: 1280, height: 720, bitrate: 2_000_000, framerate: 30 },
+                });
+                return `${info.supported ? 1 : 0}${info.powerEfficient ? 1 : 0}`;
+            } catch {
+                return 'err';
+            }
+        };
+
+        const [h264, vp9, av1, hevc, hevc10, av1_10, vp9_2, h264_4k, encH264, encVp9, encAv1] = await Promise.all([
             query('video/mp4; codecs="avc1.42E01E"'),
             query('video/webm; codecs="vp09.00.10.08"'),
             query('video/mp4; codecs="av01.0.05M.08"'),
+            query('video/mp4; codecs="hvc1.1.6.L93.B0"'),
+            query('video/mp4; codecs="hvc1.2.4.L93.B0"'),
+            query('video/mp4; codecs="av01.0.12M.10"', 3840, 2160),
+            query('video/webm; codecs="vp09.02.10.10"'),
+            query('video/mp4; codecs="avc1.640033"', 3840, 2160, 60),
+            encode('video/h264'),
+            encode('video/vp9'),
+            encode('video/av1'),
         ]);
 
-        return { h264, vp9, av1 };
+        let rtc: string | null = null;
+        try {
+            const sender = (globalThis as { RTCRtpSender?: { getCapabilities?: (kind: string) => { codecs?: Array<{ mimeType?: unknown }> } | null } }).RTCRtpSender;
+            const codecs = sender?.getCapabilities?.('video')?.codecs;
+            if (Array.isArray(codecs)) {
+                const families = new Set<string>();
+                for (const codec of codecs) {
+                    if (typeof codec?.mimeType === 'string') families.add(codec.mimeType.replace(/^video\//i, '').toUpperCase().slice(0, 12));
+                }
+                rtc = [...families].sort().slice(0, 12).join(',');
+            }
+        } catch {
+            rtc = null;
+        }
+
+        return { h264, vp9, av1, hevc, hevc10, av1_10, vp9_2, h264_4k, enc: { h264: encH264, vp9: encVp9, av1: encAv1 }, rtc };
     });
+}
+
+/** `tier2.decoders` on the wire: three-bit `supported smooth powerEfficient` strings (or `err`), two-bit encoder strings, and the RTP codec families. */
+export interface DecodersValue {
+    readonly h264: string;
+    readonly vp9: string;
+    readonly av1: string;
+    readonly hevc: string;
+    readonly hevc10: string;
+    readonly av1_10: string;
+    readonly vp9_2: string;
+    readonly h264_4k: string;
+    readonly enc: { readonly h264: string; readonly vp9: string; readonly av1: string };
+    readonly rtc: string | null;
 }
 
 /** How long `voices` waits for `voiceschanged` when the first `getVoices()` is empty. */
@@ -2327,53 +2480,7 @@ export function webrtc(): Promise<ProbeResult<Record<string, unknown>>> {
     })();
 }
 
-/** `tier2.gpuMath` on the wire. */
-export interface GpuMathValue {
-    /** `fnv1a32` of the 64 RGBA bytes of the 4×4 render. */
-    readonly hash: string;
-    /** The fragment-shader precision the render ran at, e.g. `highp:23`; compare hashes only within one class. */
-    readonly precision: string;
-    /** The renderer names a software rasteriser; the server then marks the component absent. */
-    readonly software: boolean;
-}
-
-/** Renderer strings of software rasterisers (SwiftShader, llvmpipe, softpipe, WARP / Basic Render, lavapipe, Mesa's software paths). */
-const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|lavapipe|\bwarp\b|basic render|software rasterizer|mesa offscreen/i;
-
-/** Whether a renderer string names a software rasteriser. */
-export function isSoftwareRenderer(renderer: string): boolean {
-    return SOFTWARE_RENDERER.test(renderer);
-}
-
-const GPU_MATH_VERTEX = 'attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }';
-
-/**
- * Four channels of amplified transcendental output, each varying in BOTH coordinates
- * (notes/22 review: at 8 bits only an amplified, two-dimensional function carries bits).
- */
-const GPU_MATH_FRAGMENT = `
-#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-void main() {
-    float x = gl_FragCoord.x / 4.0;
-    float y = gl_FragCoord.y / 4.0;
-    gl_FragColor = vec4(
-        fract(sin(x * 7.0 + y * 3.0) * 43758.5453),
-        fract(exp(x * 3.0 + y) * 1013.0),
-        fract(pow(x + 0.5, 2.2 + y) * 611.0),
-        fract(log(x + y + 1.5) * 997.0)
-    );
-}`;
-
-/** Thrown inside the render to settle the probe as `unavailable(reason)`. Never on the wire. */
-class GpuMathUnavailable extends Error {
-    constructor(readonly reason: string) {
-        super(reason);
-    }
-}
+export { isSoftwareRenderer, type GpuMathValue };
 
 /**
  * The GPU's transcendental arithmetic, read back as pixels (notes/22 M1). TIER.HARDWARE, on
@@ -2411,106 +2518,46 @@ class GpuMathUnavailable extends Error {
  */
 export function gpuMath(): ProbeResult<GpuMathValue> {
     try {
-        return ok(renderGpuMath());
+        return ok(pageGpuMath());
     } catch (error) {
         return error instanceof GpuMathUnavailable ? unavailable(error.reason) : failed(error);
     }
 }
 
-/** The render behind `gpuMath`. Throws `GpuMathUnavailable` for the expected failures. */
-function renderGpuMath(): GpuMathValue {
+/**
+ * The page's `gpuMath` render, memoised per shared context: `workerScope` (tier 2, first) needs
+ * the window's hash to hand to the server beside the worker's, and `gpuMath` (hardware tier,
+ * later) reports the same value, so the 4×4 render and its shader compile happen once. A thrown
+ * `GpuMathUnavailable` is remembered too (the same answer the second time).
+ */
+const pageGpuMathMemo = new WeakMap<object, GpuMathValue | GpuMathUnavailable>();
+
+function pageGpuMath(): GpuMathValue {
     const shared = sharedWebGl();
     if (!shared) throw new GpuMathUnavailable('no-webgl');
-    const gl = shared.context;
 
-    const highp = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
-    const precision = highp && highp.precision > 0
-        ? `highp:${highp.precision}`
-        : `mediump:${gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.MEDIUM_FLOAT)?.precision ?? 0}`;
-    const identity = unmaskedWebGl(gl);
-    const renderer = identity.renderer ?? String(gl.getParameter(gl.RENDERER));
-
-    const created: Array<() => void> = [];
-    const ditherWas = gl.isEnabled(gl.DITHER);
-    const previousFramebuffer = gl.getParameter(gl.FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
-    const previousProgram = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram | null;
-    const previousBuffer = gl.getParameter(gl.ARRAY_BUFFER_BINDING) as WebGLBuffer | null;
-    const previousTexture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
-    const previousViewport = gl.getParameter(gl.VIEWPORT) as Int32Array | null;
-    let attribute = -1;
-
-    try {
-        const compile = (type: number, source: string): WebGLShader => {
-            const shader = gl.createShader(type);
-            if (!shader) throw new GpuMathUnavailable('compile-failed');
-            created.push(() => gl.deleteShader(shader));
-            gl.shaderSource(shader, source);
-            gl.compileShader(shader);
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new GpuMathUnavailable('compile-failed');
-            return shader;
-        };
-        const program = gl.createProgram();
-        if (!program) throw new GpuMathUnavailable('compile-failed');
-        created.push(() => gl.deleteProgram(program));
-        gl.attachShader(program, compile(gl.VERTEX_SHADER, GPU_MATH_VERTEX));
-        gl.attachShader(program, compile(gl.FRAGMENT_SHADER, GPU_MATH_FRAGMENT));
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new GpuMathUnavailable('compile-failed');
-
-        const texture = gl.createTexture();
-        const framebuffer = gl.createFramebuffer();
-        const buffer = gl.createBuffer();
-        if (!texture || !framebuffer || !buffer) throw new GpuMathUnavailable('incomplete-framebuffer');
-        created.push(() => gl.deleteTexture(texture), () => gl.deleteFramebuffer(framebuffer), () => gl.deleteBuffer(buffer));
-
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 4, 4, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new GpuMathUnavailable('incomplete-framebuffer');
-
-        gl.disable(gl.DITHER);
-        gl.viewport(0, 0, 4, 4);
-        gl.useProgram(program);
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-        attribute = gl.getAttribLocation(program, 'p');
-        gl.enableVertexAttribArray(attribute);
-        gl.vertexAttribPointer(attribute, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-        const first = new Uint8Array(64);
-        const second = new Uint8Array(64);
-        gl.readPixels(0, 0, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, first);
-        gl.readPixels(0, 0, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, second);
-        for (let i = 0; i < 64; i++) {
-            if (first[i] !== second[i]) throw new GpuMathUnavailable('randomised');
-        }
-
-        return { hash: fnv1a32Bytes(first), precision, software: isSoftwareRenderer(renderer) };
-    } finally {
+    let memo = pageGpuMathMemo.get(shared.context);
+    if (memo === undefined) {
         try {
-            if (attribute >= 0) gl.disableVertexAttribArray(attribute);
-            if (ditherWas) gl.enable(gl.DITHER);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, previousFramebuffer);
-            gl.useProgram(previousProgram);
-            gl.bindBuffer(gl.ARRAY_BUFFER, previousBuffer);
-            gl.bindTexture(gl.TEXTURE_2D, previousTexture);
-            if (previousViewport && previousViewport.length === 4) {
-                gl.viewport(previousViewport[0] as number, previousViewport[1] as number, previousViewport[2] as number, previousViewport[3] as number);
-            }
-        } catch {
-            /* a lost context has no state left to restore */
+            memo = renderGpuMathOn(shared.context);
+        } catch (error) {
+            if (!(error instanceof GpuMathUnavailable)) throw error;
+            memo = error;
         }
-        for (const dispose of created.reverse()) {
-            try {
-                dispose();
-            } catch {
-                /* already gone with the context */
-            }
-        }
+        pageGpuMathMemo.set(shared.context, memo);
+    }
+    if (memo instanceof GpuMathUnavailable) throw memo;
+
+    return memo;
+}
+
+/** The window half of the cross-realm WebGL comparison: hash and precision, or null where no render is possible. */
+function pageGpuMathOrNull(): { readonly hash: string; readonly precision: string } | null {
+    try {
+        const { hash, precision } = pageGpuMath();
+        return { hash, precision };
+    } catch {
+        return null;
     }
 }
 

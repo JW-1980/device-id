@@ -32,7 +32,7 @@ export const FINGERPRINT_VERSION = 3;
  * Which set of probes this bundle runs, sent as `probes` in every envelope.
  *
  * Bumped whenever a probe is ADDED (the server's `ProbeRegistry::PROBE_SET`, kept equal by
- * `tests/Unit/ProbeSetTest`; set 3 added `webrtc` and `behavior`). The server's omission gate expects of an envelope
+ * `tests/Unit/ProbeSetTest`; set 3 added `webrtc` and `behavior`; set 4 added the integrity probes `canvasPattern` and `automationMarks`). The server's omission gate expects of an envelope
  * only the probes of the set it reports, so a page left open across a deploy, still running
  * the previous bundle, is judged against the probes that bundle actually has. A body without
  * the marker is judged against set 1, the bundle that predates it.
@@ -40,7 +40,7 @@ export const FINGERPRINT_VERSION = 3;
  * Not a version of the envelope SHAPE (`FINGERPRINT_VERSION`): an added probe is an added
  * key, which every server version already reads.
  */
-export const PROBE_SET = 3;
+export const PROBE_SET = 4;
 
 /** Which half of one visit an envelope carries. The token is redeemable once per slot. */
 export type EnvelopeSlot = 'tier1' | 'tier2';
