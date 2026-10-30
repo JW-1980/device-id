@@ -6,8 +6,8 @@ namespace NutriCompare\Fingerprint\Scoring;
 
 use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
 use NutriCompare\Fingerprint\Rules\IntegrityFindings;
-use NutriCompare\Fingerprint\Support\Config;
 use NutriCompare\Fingerprint\Support\Confidence;
+use NutriCompare\Fingerprint\Support\Config;
 use NutriCompare\Fingerprint\Support\ProbeEnvelope;
 use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
 

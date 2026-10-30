@@ -27,6 +27,7 @@ use PHPUnit\Framework\TestCase;
 final class IntegrityFindingsTest extends TestCase
 {
     private const FIXTURE = __DIR__.'/../Fixtures/fingerprint/honest-integrity.json';
+
     /**
      * The captured honest envelopes, per engine: `[engine => [form => claims]]`, forms being
      * the tier-1 envelope, the tier-2 envelope and the identify path's merged claim set
