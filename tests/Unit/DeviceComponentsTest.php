@@ -241,4 +241,64 @@ final class DeviceComponentsTest extends TestCase
         $this->assertContains('gpuCaps', DeviceComponents::PROTECTED_UNTRUSTED);
         $this->assertContains('codecsHw', DeviceComponents::PROTECTED_UNTRUSTED);
     }
+
+    // ---------------------------------------------------------------- canvasGeometry is gone
+
+    #[Test]
+    public function dropping_canvas_geometry_changes_no_key_and_no_component(): void
+    {
+        Config::use(['fingerprint' => ['device_key_secret' => self::SECRET]]);
+        $deriver = new DeviceKeyDeriver;
+
+        $with = self::claims();
+        $this->assertArrayHasKey('canvasGeometry', $with['tier2'], 'precondition: the captured fixture still carries the old probe');
+        $without = $with;
+        unset($without['tier2']['canvasGeometry']);
+
+        $a = $deriver->keys($with, new TransportIntegrityResult);
+        $b = $deriver->keys($without, new TransportIntegrityResult);
+        $this->assertNotNull($a);
+        $this->assertNotNull($b);
+        $this->assertNotNull($a->browserKey);
+        $this->assertNotNull($a->hardwareKey);
+        $this->assertSame($a->browserKey, $b->browserKey);
+        $this->assertSame($a->hardwareKey, $b->hardwareKey);
+        $this->assertSame($a->components, $b->components);
+        $this->assertSame($a->coverage, $b->coverage);
+    }
+
+    #[Test]
+    public function the_gpu_components_that_replace_its_share_still_separate_different_gpus_and_renderers(): void
+    {
+        // `hardware_key` is os|arch|touch and never contained a canvas or GPU value; what tells two
+        // GPUs apart is the `gpu` class (WebGL limits and precision, or the WebGPU adapter) and the
+        // `gpuMath` shader class, which this asserts on the captured fixtures.
+        $base = self::claims();
+        $base['tier2']['gpuMath'] = ['hash' => '0a1b2c3d', 'precision' => 'highp:23', 'software' => false];
+
+        $biggerTextures = $base;
+        $biggerTextures['tier2']['gpu']['webgl']['limits']['MAX_TEXTURE_SIZE'] = 16384;
+
+        $otherRounding = $base;
+        $otherRounding['tier2']['gpuMath']['hash'] = '9f8e7d6c';
+
+        $webgpuNvidia = $base;
+        $webgpuNvidia['tier2']['gpu']['webgpu'] = ['vendor' => 'nvidia', 'architecture' => 'ada'];
+        $webgpuAmd = $base;
+        $webgpuAmd['tier2']['gpu']['webgpu'] = ['vendor' => 'amd', 'architecture' => 'rdna-3'];
+
+        $this->assertNotSame(self::components($base)['gpu'], self::components($biggerTextures)['gpu']);
+        $this->assertNotNull(self::components($base)['gpuMath']);
+        $this->assertNotSame(self::components($base)['gpuMath'], self::components($otherRounding)['gpuMath']);
+        $this->assertNotSame(self::components($webgpuNvidia)['gpu'], self::components($webgpuAmd)['gpu']);
+
+        // And the captured engines that report a GPU class report different ones (the Firefox capture
+        // has no WebGL class: its context was refused).
+        $classes = [];
+        foreach (['chromium', 'webkit'] as $engine) {
+            $claims = json_decode((string) file_get_contents(__DIR__.'/../Fixtures/fingerprint/claims-'.$engine.'.json'), true, 64, JSON_THROW_ON_ERROR);
+            $classes[$engine] = self::components($claims)['gpu'];
+        }
+        $this->assertCount(2, array_unique(array_filter($classes)), json_encode($classes, JSON_THROW_ON_ERROR));
+    }
 }

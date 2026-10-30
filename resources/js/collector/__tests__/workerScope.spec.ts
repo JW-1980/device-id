@@ -12,8 +12,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SCOPE_REPLY_KIND, scopeSnapshot, type ScopeSnapshot } from '@device-id/collector/realm';
 import { releaseShared } from '@device-id/collector/shared';
-import { probesOf, TIER, WORKER_SCOPE_TIMEOUT_MS, workerScope } from '@device-id/collector/value-probes';
-import { collectTier2 } from '@device-id/collector/index';
+import { prestartWorkerScope, probesOf, TIER, WORKER_SCOPE_TIMEOUT_MS, workerScope } from '@device-id/collector/value-probes';
+import { collect, collectTier2 } from '@device-id/collector/index';
 import type { Challenge } from '@device-id/collector/protocol';
 
 type Behaviour = (worker: FakeWorker, message: unknown) => void;
@@ -245,5 +245,127 @@ describe('workerScope', () => {
         expect(onWire?.workerType).toBe('dedicated');
         expect(strip(first.claims)).toBe(strip(second.claims));
         expect(first.digest).toBe(second.digest);
+    });
+});
+
+describe('prestartWorkerScope (the worker starts during tier 1)', () => {
+    const reply = (worker: FakeWorker): void => worker.reply({ kind: SCOPE_REPLY_KIND, snapshot: workerSideSnapshot() });
+
+    it('starts one worker ahead of workerScope(), which adopts it instead of constructing another', async () => {
+        installFakeWorker(reply);
+
+        prestartWorkerScope();
+        prestartWorkerScope(); // a second call while one is waiting starts nothing
+        expect(FakeWorker.instances).toHaveLength(1);
+        expect(FakeWorker.instances[0]?.received).toEqual(['scope']);
+
+        const result = await workerScope();
+
+        expect(result.state).toBe('ok');
+        expect(FakeWorker.instances).toHaveLength(1);
+        expect(FakeWorker.instances[0]?.terminated).toBe(true);
+        expect(result.state === 'ok' && result.value.worker.userAgent).toBe('Mozilla/5.0 (worker realm)');
+    });
+
+    it('keeps a reply that arrived before the probe ran, and still reads the window snapshot AFTER it', async () => {
+        let stage = 'before';
+        const spy = vi.spyOn(navigator, 'language', 'get').mockImplementation(() => stage);
+        try {
+            installFakeWorker(reply);
+            prestartWorkerScope();
+            await Promise.resolve(); // the fake worker has replied by now
+            await Promise.resolve();
+            stage = 'after';
+
+            const result = await workerScope();
+            expect(result.state === 'ok' && result.value.window.language).toBe('after');
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it('keeps an error that arrived before the probe ran: blocked, terminated, event cancelled at dispatch', async () => {
+        let event: Event | null = null;
+        installFakeWorker((worker) => {
+            event = new Event('error', { cancelable: true });
+            worker.dispatchEvent(event);
+        });
+        prestartWorkerScope();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect((event as Event | null)?.defaultPrevented).toBe(true);
+        await expect(workerScope()).resolves.toEqual({ state: 'unavailable', reason: 'blocked' });
+        expect(FakeWorker.instances[0]?.terminated).toBe(true);
+    });
+
+    it('counts the time already spent against the one ceiling', async () => {
+        vi.useFakeTimers();
+        installFakeWorker(() => undefined); // never replies
+        prestartWorkerScope();
+        await vi.advanceTimersByTimeAsync(WORKER_SCOPE_TIMEOUT_MS - 100);
+
+        const pending = workerScope();
+        let settled = false;
+        void pending.then(() => {
+            settled = true;
+        });
+        await vi.advanceTimersByTimeAsync(99);
+        expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(2);
+        await expect(pending).resolves.toEqual({ state: 'unavailable', reason: 'timeout' });
+        expect(FakeWorker.instances[0]?.terminated).toBe(true);
+    });
+
+    it('terminates a worker nobody adopted once its own timer runs out', async () => {
+        vi.useFakeTimers();
+        installFakeWorker(() => undefined);
+        prestartWorkerScope();
+
+        await vi.advanceTimersByTimeAsync(WORKER_SCOPE_TIMEOUT_MS + 1000);
+        expect(FakeWorker.instances[0]?.terminated).toBe(false);
+        await vi.advanceTimersByTimeAsync(1100);
+        expect(FakeWorker.instances[0]?.terminated).toBe(true);
+
+        // The slot is free again: a later prestart starts a fresh worker.
+        prestartWorkerScope();
+        expect(FakeWorker.instances).toHaveLength(2);
+        // Leave nothing pending for the next test.
+        await vi.advanceTimersByTimeAsync(WORKER_SCOPE_TIMEOUT_MS + 3000);
+    });
+
+    it('does nothing when the policy disables workerScope, and never throws without Worker or when the constructor is blocked', async () => {
+        installFakeWorker(reply);
+        prestartWorkerScope(['workerScope']);
+        expect(FakeWorker.instances).toHaveLength(0);
+
+        FakeWorker.throwOnConstruct = true;
+        expect(() => prestartWorkerScope()).not.toThrow();
+        FakeWorker.throwOnConstruct = false;
+        // A blocked prestart leaves the slot free: workerScope() starts its own.
+        await expect(workerScope()).resolves.toMatchObject({ state: 'ok' });
+
+        restoreWorker?.();
+        restoreWorker = null;
+        expect(() => prestartWorkerScope()).not.toThrow();
+    });
+
+    it('is started by collect() after tier 1, unless the policy disables workerScope', async () => {
+        // `parallelism` is off by default on a real server (it would spawn its own workers).
+        const challenge = (disabledProbes: string[]): Challenge => ({ token: 't', purpose: 'signin', expiresAt: 0, disabledProbes: [...disabledProbes, 'parallelism'] });
+
+        installFakeWorker(reply);
+        await collect(challenge(['workerScope']), 'signin');
+        expect(FakeWorker.instances).toHaveLength(0);
+
+        await collect(challenge([]), 'signin');
+        expect(FakeWorker.instances).toHaveLength(1);
+        expect(FakeWorker.instances[0]?.terminated).toBe(false);
+
+        // Tier 2 then adopts it.
+        const tier2 = await collectTier2(challenge([]), 'signin');
+        expect(FakeWorker.instances).toHaveLength(1);
+        expect(tier2.claims.tier2?.workerScope).toMatchObject({ workerType: 'dedicated' });
+        expect(FakeWorker.instances[0]?.terminated).toBe(true);
     });
 });

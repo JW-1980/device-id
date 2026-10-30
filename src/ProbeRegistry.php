@@ -96,7 +96,6 @@ final class ProbeRegistry
         'errorText' => [self::TIER_TWO, false, 'engine', 'Exact engine error strings.'],
         'audioRealtime' => [self::TIER_TWO, true, 'device', 'AudioContext sample rate, channels and latency; the audio component the matcher scores.'],
         'permissions' => [self::TIER_TWO, false, 'environment', 'Permission states for 18 registry names plus Notification.permission; the headless pair is a rule input.'],
-        'canvasGeometry' => [self::TIER_TWO, false, 'device', 'A pixel hash of drawn geometry; random under canvas noise, so a weak signal.'],
         'fontFallback' => [self::TIER_TWO, false, 'engine', 'Which generic families collide by measured width.'],
         'intl' => [self::TIER_TWO, false, 'environment', 'Resolved locale and time zone; compared with Accept-Language and the language list.'],
         'audioOffline' => [self::TIER_TWO, false, 'engine', 'OfflineAudioContext render sum; an engine constant.'],

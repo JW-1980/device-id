@@ -83,7 +83,7 @@ import {
 } from './protocol';
 import { acquireShared, releaseShared } from './shared';
 import { sendClaims, sendDecline, type SendResult } from './transport';
-import { TIER, VALUE_PROBES, nextIdle, runDeferred, runTier, type UnitTrace } from './value-probes';
+import { TIER, VALUE_PROBES, nextIdle, prestartWorkerScope, runDeferred, runTier, type UnitTrace } from './value-probes';
 
 export type { SendFailure, SendResult } from './transport';
 export type { Challenge, CollectedClaims, CollectionPurpose, DeclineReason, EnvelopeSlot } from './protocol';
@@ -188,6 +188,9 @@ export async function collect(challenge: Challenge, purpose: CollectionPurpose):
     const integrity = collectIntegrity(disabled);
 
     const tier1 = await resolveAll(await runTier(TIER.ONE, disabled));
+    // Off the critical path: the worker's start-up and its WebGL work now overlap the tier-1
+    // request and the wait for the first idle slice (`workerScope` adopts it in tier 2).
+    prestartWorkerScope(disabled);
     const finished = now();
 
     const claims: CollectedClaims = {
@@ -362,6 +365,7 @@ export async function collectForIdentity(
 
     const integrity = collectIntegrity(policy);
     const tier1 = await resolveAll(await runTier(TIER.ONE, policy));
+    prestartWorkerScope(policy);
 
     const deferred = startDeferred(policy);
     let timer: ReturnType<typeof setTimeout> | undefined;

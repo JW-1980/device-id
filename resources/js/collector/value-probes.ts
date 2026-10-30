@@ -1044,8 +1044,7 @@ export function workerScope(): Promise<ProbeResult<WorkerScopeValue>> {
     }
 
     return new Promise((resolve) => {
-        const started = nowMs();
-        let worker: Worker | null = null;
+        let run: ScopeRun | null = null;
         let timer: ReturnType<typeof setTimeout> | undefined;
         let unregister: (() => void) | undefined;
         let settled = false;
@@ -1055,17 +1054,36 @@ export function workerScope(): Promise<ProbeResult<WorkerScopeValue>> {
             settled = true;
             if (timer !== undefined) clearTimeout(timer);
             unregister?.();
-            try {
-                worker?.terminate();
-            } catch {
-                /* a worker that cannot be terminated is already gone */
-            }
+            run?.dispose();
             resolve(result);
+        };
+
+        const handle = (outcome: ScopeOutcome): void => {
+            // First: a reply that arrives after the probe settled (timeout, release) must
+            // not read the window snapshot, which would recreate the shared WebGL context
+            // that `releaseShared()` has just lost.
+            if (settled || run === null) return;
+            if (outcome.kind === 'messageerror') {
+                finish(unavailable('malformed'));
+            } else if (outcome.kind === 'error') {
+                finish(unavailable('blocked'));
+            } else {
+                const fromWorker = sanitiseReply(outcome.data);
+                if (!fromWorker) {
+                    finish(unavailable('malformed'));
+                    return;
+                }
+                const elapsedMs = Math.round((nowMs() - run.started) * 1000) / 1000;
+                const fromWindow = scopeSnapshot(unmaskedWebGl(sharedWebGl()?.context), windowCanvasHash(), pageGpuMathOrNull());
+                finish(ok({ workerType: 'dedicated', window: fromWindow, worker: fromWorker, elapsedMs }));
+            }
         };
 
         try {
             try {
-                worker = createScopeWorker();
+                // The worker `prestartWorkerScope()` started during tier 1, when there is one
+                // (its start-up and WebGL work have been running since); otherwise a fresh one.
+                run = takePrestartedScope() ?? startScopeRun();
             } catch {
                 finish(unavailable('blocked'));
                 return;
@@ -1073,34 +1091,12 @@ export function workerScope(): Promise<ProbeResult<WorkerScopeValue>> {
 
             unregister = onRelease(() => finish(unavailable('released')));
 
-            worker.addEventListener('message', (event: MessageEvent) => {
-                // First: a reply that arrives after the probe settled (timeout, release) must
-                // not read the window snapshot, which would recreate the shared WebGL context
-                // that `releaseShared()` has just lost.
-                if (settled) return;
-                const fromWorker = sanitiseReply(event.data);
-                if (!fromWorker) {
-                    finish(unavailable('malformed'));
-                    return;
-                }
-                const elapsedMs = Math.round((nowMs() - started) * 1000) / 1000;
-                const fromWindow = scopeSnapshot(unmaskedWebGl(sharedWebGl()?.context), windowCanvasHash(), pageGpuMathOrNull());
-                finish(ok({ workerType: 'dedicated', window: fromWindow, worker: fromWorker, elapsedMs }));
-            });
-            worker.addEventListener('messageerror', () => finish(unavailable('malformed')));
-            worker.addEventListener('error', (event: Event) => {
-                // Handled here; without this the engine also reports it as uncaught.
-                event.preventDefault();
-                finish(unavailable('blocked'));
-            });
+            // The time already spent counts against the same ceiling: a worker started early
+            // is not given a second one.
+            timer = setTimeout(() => finish(unavailable('timeout')), Math.max(0, WORKER_SCOPE_TIMEOUT_MS - (nowMs() - run.started)));
 
-            timer = setTimeout(() => finish(unavailable('timeout')), WORKER_SCOPE_TIMEOUT_MS);
-
-            try {
-                worker.postMessage('scope');
-            } catch {
-                finish(unavailable('blocked'));
-            }
+            // An outcome that arrived before the probe ran is handled now, in the same turn.
+            run.listen(handle);
         } catch (error) {
             // Nothing above is expected to throw outside its own guard; if something does,
             // the probe still settles, as an error, and the worker is still terminated.
@@ -1109,59 +1105,113 @@ export function workerScope(): Promise<ProbeResult<WorkerScopeValue>> {
     });
 }
 
+/** What the scope worker did first: replied, failed to deserialise, or errored. */
+type ScopeOutcome =
+    | { readonly kind: 'message'; readonly data: unknown }
+    | { readonly kind: 'messageerror' }
+    | { readonly kind: 'error' };
+
+/** A scope worker in flight, whether started by `workerScope()` itself or ahead of it. */
+interface ScopeRun {
+    /** `performance.now()` when the worker was constructed. */
+    readonly started: number;
+    /** Call `handler` with the first outcome, now if it has already happened. */
+    readonly listen: (handler: (outcome: ScopeOutcome) => void) => void;
+    /** Stop listening and terminate the worker. Idempotent. */
+    readonly dispose: () => void;
+}
+
 /**
- * Canvas GEOMETRY, not canvas text. 0.450 ms, 3 classes, value score 363.9.
- *
- * The measured reason for preferring it: cross-load stability of geometry was
- * **1.00** while a text-bearing canvas probe scored **0.67** — its hash changed
- * between two page loads in 8 of 24 cells, because the font stack resolves
- * differently between loads. That reproduces the FP-Stud result locally and
- * indicts the most widely deployed fingerprinting technique. If a text canvas is
- * used at all it must be bucketed, and this probe deliberately excludes text.
+ * Construct the scope worker, record its first outcome and ask it for its snapshot. Throws when
+ * the worker cannot be constructed or `postMessage` throws (the caller reports `blocked`).
  */
-export function canvasGeometry(): ProbeResult<Record<string, unknown>> {
-    return probe('canvasGeometry', () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 200;
-        canvas.height = 200;
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('no 2d context');
+function startScopeRun(): ScopeRun {
+    const worker = createScopeWorker();
+    const started = nowMs();
+    let outcome: ScopeOutcome | null = null;
+    let handler: ((outcome: ScopeOutcome) => void) | null = null;
+    let disposed = false;
 
-        context.fillStyle = '#000';
-        context.fillRect(0, 0, 200, 200);
-        context.strokeStyle = '#fff';
-        context.lineWidth = 1.1;
-        // Fractional and half-pixel coordinates exercise the rasteriser's snapping.
-        context.beginPath();
-        context.arc(100.5, 100.25, 50.5, 0, Math.PI * 1.7);
-        context.stroke();
-        context.beginPath();
-        context.moveTo(0.5, 0.5);
-        context.bezierCurveTo(20.25, 40.75, 120.5, 5.5, 199.5, 90.25);
-        context.stroke();
-        context.globalCompositeOperation = 'multiply';
-        context.fillStyle = 'rgba(255,0,0,0.5)';
-        context.fillRect(20, 20, 80, 80);
-        context.globalCompositeOperation = 'lighter';
-        context.fillStyle = 'rgba(0,0,255,0.5)';
-        context.fillRect(80, 80, 80, 80);
-
-        const data = context.getImageData(0, 0, 200, 200).data;
-        let hash = 0x811c9dc5;
-        let sum = 0;
-        for (let index = 0; index < data.length; index += 4) {
-            hash = Math.imul(hash ^ (data[index] as number), 16777619) >>> 0;
-            sum += data[index] as number;
-        }
-
-        return {
-            hash: (hash >>> 0).toString(16),
-            redSum: sum,
-            supportsOffscreen: typeof OffscreenCanvas === 'function',
-            // From the collection's single shared context, not a throwaway one.
-            supportsWebgl2: sharedWebGl()?.webgl2 ?? false,
-        };
+    const record = (next: ScopeOutcome): void => {
+        if (outcome !== null || disposed) return;
+        outcome = next;
+        handler?.(next);
+    };
+    worker.addEventListener('message', (event: MessageEvent) => record({ kind: 'message', data: event.data }));
+    worker.addEventListener('messageerror', () => record({ kind: 'messageerror' }));
+    worker.addEventListener('error', (event: Event) => {
+        // Handled here; without this the engine also reports it as uncaught. Must happen while
+        // the event is being dispatched, so it cannot wait for a consumer.
+        event.preventDefault();
+        record({ kind: 'error' });
     });
+
+    const run: ScopeRun = {
+        started,
+        listen: (next) => {
+            handler = next;
+            if (outcome !== null) next(outcome);
+        },
+        dispose: () => {
+            disposed = true;
+            handler = null;
+            try {
+                worker.terminate();
+            } catch {
+                /* a worker that cannot be terminated is already gone */
+            }
+        },
+    };
+
+    try {
+        worker.postMessage('scope');
+    } catch (error) {
+        run.dispose();
+        throw error;
+    }
+
+    return run;
+}
+
+/** The worker started ahead of `workerScope()` and not yet adopted by it. */
+let prestartedScope: { readonly run: ScopeRun; readonly expire: ReturnType<typeof setTimeout> } | null = null;
+
+/** How long past its own ceiling an unadopted pre-started worker lives before it is terminated. */
+const PRESTART_GRACE_MS = 2000;
+
+/**
+ * Start the scope worker NOW, so its start-up and its off-thread WebGL work (a context, a
+ * shader compile for `gpuMath`) overlap the tier-1 request and the wait for the first idle
+ * slice, instead of beginning after both. `workerScope()` adopts it. Called at the end of the
+ * synchronous collection, so the tier-1 critical path pays only the construction.
+ *
+ * Does nothing without `Worker`, when the policy disables `workerScope`, or when one is
+ * already waiting. A worker nobody adopts (tier 2 never runs: the visitor left, a host
+ * collected tier 1 only) is terminated by its own timer. Never throws.
+ */
+export function prestartWorkerScope(disabled: readonly string[] = []): void {
+    try {
+        if (typeof Worker !== 'function' || prestartedScope !== null || disabled.includes('workerScope')) return;
+
+        const run = startScopeRun();
+        const expire = setTimeout(() => {
+            if (prestartedScope?.run === run) prestartedScope = null;
+            run.dispose();
+        }, WORKER_SCOPE_TIMEOUT_MS + PRESTART_GRACE_MS);
+        prestartedScope = { run, expire };
+    } catch {
+        // A blocked worker is a legitimate configuration; `workerScope()` will report it.
+        prestartedScope = null;
+    }
+}
+
+function takePrestartedScope(): ScopeRun | null {
+    const taken = prestartedScope;
+    prestartedScope = null;
+    if (taken === null) return null;
+    clearTimeout(taken.expire);
+
+    return taken.run;
 }
 
 /** Intl and ICU. 1.960 ms, 8 classes. High entropy, and engine-invariant where it matters. */
@@ -3049,7 +3099,6 @@ export const VALUE_PROBES: readonly ValueProbe[] = [
     { name: 'textMetrics', tier: TIER.TWO, run: textMetrics, heavy: true },        // 12 ms cold (first canvas text)
     { name: 'errorText', tier: TIER.TWO, run: errorText, heavy: true },            // 8-71 ms cold (first ICU errors)
     { name: 'permissions', tier: TIER.TWO, run: permissions },                     // 12 ms cold, async
-    { name: 'canvasGeometry', tier: TIER.TWO, run: canvasGeometry, heavy: true },  // 17-193 ms cold (shared WebGL context)
     { name: 'fontFallback', tier: TIER.TWO, run: fontFallback, heavy: true },      // 17 ms cold
     { name: 'intl', tier: TIER.TWO, run: intl, heavy: true },                      // 10-105 ms cold (ICU)
     { name: 'timezoneLmt', tier: TIER.TWO, run: timezoneLmt },
@@ -3077,7 +3126,7 @@ export const VALUE_PROBES: readonly ValueProbe[] = [
     { name: 'emojiMetrics', tier: TIER.HARDWARE, run: emojiMetrics, heavy: true, needsFonts: true },
     // Stepped over SCRIPTS_STEPS slices since round-3 CL3-5 (80-102 ms as one unit at 4x CPU).
     { name: 'scripts', tier: TIER.HARDWARE, run: scripts, stepped: scriptsSteps, heavy: true, needsFonts: true },  // 7-104 ms cold (font fallback)
-    { name: 'gpu', tier: TIER.HARDWARE, run: gpu, heavy: true },                   // first WebGL context where canvasGeometry did not create it
+    { name: 'gpu', tier: TIER.HARDWARE, run: gpu, heavy: true },                   // creates the collection's shared WebGL context
     { name: 'gpuMath', tier: TIER.HARDWARE, run: gpuMath, heavy: true },           // shader compile cold, ≤2 ms warm
     { name: 'decoders', tier: TIER.HARDWARE, run: decoders },                      // async
     { name: 'voices', tier: TIER.HARDWARE, run: voices },                          // up to VOICES_WAIT_MS of WAIT, not work

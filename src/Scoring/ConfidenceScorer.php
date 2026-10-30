@@ -56,7 +56,6 @@ final class ConfidenceScorer
         'tier2:audioRealtime' => ['weight' => 574, 'charge' => 0.25],
         'tier2:errorText' => ['weight' => 509, 'charge' => 0.25],
         'tier2:fontFallback' => ['weight' => 422, 'charge' => 0.25],
-        'tier2:canvasGeometry' => ['weight' => 364, 'charge' => 0.25],
         'tier2:intl' => ['weight' => 259, 'charge' => 0.25],
         'tier2:permissions' => ['weight' => 224, 'charge' => 0.25],
         'tier2:audioOffline' => ['weight' => 146, 'charge' => 0.25],
