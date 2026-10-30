@@ -76,7 +76,7 @@ final class DeviceSignals
     ];
 
     /**
-     * The signals a v3 claim set carries (resources/js/Support/fingerprint), in
+     * The signals a v3 claim set carries (resources/js/v3), in
      * the shape above:
      *
      *   platform       <- tier1.environment.identity.platform

@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "isolatedModules": true,
+        "target": "ESNext",
+        "lib": ["ESNext", "DOM", "DOM.Iterable", "WebWorker"],
+        "noEmit": true,
+        "skipLibCheck": true,
+        "types": ["node", "vite/client"],
+        "paths": {
+            "@device-id/*": ["./resources/js/*"]
+        }
+    },
+    "include": ["resources/js/**/*.ts"],
+    "exclude": ["resources/js/**/*.spec.ts"]
+}

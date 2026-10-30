@@ -53,3 +53,24 @@ jobs:
         # No gate may write into the package; a difference means the run verified a tree that
         # is not the one committed.
         run: git diff --exit-code
+
+  collectors:
+    name: Browser collectors (typecheck, Vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Vitest
+        run: npm test

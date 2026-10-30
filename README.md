@@ -66,6 +66,47 @@ NutriCompare uses the shipped defaults (its admin screen writes `constraint_weig
 WelZoLekker enables the four opt-in rules and supplies its own catalogue (`config/fingerprint.php`
 there).
 
+## Browser collectors
+
+The collectors that run in the visitor's browser ship in this package too, as TypeScript
+sources under `resources/js/`. The application's bundler compiles them, so nothing is
+published to npm.
+
+| Directory | Protocol | Used by | Notes |
+|---|---|---|---|
+| `resources/js/v3/` | envelope v3 (two slots, one nonce) | NutriCompare | worker/realm cross-checks, lie battery, integrity findings; Vitest suite in `v3/__tests__/` |
+| `resources/js/v2/` | envelope v2 | WelZoLekker | WebRTC, speech voices, passive behaviour probes; `boot.ts` starts collection |
+| `resources/js/shared/` | — | both | `xsrf.ts`: the Laravel `X-XSRF-TOKEN` header value |
+
+Both are moved here unchanged. They are two collectors, not one: switching an application to
+the other one changes the claims it sends and therefore every device key it derives, so that
+is a migration (with key carry-over) and is not done by moving files.
+
+A host maps `@device-id` to the installed package and imports a collector by version:
+
+```js
+// vite.config.js
+import { fileURLToPath } from 'node:url';
+
+export default defineConfig({
+    resolve: {
+        alias: {
+            '@device-id': fileURLToPath(new URL('./vendor/jw-1980/device-id/resources/js', import.meta.url)),
+        },
+    },
+});
+```
+
+```js
+const { collectAndSend } = await import('@device-id/v3');
+```
+
+TypeScript hosts add `"@device-id/*": ["./vendor/jw-1980/device-id/resources/js/*"]` to
+`compilerOptions.paths`. Because the bundler reads `vendor/`, **`composer install` must run
+before `npm run build`** (and before the host's type-check and Vitest).
+
+Tests and type-check here: `npm ci && npm test && npm run typecheck`.
+
 ## Usage without a framework
 
 ```php
@@ -133,7 +174,7 @@ and the application depends on it.
 | Ingest orchestration (`FingerprintIngest`, `IngestOutcome`, `IngestContext`, `DeviceIdentityResolver`) | no — persistence and HTTP | yes |
 | `BotRiskScorer` | no — anti-scraping, not this engine | — |
 | Storage (device and observation rows), HTTP endpoints, admin screens | no | yes |
-| Client collector (browser JavaScript) | not yet: each application still has its own (NutriCompare `resources/js/Support/fingerprint/`, WelZoLekker `resources/js/fingerprint/`) | yes |
+| Client collectors (browser TypeScript) | **yes**: `resources/js/v3/` and `resources/js/v2/` (see "Browser collectors") | the bundler alias and the HTTP endpoints |
 
 ## How NutriCompare (Laravel) depends on it
 
