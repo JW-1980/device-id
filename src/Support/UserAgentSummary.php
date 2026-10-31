@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Support;
+namespace DeviceId\Support;
 
 /**
  * Reduces a User-Agent header to a low-entropy summary such as

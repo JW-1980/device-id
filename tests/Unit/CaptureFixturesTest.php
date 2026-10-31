@@ -6,7 +6,7 @@ namespace DeviceId\Tests\Unit;
 
 use DeviceId\Capture\CaptureAnalysis;
 use DeviceId\Capture\Expectations;
-use NutriCompare\Fingerprint\Support\Config;
+use DeviceId\Support\Config;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;

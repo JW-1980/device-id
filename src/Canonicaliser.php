@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint;
+namespace DeviceId;
 
 /**
  * Deterministic canonical serialisation. The copy here is authoritative.

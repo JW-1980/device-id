@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit\Crawlers;
 
-use NutriCompare\Fingerprint\Crawlers\HostnameSuffix;
-use NutriCompare\Fingerprint\Crawlers\OperatorAllowlist;
+use DeviceId\Crawlers\HostnameSuffix;
+use DeviceId\Crawlers\OperatorAllowlist;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;

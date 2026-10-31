@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit\Crawlers;
 
-use NutriCompare\Fingerprint\Crawlers\ArrayCache;
-use NutriCompare\Fingerprint\Crawlers\CrawlerCatalogue;
-use NutriCompare\Fingerprint\Crawlers\CrawlerVerifier;
-use NutriCompare\Fingerprint\Crawlers\DnsResolver;
-use NutriCompare\Fingerprint\Crawlers\IpRangeDirectory;
-use NutriCompare\Fingerprint\Crawlers\RangeFetcher;
+use DeviceId\Crawlers\ArrayCache;
+use DeviceId\Crawlers\CrawlerCatalogue;
+use DeviceId\Crawlers\CrawlerVerifier;
+use DeviceId\Crawlers\DnsResolver;
+use DeviceId\Crawlers\IpRangeDirectory;
+use DeviceId\Crawlers\RangeFetcher;
 use PHPUnit\Framework\TestCase;
 
 /** A DNS with scripted answers. Anything not scripted is "no answer". */

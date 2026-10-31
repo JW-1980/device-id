@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Matching;
+namespace DeviceId\Matching;
 
 /**
  * Where `DeviceMatcher` reads candidate rows from.

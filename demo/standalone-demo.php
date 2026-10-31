@@ -31,14 +31,14 @@ $root = dirname(__DIR__);
 // The ONLY include. Thirteen lines of spl_autoload_register, and no framework.
 require __DIR__.'/../src/autoload.php';
 
-use NutriCompare\Fingerprint\Canonicaliser;
-use NutriCompare\Fingerprint\CheckRegistry;
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Scoring\ConfidenceScorer;
-use NutriCompare\Fingerprint\Scoring\VerdictScorer;
-use NutriCompare\Fingerprint\Settings;
-use NutriCompare\Fingerprint\Support\Config;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
+use DeviceId\Canonicaliser;
+use DeviceId\CheckRegistry;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Scoring\ConfidenceScorer;
+use DeviceId\Scoring\VerdictScorer;
+use DeviceId\Settings;
+use DeviceId\Support\Config;
+use DeviceId\Support\TransportIntegrityResult;
 
 $line = static function (string $title): void {
     echo "\n".str_repeat('=', 78)."\n".$title."\n".str_repeat('=', 78)."\n";

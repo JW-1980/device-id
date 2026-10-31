@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Crawlers;
+namespace DeviceId\Crawlers;
 
 /**
  * An in-process cache with injectable time: for tests, the demo, and hosts with nothing better.

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Matching;
+namespace DeviceId\Matching;
 
-use NutriCompare\Fingerprint\Keys\DeviceComponents;
-use NutriCompare\Fingerprint\Keys\DeviceKeys;
+use DeviceId\Keys\DeviceComponents;
+use DeviceId\Keys\DeviceKeys;
 
 /**
  * Finds the device a claim set most probably belongs to.

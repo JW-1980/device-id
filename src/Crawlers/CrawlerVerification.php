@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Crawlers;
+namespace DeviceId\Crawlers;
 
 /**
  * The outcome of checking a "I am Googlebot" claim. Five states, kept distinct on purpose:

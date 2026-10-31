@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Crawlers;
+namespace DeviceId\Crawlers;
 
 /**
  * The cache the host provides (any key-value store with a TTL).

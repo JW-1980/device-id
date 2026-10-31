@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Matching;
+namespace DeviceId\Matching;
 
-use NutriCompare\Fingerprint\Keys\DeviceComponents;
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Support\Config;
+use DeviceId\Keys\DeviceComponents;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Support\Config;
 
 /**
  * The matcher's weights and thresholds ({@see DeviceMatcher}), normalised: one function from

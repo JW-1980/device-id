@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Support;
+namespace DeviceId\Support;
 
 /**
  * How much of the expected measurement surface actually answered, as 1-100.

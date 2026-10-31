@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Crawlers;
+namespace DeviceId\Crawlers;
 
-use NutriCompare\Fingerprint\Support\TransportFinding;
-use NutriCompare\Fingerprint\Support\Verdict;
+use DeviceId\Support\TransportFinding;
+use DeviceId\Support\Verdict;
 
 /**
  * The one answer a host gets for a request: allowed (and why), or "score it normally".

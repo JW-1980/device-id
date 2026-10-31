@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Rules\IntegrityFindings;
+use DeviceId\Rules\IntegrityFindings;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 

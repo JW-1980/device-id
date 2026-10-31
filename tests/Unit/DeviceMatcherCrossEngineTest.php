@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Keys\DeviceComponents;
-use NutriCompare\Fingerprint\Keys\DeviceKeys;
-use NutriCompare\Fingerprint\Matching\DeviceCandidateSource;
-use NutriCompare\Fingerprint\Matching\DeviceMatcher;
-use NutriCompare\Fingerprint\Matching\MatchCandidate;
-use NutriCompare\Fingerprint\Matching\MatchResult;
-use NutriCompare\Fingerprint\Support\Config;
+use DeviceId\Keys\DeviceComponents;
+use DeviceId\Keys\DeviceKeys;
+use DeviceId\Matching\DeviceCandidateSource;
+use DeviceId\Matching\DeviceMatcher;
+use DeviceId\Matching\MatchCandidate;
+use DeviceId\Matching\MatchResult;
+use DeviceId\Support\Config;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 

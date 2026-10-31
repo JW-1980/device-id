@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Scoring;
+namespace DeviceId\Scoring;
 
-use NutriCompare\Fingerprint\Support\Confidence;
-use NutriCompare\Fingerprint\Support\Verdict;
+use DeviceId\Support\Confidence;
+use DeviceId\Support\Verdict;
 
 /**
  * Everything the scorers decided about one envelope, as the rows store it: the verdict,

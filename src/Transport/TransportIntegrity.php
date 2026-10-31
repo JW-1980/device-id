@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Transport;
+namespace DeviceId\Transport;
 
-use NutriCompare\Fingerprint\Crawlers\TrafficClassification;
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Support\TransportFinding;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
-use NutriCompare\Fingerprint\Support\TransportRequestFacts;
+use DeviceId\Crawlers\TrafficClassification;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Support\TransportFinding;
+use DeviceId\Support\TransportIntegrityResult;
+use DeviceId\Support\TransportRequestFacts;
 
 /**
  * Inspects what the server can see about a request, and reports the parts that a

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Crawlers;
+namespace DeviceId\Crawlers;
 
 /**
  * The known crawlers and uptime monitors, in match order (the first definition whose token appears

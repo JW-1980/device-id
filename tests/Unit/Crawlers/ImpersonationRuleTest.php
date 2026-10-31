@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit\Crawlers;
 
-use NutriCompare\Fingerprint\CheckRegistry;
-use NutriCompare\Fingerprint\Crawlers\CrawlerVerification;
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Scoring\VerdictScorer;
-use NutriCompare\Fingerprint\Settings;
-use NutriCompare\Fingerprint\Support\TransportRequestFacts;
-use NutriCompare\Fingerprint\Support\Verdict;
-use NutriCompare\Fingerprint\Transport\TransportIntegrity;
+use DeviceId\CheckRegistry;
+use DeviceId\Crawlers\CrawlerVerification;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Scoring\VerdictScorer;
+use DeviceId\Settings;
+use DeviceId\Support\TransportRequestFacts;
+use DeviceId\Support\Verdict;
+use DeviceId\Transport\TransportIntegrity;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 

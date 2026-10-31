@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Canonicaliser;
-use NutriCompare\Fingerprint\Keys\DeviceKeyDeriver;
-use NutriCompare\Fingerprint\ProbeRegistry;
-use NutriCompare\Fingerprint\Scoring\ConfidenceScorer;
-use NutriCompare\Fingerprint\Scoring\ProbeOmission;
-use NutriCompare\Fingerprint\Support\Config;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
+use DeviceId\Canonicaliser;
+use DeviceId\Keys\DeviceKeyDeriver;
+use DeviceId\ProbeRegistry;
+use DeviceId\Scoring\ConfidenceScorer;
+use DeviceId\Scoring\ProbeOmission;
+use DeviceId\Support\Config;
+use DeviceId\Support\TransportIntegrityResult;
 use PHPUnit\Framework\TestCase;
 
 /**

@@ -8,9 +8,7 @@ PHP 8.2+, no Laravel, no Symfony, no PSR-7.
 This repository is the **single place the engine is developed**. Applications install it with
 Composer; they never copy it. Current consumers: NutriCompare and WelZoLekker.
 
-> The PHP namespace is still `NutriCompare\Fingerprint\…` (where the engine was born). It is kept
-> so the move into this package did not rewrite every `use` statement in the consumers; renaming
-> it is a separate, mechanical change.
+The PHP namespace is `DeviceId\` (PSR-4 root `src/`).
 
 ## Installing it in an application (private, not on Packagist)
 
@@ -278,7 +276,7 @@ on, when the engine changes.
 ```php
 require 'vendor/autoload.php';   // or src/autoload.php for a drop-in copy
 
-use NutriCompare\Fingerprint\Settings;
+use DeviceId\Settings;
 
 $settings = Settings::fromArray([
     'enabled'           => true,
@@ -345,7 +343,7 @@ and the application depends on it.
 ## How NutriCompare (Laravel) depends on it
 
 - Autoload: the application requires `jw-1980/device-id` (see "Installing it" above); Composer's
-  PSR-4 map points `NutriCompare\Fingerprint\` at `vendor/jw-1980/device-id/src/`.
+  PSR-4 map points `DeviceId\` at `vendor/jw-1980/device-id/src/`.
   `app/` imports the package classes directly; there are no aliases and no shim classes.
 - `App\Providers\FingerprintServiceProvider` (registered in `bootstrap/providers.php`) calls
   `Config::resolveWith()` with a resolver that answers each key LIVE: `fingerprint.constraint_weights`,
@@ -414,7 +412,7 @@ the *current file's* namespace; it now resolves each imported class to its own d
 `php -l` clean, no `App\` reference left, and `prove-standalone.php` green — while importing
 `AntiScrapingConfig` and `BotRiskState`, which are **not in this package**. A dangling import
 is valid PHP and introduces no framework symbol, so both gates passed it. The port script now
-resolves every `NutriCompare\Fingerprint\…` import to a file and refuses to pass if one does
+resolves every `DeviceId\…` import to a file and refuses to pass if one does
 not exist.
 
 **An inventory that was wrong.** Before starting, all eighteen candidate classes were reported

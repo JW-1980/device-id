@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Transport;
+namespace DeviceId\Transport;
 
 /**
  * The outcome of looking for a JA4 on a request: a fingerprint, or a reason there is

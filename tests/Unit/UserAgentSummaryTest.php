@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Support\UserAgentSummary;
+use DeviceId\Support\UserAgentSummary;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

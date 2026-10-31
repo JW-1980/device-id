@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Support;
+namespace DeviceId\Support;
 
 /**
  * A derived device key, with the salt version that produced it.

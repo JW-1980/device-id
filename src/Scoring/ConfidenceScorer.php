@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Scoring;
+namespace DeviceId\Scoring;
 
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Rules\IntegrityFindings;
-use NutriCompare\Fingerprint\Support\Confidence;
-use NutriCompare\Fingerprint\Support\Config;
-use NutriCompare\Fingerprint\Support\ProbeEnvelope;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Rules\IntegrityFindings;
+use DeviceId\Support\Confidence;
+use DeviceId\Support\Config;
+use DeviceId\Support\ProbeEnvelope;
+use DeviceId\Support\TransportIntegrityResult;
 
 /**
  * Scores how much of the expected measurement surface answered (coverage, 1-100).

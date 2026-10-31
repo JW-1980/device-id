@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Crawlers;
+namespace DeviceId\Crawlers;
 
 /**
  * Vendor-published IP lists, fetched through the host's `RangeFetcher` and kept in its cache.

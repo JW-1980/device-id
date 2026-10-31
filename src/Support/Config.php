@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Support;
+namespace DeviceId\Support;
 
-use NutriCompare\Fingerprint\Settings;
+use DeviceId\Settings;
 
 /**
  * The bridge between the ported engine and whatever the host calls configuration.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint;
+namespace DeviceId;
 
 /**
  * Every measurement METHOD the browser collector can run, with whether an operator may

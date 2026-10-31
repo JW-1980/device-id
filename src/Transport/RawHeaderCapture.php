@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Transport;
+namespace DeviceId\Transport;
 
-use NutriCompare\Fingerprint\Support\Config;
+use DeviceId\Support\Config;
 
 final class RawHeaderCapture
 {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Support;
+namespace DeviceId\Support;
 
 /**
  * One identity's rolling counters, and the window they roll over on.

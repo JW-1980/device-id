@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Keys;
+namespace DeviceId\Keys;
 
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Rules\IntegrityFindings;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Rules\IntegrityFindings;
+use DeviceId\Support\TransportIntegrityResult;
 
 /**
  * Quantises a claim set into the engine-independent component map the matcher scores.

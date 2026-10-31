@@ -9,7 +9,7 @@ declare(strict_types=1);
  */
 require __DIR__.'/../../src/autoload.php';
 
-use NutriCompare\Fingerprint\ProbeRegistry;
+use DeviceId\ProbeRegistry;
 
 echo json_encode([
     'disabled_probes' => ProbeRegistry::disabled(),

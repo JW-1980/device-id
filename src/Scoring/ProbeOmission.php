@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Scoring;
+namespace DeviceId\Scoring;
 
-use NutriCompare\Fingerprint\ProbeRegistry;
-use NutriCompare\Fingerprint\Support\Verdict;
+use DeviceId\ProbeRegistry;
+use DeviceId\Support\Verdict;
 
 /**
  * The omission gate: a sign-up or password reset whose envelopes simply LEAVE OUT many of

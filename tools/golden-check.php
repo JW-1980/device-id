@@ -59,14 +59,14 @@ declare(strict_types=1);
  */
 require __DIR__.'/../src/autoload.php';
 
-use NutriCompare\Fingerprint\Canonicaliser;
-use NutriCompare\Fingerprint\Keys\DeviceKeyDeriver;
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Rules\IntegrityFindings;
-use NutriCompare\Fingerprint\Scoring\ConfidenceScorer;
-use NutriCompare\Fingerprint\Scoring\VerdictScorer;
-use NutriCompare\Fingerprint\Support\Config;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
+use DeviceId\Canonicaliser;
+use DeviceId\Keys\DeviceKeyDeriver;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Rules\IntegrityFindings;
+use DeviceId\Scoring\ConfidenceScorer;
+use DeviceId\Scoring\VerdictScorer;
+use DeviceId\Support\Config;
+use DeviceId\Support\TransportIntegrityResult;
 
 /**
  * The fixed configuration every answer below was recorded under: the shipped bands and

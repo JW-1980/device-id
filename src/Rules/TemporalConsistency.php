@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Rules;
+namespace DeviceId\Rules;
 
-use NutriCompare\Fingerprint\Scoring\VerdictScorer;
-use NutriCompare\Fingerprint\Support\PreviousObservation;
-use NutriCompare\Fingerprint\Support\TransportFinding;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
+use DeviceId\Scoring\VerdictScorer;
+use DeviceId\Support\PreviousObservation;
+use DeviceId\Support\TransportFinding;
+use DeviceId\Support\TransportIntegrityResult;
 
 /**
  * Consistency across observations of one device: observation N against N-1.

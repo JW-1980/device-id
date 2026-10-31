@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Scoring;
+namespace DeviceId\Scoring;
 
-use NutriCompare\Fingerprint\Matching\MatcherSettings;
-use NutriCompare\Fingerprint\Support\Config;
+use DeviceId\Matching\MatcherSettings;
+use DeviceId\Support\Config;
 
 /**
  * The omission gate's settings ({@see ProbeOmission}), normalised: whether it may raise a

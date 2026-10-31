@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Matching;
+namespace DeviceId\Matching;
 
 /**
  * The `MatchCandidate` accessors for an Eloquent device row with `id`, `cluster_id`,

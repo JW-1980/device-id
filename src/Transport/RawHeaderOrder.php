@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Transport;
+namespace DeviceId\Transport;
 
 /**
  * The outcome of trying to recover the client's HTTP header order.

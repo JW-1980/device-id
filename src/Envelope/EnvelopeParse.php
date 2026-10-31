@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Envelope;
+namespace DeviceId\Envelope;
 
 /**
  * The outcome of parsing a claims body: an envelope, or a named reason it was not

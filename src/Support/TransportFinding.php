@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Support;
+namespace DeviceId\Support;
 
-use NutriCompare\Fingerprint\Transport\TransportIntegrity;
+use DeviceId\Transport\TransportIntegrity;
 
 /**
  * One thing observed about an HTTP request that the server can prove.

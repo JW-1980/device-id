@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Envelope;
+namespace DeviceId\Envelope;
 
 /**
  * The two envelope slots a challenge nonce is redeemed for: tier 1 (sent at once) and tier 2

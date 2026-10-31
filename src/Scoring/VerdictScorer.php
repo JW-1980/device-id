@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Scoring;
+namespace DeviceId\Scoring;
 
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Support\Confidence;
-use NutriCompare\Fingerprint\Support\Config;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
-use NutriCompare\Fingerprint\Support\Verdict;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Support\Confidence;
+use DeviceId\Support\Config;
+use DeviceId\Support\TransportIntegrityResult;
+use DeviceId\Support\Verdict;
 
 /**
  * Turns contradictions into a band, and is the only place a decision is made.

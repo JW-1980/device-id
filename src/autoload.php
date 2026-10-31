@@ -15,7 +15,7 @@ declare(strict_types=1);
  * Composer users get the PSR-4 map in composer.json instead, and this file is simply unused.
  */
 spl_autoload_register(static function (string $class): void {
-    $prefix = 'NutriCompare\\Fingerprint\\';
+    $prefix = 'DeviceId\\';
     if (! str_starts_with($class, $prefix)) {
         return;
     }

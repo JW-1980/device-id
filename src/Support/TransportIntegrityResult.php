@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Support;
+namespace DeviceId\Support;
 
-use NutriCompare\Fingerprint\Transport\TransportIntegrity;
+use DeviceId\Transport\TransportIntegrity;
 
 /**
  * The outcome of inspecting what the server could see about a request.
@@ -21,7 +21,7 @@ use NutriCompare\Fingerprint\Transport\TransportIntegrity;
  * `navigator.platform` and the server already holds `Sec-CH-UA-Platform`, and the
  * interesting event is the disagreement. A property that mixes "wrong" with
  * "observed" makes it impossible to write that check without re-deciding, for
- * every field, which category it is in. `NutriCompare\Fingerprint\Rules\EnvironmentConsistency`
+ * every field, which category it is in. `DeviceId\Rules\EnvironmentConsistency`
  * reads only from `witnesses()`; `App\Http\Middleware\TransportIntegrityMiddleware`
  * reacts only to `findings()`.
  *

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Matching\MatcherSettings;
-use NutriCompare\Fingerprint\Support\Config;
+use DeviceId\Matching\MatcherSettings;
+use DeviceId\Support\Config;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 

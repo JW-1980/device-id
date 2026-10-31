@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Keys\DeviceComponents;
-use NutriCompare\Fingerprint\Keys\DeviceKeyDeriver;
-use NutriCompare\Fingerprint\ProbeRegistry;
-use NutriCompare\Fingerprint\Support\Config;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
+use DeviceId\Keys\DeviceComponents;
+use DeviceId\Keys\DeviceKeyDeriver;
+use DeviceId\ProbeRegistry;
+use DeviceId\Support\Config;
+use DeviceId\Support\TransportIntegrityResult;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 

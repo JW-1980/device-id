@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Support\ProbeEnvelope;
+use DeviceId\Support\ProbeEnvelope;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 

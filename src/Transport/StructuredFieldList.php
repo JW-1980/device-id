@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Transport;
+namespace DeviceId\Transport;
 
 /**
  * An RFC 8941 (Structured Field Values) LIST parser, for the `Sec-CH-UA*` family.

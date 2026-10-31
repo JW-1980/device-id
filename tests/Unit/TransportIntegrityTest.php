@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Support\TransportRequestFacts;
-use NutriCompare\Fingerprint\Transport\Ja4;
-use NutriCompare\Fingerprint\Transport\TransportIntegrity;
+use DeviceId\Support\TransportRequestFacts;
+use DeviceId\Transport\Ja4;
+use DeviceId\Transport\TransportIntegrity;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;

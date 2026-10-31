@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Support;
+namespace DeviceId\Support;
 
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Rules\IntegrityFindings;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Rules\IntegrityFindings;
 
 /**
  * The browser signals the device risk rules read, and nothing else.

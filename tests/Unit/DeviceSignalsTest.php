@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Support\DeviceSignals;
+use DeviceId\Support\DeviceSignals;
 use PHPUnit\Framework\TestCase;
 
 class DeviceSignalsTest extends TestCase

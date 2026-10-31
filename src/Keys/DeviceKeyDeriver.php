@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Keys;
+namespace DeviceId\Keys;
 
-use NutriCompare\Fingerprint\Canonicaliser;
-use NutriCompare\Fingerprint\Support\Config;
-use NutriCompare\Fingerprint\Support\DeviceKey;
-use NutriCompare\Fingerprint\Support\ProbeEnvelope;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
+use DeviceId\Canonicaliser;
+use DeviceId\Support\Config;
+use DeviceId\Support\DeviceKey;
+use DeviceId\Support\ProbeEnvelope;
+use DeviceId\Support\TransportIntegrityResult;
 
 /**
  * Derives the two device keys from a claim set.

@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Rules;
+namespace DeviceId\Rules;
 
-use NutriCompare\Fingerprint\Scoring\VerdictScorer;
-use NutriCompare\Fingerprint\Support\Config;
-use NutriCompare\Fingerprint\Support\FeatureShipVersions;
-use NutriCompare\Fingerprint\Support\ProbeEnvelope;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
-use NutriCompare\Fingerprint\Transport\StructuredFieldList;
+use DeviceId\Scoring\VerdictScorer;
+use DeviceId\Support\Config;
+use DeviceId\Support\FeatureShipVersions;
+use DeviceId\Support\ProbeEnvelope;
+use DeviceId\Support\TransportIntegrityResult;
+use DeviceId\Transport\StructuredFieldList;
 
 /**
  * The disagreement engine: compares what the page claimed against what the transport

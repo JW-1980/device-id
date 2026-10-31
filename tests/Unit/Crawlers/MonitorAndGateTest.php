@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit\Crawlers;
 
-use NutriCompare\Fingerprint\Crawlers\ArrayCache;
-use NutriCompare\Fingerprint\Crawlers\CrawlerCatalogue;
-use NutriCompare\Fingerprint\Crawlers\CrawlerDefinition;
-use NutriCompare\Fingerprint\Crawlers\CrawlerVerifier;
-use NutriCompare\Fingerprint\Crawlers\IpRangeDirectory;
-use NutriCompare\Fingerprint\Crawlers\OperatorAllowlist;
-use NutriCompare\Fingerprint\Crawlers\TrafficGate;
-use NutriCompare\Fingerprint\Support\Verdict;
+use DeviceId\Crawlers\ArrayCache;
+use DeviceId\Crawlers\CrawlerCatalogue;
+use DeviceId\Crawlers\CrawlerDefinition;
+use DeviceId\Crawlers\CrawlerVerifier;
+use DeviceId\Crawlers\IpRangeDirectory;
+use DeviceId\Crawlers\OperatorAllowlist;
+use DeviceId\Crawlers\TrafficGate;
+use DeviceId\Support\Verdict;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint;
+namespace DeviceId;
 
 /**
  * Typed reads of a settings array, with no framework underneath.

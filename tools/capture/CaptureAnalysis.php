@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace DeviceId\Capture;
 
-use NutriCompare\Fingerprint\Envelope\ClientClaimsEnvelope;
-use NutriCompare\Fingerprint\Keys\DeviceKeyDeriver;
-use NutriCompare\Fingerprint\Keys\DeviceKeys;
-use NutriCompare\Fingerprint\Matching\DeviceCandidateSource;
-use NutriCompare\Fingerprint\Matching\DeviceMatcher;
-use NutriCompare\Fingerprint\Matching\MatchCandidate;
-use NutriCompare\Fingerprint\Matching\MatcherSettings;
-use NutriCompare\Fingerprint\ProbeRegistry;
-use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
-use NutriCompare\Fingerprint\Rules\IntegrityFindings;
-use NutriCompare\Fingerprint\Scoring\ConfidenceScorer;
-use NutriCompare\Fingerprint\Scoring\VerdictScorer;
-use NutriCompare\Fingerprint\Support\Config;
-use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
-use NutriCompare\Fingerprint\Support\TransportRequestFacts;
-use NutriCompare\Fingerprint\Transport\TransportIntegrity;
+use DeviceId\Envelope\ClientClaimsEnvelope;
+use DeviceId\Keys\DeviceKeyDeriver;
+use DeviceId\Keys\DeviceKeys;
+use DeviceId\Matching\DeviceCandidateSource;
+use DeviceId\Matching\DeviceMatcher;
+use DeviceId\Matching\MatchCandidate;
+use DeviceId\Matching\MatcherSettings;
+use DeviceId\ProbeRegistry;
+use DeviceId\Rules\EnvironmentConsistency;
+use DeviceId\Rules\IntegrityFindings;
+use DeviceId\Scoring\ConfidenceScorer;
+use DeviceId\Scoring\VerdictScorer;
+use DeviceId\Support\Config;
+use DeviceId\Support\TransportIntegrityResult;
+use DeviceId\Support\TransportRequestFacts;
+use DeviceId\Transport\TransportIntegrity;
 
 /**
  * The engine's reading of one capture, and of pairs of captures from one machine.

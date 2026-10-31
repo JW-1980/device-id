@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Crawlers;
+namespace DeviceId\Crawlers;
 
 /**
  * Pure-PHP DNS adapter: `gethostbyaddr()` for the PTR name, `gethostbynamel()` plus

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Transport;
+namespace DeviceId\Transport;
 
 /**
  * A JA4 TLS ClientHello fingerprint, as computed at the edge.

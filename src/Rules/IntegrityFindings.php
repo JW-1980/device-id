@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Rules;
+namespace DeviceId\Rules;
 
 /**
  * The integrity finding codes that hold for a claim set: what the client reported, united

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Keys;
+namespace DeviceId\Keys;
 
 /**
  * The two keys and the quantised components one claim set derives.

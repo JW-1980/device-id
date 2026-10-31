@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Envelope;
+namespace DeviceId\Envelope;
 
-use NutriCompare\Fingerprint\Support\Config;
+use DeviceId\Support\Config;
 
 /**
  * The claims body, parsed and validated. Never repaired: a parser that coerces or

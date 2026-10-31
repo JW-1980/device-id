@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Matching;
+namespace DeviceId\Matching;
 
 /**
  * The state of a device row's link, decided when the link is written and stored in

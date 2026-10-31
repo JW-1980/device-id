@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Support\Config;
+use DeviceId\Support\Config;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The package's configuration bridge (`NutriCompare\Fingerprint\Support\Config`): the static
+ * The package's configuration bridge (`DeviceId\Support\Config`): the static
  * `use()` snapshot a plain-PHP host passes, and the `resolveWith()` resolver the Laravel host
  * registers (App\Providers\FingerprintServiceProvider) so weights and bands edited on the admin
  * screen are read live rather than frozen at boot.

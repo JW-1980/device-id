@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit\Crawlers;
 
-use NutriCompare\Fingerprint\Crawlers\CrawlerCatalogue;
-use NutriCompare\Fingerprint\Crawlers\CrawlerDefinition;
-use NutriCompare\Fingerprint\Crawlers\CrawlerVerification;
+use DeviceId\Crawlers\CrawlerCatalogue;
+use DeviceId\Crawlers\CrawlerDefinition;
+use DeviceId\Crawlers\CrawlerVerification;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 

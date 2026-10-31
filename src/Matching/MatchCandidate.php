@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Matching;
+namespace DeviceId\Matching;
 
 /**
  * A stored device row as `DeviceMatcher` scores it: its id, its cluster root, the

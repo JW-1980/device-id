@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Support;
+namespace DeviceId\Support;
 
-use NutriCompare\Fingerprint\Crawlers\CrawlerVerification;
-use NutriCompare\Fingerprint\Transport\Ja4;
-use NutriCompare\Fingerprint\Transport\RawHeaderCapture;
-use NutriCompare\Fingerprint\Transport\TransportIntegrity;
+use DeviceId\Crawlers\CrawlerVerification;
+use DeviceId\Transport\Ja4;
+use DeviceId\Transport\RawHeaderCapture;
+use DeviceId\Transport\TransportIntegrity;
 
 /**
  * The parts of a request that TransportIntegrity needs beyond the header pairs.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint;
+namespace DeviceId;
 
 /**
  * Every check the engine can perform, with its default weight and a plain description.

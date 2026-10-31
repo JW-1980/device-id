@@ -29,7 +29,7 @@ $root = dirname(__DIR__);
 // A deliberately minimal autoloader. Not Composer's: the point is to demonstrate that the
 // package resolves with nothing but PHP's own SPL machinery.
 spl_autoload_register(static function (string $class) use ($root): void {
-    $prefix = 'NutriCompare\\Fingerprint\\';
+    $prefix = 'DeviceId\\';
     if (! str_starts_with($class, $prefix)) {
         return;
     }
@@ -68,7 +68,7 @@ foreach (allPhpFiles($root.'/src') as $file) {
         continue;
     }
 
-    $fqcn = 'NutriCompare\\Fingerprint\\'.str_replace('/', '\\', substr($relative, 0, -4));
+    $fqcn = 'DeviceId\\'.str_replace('/', '\\', substr($relative, 0, -4));
 
     if (! class_exists($fqcn) && ! interface_exists($fqcn) && ! trait_exists($fqcn) && ! enum_exists($fqcn)) {
         $failures[] = "could not autoload {$fqcn} from {$relative} with a bare SPL autoloader";
@@ -242,8 +242,8 @@ foreach (allPhpFiles($root.'/src') as $file) {
         // than no gate, because the next time it fires you do not know which to believe.
         $dir = dirname(substr($file, strlen($root.'/src/')));
         $namespace = $dir === '.' || $dir === ''
-            ? 'NutriCompare\\Fingerprint'
-            : 'NutriCompare\\Fingerprint\\'.str_replace('/', '\\', $dir);
+            ? 'DeviceId'
+            : 'DeviceId\\'.str_replace('/', '\\', $dir);
 
         $declared[] = $namespace.'\\'.$m[1];
     }
@@ -259,11 +259,11 @@ foreach (allPhpFiles($root.'/src') as $file) {
     $relative = substr($file, strlen($root.'/src/'));
     // Same directory-to-namespace rule as `$declared`, and the empty case handled explicitly:
     // `substr($relative, 0, 0)` is `''`, and concatenating that leaves a trailing separator, so
-    // a class at the src root resolved as `NutriCompare\Fingerprint\\RawHeaderOrder`.
+    // a class at the src root resolved as `DeviceId\\RawHeaderOrder`.
     $ownDir = dirname($relative);
     $ownNamespace = $ownDir === '.' || $ownDir === ''
-        ? 'NutriCompare\\Fingerprint'
-        : 'NutriCompare\\Fingerprint\\'.str_replace('/', '\\', $ownDir);
+        ? 'DeviceId'
+        : 'DeviceId\\'.str_replace('/', '\\', $ownDir);
 
     // The alias map this file can actually use. A short name means the LAST segment of its
     // import, and that import may be aliased — resolving `Config` against the wrong file's
@@ -277,7 +277,7 @@ foreach (allPhpFiles($root.'/src') as $file) {
     }
 
     foreach ($aliases as $short => $fqcn) {
-        $aliases[$short] = str_starts_with($fqcn, 'NutriCompare\\Fingerprint\\') ? $fqcn : null;
+        $aliases[$short] = str_starts_with($fqcn, 'DeviceId\\') ? $fqcn : null;
     }
 
     // Every position a class name can appear: static call, construction, a parameter or return

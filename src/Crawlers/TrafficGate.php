@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace NutriCompare\Fingerprint\Crawlers;
+namespace DeviceId\Crawlers;
 
-use NutriCompare\Fingerprint\Support\Verdict;
+use DeviceId\Support\Verdict;
 
 /**
  * Classifies a request before any fingerprint or bot scoring runs.

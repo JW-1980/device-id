@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace DeviceId\Tests\Unit;
 
-use NutriCompare\Fingerprint\Scoring\ConfidenceScorer;
-use NutriCompare\Fingerprint\Support\Config;
+use DeviceId\Scoring\ConfidenceScorer;
+use DeviceId\Support\Config;
 use PHPUnit\Framework\TestCase;
 
 /**
