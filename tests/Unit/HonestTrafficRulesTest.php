@@ -120,6 +120,39 @@ final class HonestTrafficRulesTest extends TestCase
         $this->assertNotContains('lied_os', $codes);
     }
 
+    private const ANDROID_DESKTOP_SITE = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
+
+    #[Test]
+    public function android_chrome_in_desktop_site_mode_is_not_a_lied_os(): void
+    {
+        // "Request desktop site": a Linux desktop UA, the device's own client hints (Android,
+        // touch). `navigator.platform` is the device's `Linux armv8l` or the desktop's `Linux x86_64`.
+        foreach (['Linux armv8l', 'Linux x86_64'] as $platform) {
+            $codes = self::codes(
+                self::environment(self::ANDROID_DESKTOP_SITE, $platform, ['maxTouchPoints' => 5]),
+                ['sec_ch_ua_platform' => '"Android"'],
+            );
+
+            $this->assertNotContains('lied_os', $codes, $platform);
+        }
+    }
+
+    #[Test]
+    public function desktop_site_mode_does_not_excuse_a_real_os_spoof(): void
+    {
+        $android = ['sec_ch_ua_platform' => '"Android"'];
+
+        // A Windows UA over an Android device: desktop mode never claims Windows.
+        $this->assertContains('lied_os', self::codes(self::environment(self::DESKTOP_CHROME, 'Linux armv8l', ['maxTouchPoints' => 5]), $android));
+        // A Linux UA with an Android hint but no touch screen: not a phone.
+        $this->assertContains('lied_os', self::codes(self::environment(self::ANDROID_DESKTOP_SITE, 'Linux armv8l', ['maxTouchPoints' => 0]), $android));
+        $this->assertContains('lied_os', self::codes(self::environment(self::ANDROID_DESKTOP_SITE, 'Linux x86_64'), $android));
+        // A Linux UA, an Android hint and touch, but a Windows platform string: a patched platform.
+        $this->assertContains('lied_os', self::codes(self::environment(self::ANDROID_DESKTOP_SITE, 'Win32', ['maxTouchPoints' => 5]), $android));
+        // A Linux UA over a platform that says Android while the HEADER says Linux (no Android hint at all).
+        $this->assertContains('lied_os', self::codes(self::environment(self::ANDROID_DESKTOP_SITE, 'Linux armv8l', ['maxTouchPoints' => 5]), ['sec_ch_ua_platform' => '"Windows"']));
+    }
+
     #[Test]
     public function android_on_arm_is_still_consistent_and_a_desktop_claim_on_arm_still_fires(): void
     {

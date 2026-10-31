@@ -1352,6 +1352,20 @@ final class EnvironmentConsistency
                     $platformFamily = $platformFamily === 'chromeos' ? 'linux' : $platformFamily;
                     $hintFamily = $hintFamily === 'chromeos' ? 'linux' : $hintFamily;
 
+                    // Android Chrome's "desktop site" mode swaps the User-Agent for a Linux desktop one
+                    // and leaves the client hints (`Android`, `?1`) and the touch screen as they were;
+                    // `navigator.platform` is either the device's (`Linux armv8l`) or the desktop's
+                    // (`Linux x86_64`). That is a setting, not a lie: a Linux UA is silent when the
+                    // browser's own hint says Android, a touch screen is present and the platform is
+                    // Linux-family. A Windows or macOS UA over an Android hint still fires, because
+                    // desktop mode never claims those.
+                    if ($uaFamily === 'linux' && $hintFamily === 'android' && in_array($platformFamily, ['android', 'linux'], true)) {
+                        $touchPoints = $this->value($c, 'tier1', 'environment', 'identity', 'maxTouchPoints');
+                        if (is_int($touchPoints) && $touchPoints > 0) {
+                            return null;
+                        }
+                    }
+
                     // Client-Hints is authoritative where it exists, because it is what
                     // the browser reported about itself rather than a string it chose.
                     if ($hintFamily !== null && $hintFamily !== $platformFamily) {
