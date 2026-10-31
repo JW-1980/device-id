@@ -232,6 +232,7 @@ final class DeviceComponentsTest extends TestCase
 
         $claims['integrity']['data']['resistance'] = ['state' => 'ok', 'value' => ['brave' => true, 'rfp' => false, 'tor' => false, 'gecko' => false]];
         $claims['tier1']['engineIdentity'] = ['engine' => 'v8', 'errorOwnProps' => 'message,stack', 'stackShape' => 'at', 'internalError' => false];
+        $claims['tier1']['uaClientHints']['brands'] = [['brand' => 'Brave', 'version' => '141'], ['brand' => 'Chromium', 'version' => '141']];
         $claims['tier1']['environment']['identity']['userAgent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
         $brave = self::components($claims);
         $this->assertNull($brave['keyboard']);

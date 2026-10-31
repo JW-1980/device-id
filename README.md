@@ -106,6 +106,24 @@ never counts against a link); none of the three is part of `browser_key` or `har
 (`hardware_key` stays `os|arch|touch`), and none counts towards coverage. Give `gpuCaps` and
 `codecsHw` a weight only after a three-engine capture on one real machine shows they agree.
 
+### Hardware identity (one vote per hardware) and client-reported flags
+
+`DeviceKeys::$hardwareIdentity` (`DeviceKeyDeriver::hardwareIdentity()`) is an HMAC over the measured
+high-entropy components `DeviceComponents::HARDWARE_IDENTITY` (fonts, gpu, gpuMath, voices, emoji,
+scripts), for a host's one-vote-per-hardware correlation. It is computed without the trust projection's
+client-reported inputs (`canvasFill.exact`, `canvasPattern.exact`, wrapped read-back functions), so no
+single client bit changes it. It is null when there is no secret, when no component was measured, and
+under a protection the engine evidence proves (Firefox resistFingerprinting or Tor; Brave), whose values
+are constants or per-session noise. A host must treat a null identity at least as strictly as a known one,
+or declining becomes the evasion. **Limit:** a client that forges a measurement (one bit of
+`tier2.scripts.bits`) derives a different identity; it is a correlation signal, never a sole dedupe key.
+
+The Brave shields report is honoured (components untrusted, four rules silenced) only under
+`EnvironmentConsistency::protectedBrave()`: the Chromium engine marks and UA, AND a `Brave` brand in
+`userAgentData.brands` and, when Client Hints are sent, in `Sec-CH-UA`. It used to need only the Chromium
+evidence every Chrome has, so one bit nulled eleven components. That Brave sends its own brand is Brave's
+documented behaviour; it is not measured here (no Brave build in this environment).
+
 ## Verified crawlers, uptime monitors and the operator allowlist (`src/Crawlers/`)
 
 Googlebot and the other search crawlers must never be challenged or blocked by fingerprinting or

@@ -20,6 +20,11 @@ namespace DeviceId\Keys;
  * `untrusted` is `DeviceComponents::untrusted()` for the same claim set, the component names
  * nulled in `components`; kept so a caller that stores the decision (`FingerprintIngest`)
  * does not compute it a second time.
+ *
+ * `hardwareIdentity` is {@see DeviceKeyDeriver::hardwareIdentity()}: an HMAC over the measured
+ * high-entropy components that no client-reported flag can change, for a host's
+ * one-vote-per-hardware correlation. It is a correlation feature, not proof: a forged
+ * measurement is a different identity.
  */
 final readonly class DeviceKeys
 {
@@ -35,5 +40,6 @@ final readonly class DeviceKeys
         public int $saltVersion,
         public bool $protected = false,
         public array $untrusted = [],
+        public ?string $hardwareIdentity = null,
     ) {}
 }

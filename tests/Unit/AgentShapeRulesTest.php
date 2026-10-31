@@ -165,7 +165,12 @@ final class AgentShapeRulesTest extends TestCase
     {
         $few = ['count' => 0];
         $this->assertNotContains('fonts_single_family_desktop', self::codes(self::withFonts($few, self::MAC_SAFARI, [], self::SAFARI_MARKS)));
-        $this->assertNotContains('fonts_single_family_desktop', self::codes(self::withFonts($few, self::WINDOWS_CHROME, ['resistance' => ['state' => 'ok', 'value' => ['brave' => true]]])));
+        // Brave is honoured with its own brand in the brands (EnvironmentConsistency::protectedBrave()).
+        $brave = self::withFonts($few, self::WINDOWS_CHROME, ['resistance' => ['state' => 'ok', 'value' => ['brave' => true]]]);
+        $brave['tier1']['uaClientHints'] = ['state' => 'ok', 'value' => ['brands' => [['brand' => 'Brave', 'version' => '141'], ['brand' => 'Chromium', 'version' => '141']]]];
+        $this->assertNotContains('fonts_single_family_desktop', self::codes($brave));
+        $flagOnly = self::withFonts($few, self::WINDOWS_CHROME, ['resistance' => ['state' => 'ok', 'value' => ['brave' => true]]]);
+        $this->assertContains('fonts_single_family_desktop', self::codes($flagOnly), 'a Brave flag alone buys no silence');
 
         $firefox = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0';
         $gecko = ['engine' => 'spidermonkey', 'errorOwnProps' => 'columnNumber,fileName,lineNumber,message', 'stackShape' => 'at-sign', 'internalError' => true];

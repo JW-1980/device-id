@@ -82,6 +82,15 @@ final class DeviceComponents
     public const BRAVE_UNTRUSTED = ['gpu', 'cores', 'memory', 'voices', 'panel', 'aspect', 'fonts', 'emoji', 'fontsCount', 'keyboard', 'gpuCaps'];
 
     /**
+     * The high-entropy, machine-measured components the hardware identity is keyed over
+     * ({@see DeviceKeyDeriver::hardwareIdentity()}): the font set, the WebGL class, the GPU's
+     * shader arithmetic, the voice list, the emoji metrics and the script-support bits.
+     *
+     * @var list<string>
+     */
+    public const HARDWARE_IDENTITY = ['fonts', 'gpu', 'gpuMath', 'voices', 'emoji', 'scripts'];
+
+    /**
      * Every hard component must be known for `hardware_key` (G-D2i: a null is never hashed,
      * so a tier-1-only visit and a full visit of one browser derive the same key).
      */
@@ -223,7 +232,8 @@ final class DeviceComponents
      * engine evidence of `EnvironmentConsistency::engineEvidence()` (the complete SpiderMonkey
      * mark set, a Gecko User-Agent in the claims and in the header, no Client-Hints header,
      * no JA4 profile of another family) — {@see protectedGecko()}, the one definition of
-     * that gate; `brave` counts only when the marks and the UA say Chromium. A claim that
+     * that gate; `brave` counts only under `EnvironmentConsistency::protectedBrave()` (the
+     * Chromium marks and UA AND Brave's brand in the brands and the Sec-CH-UA header). A claim that
      * fails those checks is left trusted here AND scored by the `resistance_vs_engine`
      * rule, so faking it costs risk instead of buying anonymity. Most of that evidence is
      * client-reported (a non-browser can copy a complete honest capture); the server-observed
@@ -259,7 +269,7 @@ final class DeviceComponents
         $webglWrapped = (bool) array_filter($liedApis, static fn (string $api): bool => str_contains($api, 'WebGL'));
 
         $protected = self::protectedUnder($geckoEvidence, $claims);
-        $brave = $chromiumEvidence && EnvironmentConsistency::read($claims, 'integrity', 'data', 'resistance', 'brave') === true;
+        $brave = $chromiumEvidence && EnvironmentConsistency::protectedBrave($claims, $transport);
         // The finding is raised by the synchronous phase (tier-1 envelope); the deferred
         // phase re-measures the fill and reports it as data only, so the tier-2 envelope
         // — the one that carries the canvas-measured components — can be judged on its own.

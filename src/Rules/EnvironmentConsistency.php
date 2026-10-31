@@ -1874,8 +1874,7 @@ final class EnvironmentConsistency
                         return null;
                     }
 
-                    if (self::protectedGecko($c, $t)
-                        || (self::engineEvidence($c, $t)['chromium'] && $this->value($c, 'integrity', 'data', 'resistance', 'brave') === true)) {
+                    if (self::protectedGecko($c, $t) || self::protectedBrave($c, $t)) {
                         return null;
                     }
 
@@ -1897,8 +1896,7 @@ final class EnvironmentConsistency
                         return null;
                     }
 
-                    if (self::protectedGecko($c, $t)
-                        || (self::engineEvidence($c, $t)['chromium'] && $this->value($c, 'integrity', 'data', 'resistance', 'brave') === true)) {
+                    if (self::protectedGecko($c, $t) || self::protectedBrave($c, $t)) {
                         return null;
                     }
 
@@ -2135,7 +2133,7 @@ final class EnvironmentConsistency
                         return null;
                     }
 
-                    if (self::claimsGeckoProtection($c) || $this->value($c, 'integrity', 'data', 'resistance', 'brave') === true) {
+                    if (self::protectedGecko($c, $t) || self::protectedBrave($c, $t)) {
                         return null;
                     }
 
@@ -2299,7 +2297,7 @@ final class EnvironmentConsistency
                     // the viewport plus a small random amount, so both honestly miss. Silent only
                     // when the engine evidence agrees with the client-reported Brave flag (the gate
                     // `canvas_realm_mismatch` uses), so a forged flag buys nothing on Gecko/WebKit.
-                    if (self::engineEvidence($c, $t)['chromium'] && $this->value($c, 'integrity', 'data', 'resistance', 'brave') === true) {
+                    if (self::protectedBrave($c, $t)) {
                         return null;
                     }
 
@@ -2789,6 +2787,46 @@ final class EnvironmentConsistency
     public static function protectedGecko(mixed $claims, TransportIntegrityResult $transport = new TransportIntegrityResult): bool
     {
         return self::claimsGeckoProtection($claims) && self::engineEvidence($claims, $transport)['gecko'];
+    }
+
+    /**
+     * Brave with its shields, by the client's `brave` report AND engine evidence a flag alone
+     * cannot supply: the Chromium engine marks and a Chromium User-Agent
+     * (`engineEvidence()['chromium']`), and Brave's own brand in `userAgentData.brands` and, when
+     * the request carries Client Hints, in the `Sec-CH-UA` header (Brave lists a `Brave` brand
+     * in both; documented by Brave, not measured in this repository, which has no Brave build).
+     *
+     * It was the flag plus `engineEvidence()['chromium']`, which every Chrome satisfies, so one
+     * client-reported bit nulled eleven components and silenced four rules (skeptical review
+     * M1). A JavaScript spoofer cannot rewrite the header; a non-browser client that forges
+     * both still gains only what not sending those probes would give it.
+     */
+    public static function protectedBrave(mixed $claims, TransportIntegrityResult $transport = new TransportIntegrityResult): bool
+    {
+        if (self::read($claims, 'integrity', 'data', 'resistance', 'brave') !== true || ! self::engineEvidence($claims, $transport)['chromium']) {
+            return false;
+        }
+
+        $brands = self::read($claims, 'tier1', 'uaClientHints', 'brands');
+        $namesBrave = false;
+        foreach (is_array($brands) ? $brands : [] as $brand) {
+            $name = is_array($brand) ? ($brand['brand'] ?? null) : $brand;
+            if (is_string($name) && strtolower(trim($name)) === 'brave') {
+                $namesBrave = true;
+            }
+        }
+        if (! $namesBrave) {
+            return false;
+        }
+
+        $header = $transport->witnessString('sec_ch_ua');
+        if ($header === null || trim($header) === '') {
+            // No Client Hints on this request (an http origin, a host without Accept-CH): the
+            // brands are the only witness.
+            return true;
+        }
+
+        return preg_match('/(^|,)\s*"Brave"\s*;\s*v=/i', $header) === 1;
     }
 
     /**

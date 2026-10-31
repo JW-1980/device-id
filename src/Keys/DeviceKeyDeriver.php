@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DeviceId\Keys;
 
 use DeviceId\Canonicaliser;
+use DeviceId\Rules\EnvironmentConsistency;
 use DeviceId\Support\Config;
 use DeviceId\Support\DeviceKey;
 use DeviceId\Support\ProbeEnvelope;
@@ -164,6 +165,7 @@ final class DeviceKeyDeriver
             $this->saltVersion($organizationId),
             DeviceComponents::protectedGecko($claims, $transport),
             $untrusted,
+            $this->hardwareIdentity($claims, $transport, $organizationId),
         );
     }
 
@@ -203,6 +205,49 @@ final class DeviceKeyDeriver
         }
 
         return hash_hmac('sha256', 'hardware:'.Canonicaliser::canonicalise(DeviceComponents::hard($components)), $secret);
+    }
+
+    /**
+     * The hardware identity: HMAC(scoped secret, canonical measured `HARDWARE_IDENTITY`
+     * components), for a host's one-vote-per-hardware correlation (welzolekker's vote dedupe).
+     *
+     * ## No client flag can change it (skeptical review M1)
+     *
+     * The components are measured WITHOUT the trust projection's client-reported inputs
+     * (`canvasFill.exact`, `canvasPattern.exact`, wrapped read-back functions, the realm
+     * comparison): each is one value in the client's body, and nulling components on it let one
+     * bit pick a different identity. Only a protection the ENGINE evidence proves changes the
+     * answer, and then to null rather than to a hash: Firefox resistFingerprinting or Tor
+     * (`protectedGecko()`) reports the protection's constants, Brave (`protectedBrave()`) farbles
+     * per session, so neither has a stable hardware identity. A host must give a null identity a
+     * policy at least as strict as a known one (for example a per-network rule), or declining
+     * becomes the evasion.
+     *
+     * An honest noise extension that varies its noise per session gives a different identity per
+     * session; the same is true of any client that forges a measurement. That is the limit of any
+     * hash over client-measured values: use it as one correlation signal, never as the only
+     * dedupe key.
+     *
+     * @param  array<array-key, mixed>  $claims
+     */
+    public function hardwareIdentity(array $claims, TransportIntegrityResult $transport, ?int $organizationId = null): ?string
+    {
+        $secret = $this->secret($organizationId);
+        if ($secret === null
+            || DeviceComponents::protectedGecko($claims, $transport)
+            || EnvironmentConsistency::protectedBrave($claims, $transport)) {
+            return null;
+        }
+
+        $measured = DeviceComponents::fromClaims($claims, $transport, $secret, []);
+        $values = [];
+        foreach (DeviceComponents::HARDWARE_IDENTITY as $name) {
+            if (($measured[$name] ?? null) !== null) {
+                $values[$name] = $measured[$name];
+            }
+        }
+
+        return $values === [] ? null : hash_hmac('sha256', 'hardware-identity:'.Canonicaliser::canonicalise($values), $secret);
     }
 
     /**

@@ -238,6 +238,8 @@ final class HonestTrafficRulesTest extends TestCase
             'tier1' => [
                 'environment' => ['state' => 'ok', 'value' => ['identity' => ['userAgent' => self::DESKTOP_CHROME, 'platform' => 'Win32']]],
                 'engineIdentity' => ['state' => 'ok', 'value' => ['engine' => 'v8', 'errorOwnProps' => 'message,stack', 'stackShape' => $engineStack, 'internalError' => false]],
+                // Brave lists its own brand; EnvironmentConsistency::protectedBrave() requires it.
+                'uaClientHints' => ['state' => 'ok', 'value' => ['brands' => [['brand' => 'Brave', 'version' => '141'], ['brand' => 'Chromium', 'version' => '141']]]],
             ],
             'integrity' => ['data' => [
                 'phantomRealm' => ['state' => 'ok', 'value' => ['screenTruth' => ['cssWidth' => false, 'cssHeight' => false]]],

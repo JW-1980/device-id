@@ -68,7 +68,10 @@ final class NewSignalRulesTest extends TestCase
                     'viewport' => ['innerWidth' => 1280, 'devicePixelRatio' => 1.5],
                 ]],
                 'engineIdentity' => ['state' => 'ok', 'value' => $marks],
-            ],
+            ] + (($integrity['resistance']['value']['brave'] ?? false) === true
+                // A Brave report comes with Brave's own brand (EnvironmentConsistency::protectedBrave()).
+                ? ['uaClientHints' => ['state' => 'ok', 'value' => ['brands' => [['brand' => 'Brave', 'version' => '141'], ['brand' => 'Chromium', 'version' => '141']]]]]
+                : []),
             'integrity' => ['findings' => [], 'data' => $integrity],
         ];
     }
