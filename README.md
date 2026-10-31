@@ -163,6 +163,64 @@ before `npm run build`** (and before the host's type-check and Vitest).
 
 Tests and type-check here: `npm ci && npm test && npm run typecheck`.
 
+## Capturing real browsers
+
+`npm run capture` runs the **real collector** (`collectAndSendDetailed`, nothing reimplemented) in real
+browsers against a local server that answers the challenge and claims endpoints the way a host with
+default settings does (envelope v3, two slots, a nonce, `disabled_probes` from `ProbeRegistry`, and the
+`Accept-CH` header above), then runs the engine over what it received. It needs Node, PHP 8.2+ and
+`npm ci`; nothing is installed or sent anywhere.
+
+```bash
+npm ci
+npx playwright install chromium firefox webkit   # the pinned Playwright 1.63.0; skip browsers you do not need
+npm run capture                                  # every browser it finds, headed and headless
+npm run capture -- --browsers=chrome,msedge,safari --mode=headed --machine=my-laptop
+npm run capture:report                           # redo the engine step for the newest capture
+```
+
+- **Browsers.** `chromium`, `firefox`, `webkit` (Playwright's own builds), `chrome` and `msedge` (the
+  installed browsers, through Playwright's channels) and `safari` (real Safari through `safaridriver`
+  over a plain-`fetch` WebDriver client; on a Mac run `sudo safaridriver --enable` once and tick
+  Safari > Develop > Allow Remote Automation). A browser that is not installed is reported as
+  "not installed" and skipped.
+- **Headed or headless.** Both by default. Headed needs a display; on Linux without one the harness
+  re-runs itself under `xvfb-run` when that exists and otherwise records "skipped". The mode of every
+  run is written down (`headless`, `headed`, `headed-xvfb`).
+- **Output.** `tools/capture/out/<timestamp>/` (git-ignored; change it with `--out=`) and a
+  `.tar.gz` of it, which is what to send back from another machine: `runs/` (raw envelopes and request
+  headers), `dataset/` (see below), `report.md`, `report.json`.
+- **What the report means.** Per capture: the verdict (band, score, rule codes with weights), the
+  confidence number with missing probes and penalties, and whether `tools/capture/expectations.php` is
+  met. An honest headed browser must not reach `challenge` and may fire no code; a headless run is
+  expected to give itself away (headless Chromium: `ua_headless_token`); any other code on an honest
+  run is a reported failure with the engine's own detail sentence, and the command exits non-zero.
+  `navigator.webdriver` is a confidence penalty (`webdriver`), not a rule code. The report also matches
+  every pair of different browsers captured on the same machine and mode with `DeviceMatcher`, both
+  ways. A link is reported, not required: signals legitimately differ between browsers.
+- **Labels.** `honest` (headed, automation switches suppressed where the driver allows: Chromium family
+  only), `automation` (headed with the driver's defaults; Firefox and WebKit under Playwright, and
+  Safari under safaridriver, cannot hide it), `headless`. They are the harness's declaration, not a
+  human judgement, and even `honest` is driven by a program: it is the closest approximation to a
+  person's browser the harness can make, not a population sample.
+
+The same captures feed the permanent regression suite: `tests/Fixtures/fingerprint/captures/` holds
+captures (what the browser said, not what the engine answered) and `tests/Unit/CaptureFixturesTest`
+runs the engine over each against the expectations. To add a machine's captures:
+`php tools/capture/engine-report.php <capture-dir> --save-fixtures=tests/Fixtures/fingerprint/captures`.
+
+### The dataset (`dataset/<id>.json`, schema `device-id.capture-dataset`, version 1)
+
+One JSON per run, for a later model to train and evaluate on: `labels` (`class`, `basis`), `machine`
+(`id` is a hash of hostname and hardware, or `--machine`; the hostname is never written; `os`,
+`arch`), `browser` (`name`, `engine`, `version`, `mode`, `variant`, `driver`), `collector`
+(envelope and probe-set versions, the method policy), `transport` (request headers in wire order),
+`claims` (the engine-parsed claims of both envelopes), `features` (the merged claims flattened to
+`dotted.path` scalars; a list becomes `path.__len` and `path.__hash`), and `engine` (the verdict,
+confidence and keys under a fixed test secret). `index.jsonl` has one summary line per run. The schema
+version changes with any change to these names; `engine` is derived and should be recomputed, not trained
+on, when the engine changes.
+
 ## Usage without a framework
 
 ```php
