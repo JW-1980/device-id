@@ -34,6 +34,21 @@ final class Velocity
 {
     private const EARTH_RADIUS_KM = 6371.0088;
 
+    /** Distinct device keys one ACCOUNT was used from. */
+    public const DEVICES_PER_ACCOUNT = 'devices_per_account';
+
+    /** Distinct accounts one DEVICE KEY was used for. */
+    public const ACCOUNTS_PER_DEVICE = 'accounts_per_device';
+
+    /** Distinct e-mail addresses (hashes) used from one NETWORK. */
+    public const EMAILS_PER_NETWORK = 'emails_per_network';
+
+    private const DISTINCT_SUBJECTS = [
+        self::DEVICES_PER_ACCOUNT => 'account',
+        self::ACCOUNTS_PER_DEVICE => 'device_key',
+        self::EMAILS_PER_NETWORK => 'network_hash',
+    ];
+
     /**
      * @param  string  $event  `signup` or `login`
      * @param  string  $subjectKind  `device_key`, `network_hash` or `account`
@@ -65,6 +80,59 @@ final class Velocity
         return new VelocityFinding(VelocityFinding::BURST, $subjectKind, $subject, $severity, [
             'event' => $event, 'count' => $count, 'limit' => $limit, 'window_seconds' => $thresholds->windowSeconds,
         ]);
+    }
+
+    /**
+     * Velocity v2: how many DISTINCT values one subject touched in each of three windows (1 hour,
+     * 24 hours, 7 days), for one relation:
+     *
+     * - {@see ACCOUNTS_PER_DEVICE}: `$subject` is a device key, each event's `value` an account id
+     * - {@see DEVICES_PER_ACCOUNT}: `$subject` is an account, `value` a device key
+     * - {@see EMAILS_PER_NETWORK}: `$subject` is a network hash, `value` a keyed hash of the e-mail address
+     *
+     * Returns one finding per window whose distinct count reaches the limit
+     * ({@see VelocityThresholds::$distinct}), so a short burst and a slow drip are both reported
+     * and each is its own model feature. The same value twice counts once; events after `$now` and
+     * older than the window are ignored, so a re-run gives the same answer. Accounts-per-device
+     * stays silent when the count reaches the k-floor: a key shared by that many accounts is a
+     * device class, not a ring. A network is shared by design, so its findings are informational
+     * at the limit and medium at double.
+     *
+     * @param  string  $relation  one of the three relation constants
+     * @param  list<array{at: int, value: string}>  $events  the subject's events, any order
+     * @return list<VelocityFinding>
+     */
+    public static function distinct(string $relation, string $subject, array $events, int $now, ?VelocityThresholds $thresholds = null): array
+    {
+        $kind = self::DISTINCT_SUBJECTS[$relation] ?? throw new \InvalidArgumentException("unknown velocity relation '{$relation}'");
+        $thresholds ??= VelocityThresholds::fromConfig();
+
+        $findings = [];
+        foreach (VelocityThresholds::WINDOWS as $label => $seconds) {
+            $values = [];
+            foreach ($events as $event) {
+                if (is_array($event) && is_int($event['at'] ?? null) && is_string($event['value'] ?? null) && $event['at'] > $now - $seconds && $event['at'] <= $now) {
+                    $values[$event['value']] = true;
+                }
+            }
+            $count = count($values);
+            $limit = $thresholds->distinct[$relation][$label];
+            if ($count < $limit || ($relation === self::ACCOUNTS_PER_DEVICE && $count >= $thresholds->distinctKFloor)) {
+                continue;
+            }
+
+            $severity = match (true) {
+                $kind === 'network_hash' && $count >= 2 * $limit => ReviewItem::SEVERITY_MEDIUM,
+                $kind === 'network_hash' => ReviewItem::SEVERITY_INFORMATIONAL,
+                $count >= 2 * $limit => ReviewItem::SEVERITY_HIGH,
+                default => ReviewItem::SEVERITY_MEDIUM,
+            };
+            $findings[] = new VelocityFinding(VelocityFinding::DISTINCT, $kind, $subject, $severity, [
+                'relation' => $relation, 'window' => $label, 'distinct' => $count, 'limit' => $limit, 'window_seconds' => $seconds,
+            ]);
+        }
+
+        return $findings;
     }
 
     /**
@@ -160,7 +228,8 @@ final class Velocity
 
     /**
      * Model features of a visit: `vel_burst` when any burst finding exists for it,
-     * `vel_impossible_travel` when the account has one. Only those that hold.
+     * `vel_impossible_travel` when the account has one, and `vel_<relation>_<window>` for each
+     * distinct-count finding ({@see distinct()}). Only those that hold.
      *
      * @param  list<VelocityFinding>  $findings
      * @return array<string, float>
@@ -175,6 +244,8 @@ final class Velocity
                 $features['vel_burst'] = 1.0;
             } elseif ($finding->code === VelocityFinding::IMPOSSIBLE_TRAVEL) {
                 $features['vel_impossible_travel'] = 1.0;
+            } elseif ($finding->code === VelocityFinding::DISTINCT) {
+                $features['vel_'.$finding->evidence['relation'].'_'.$finding->evidence['window']] = 1.0;
             }
         }
 

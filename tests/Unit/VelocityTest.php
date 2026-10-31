@@ -165,4 +165,110 @@ final class VelocityTest extends TestCase
         $this->assertSame('velocity_burst', $burst->toReviewItem()->detector);
         $this->assertSame('account', $travel->toReviewItem()->subjectKind);
     }
+
+    // ------------------------------------------------------------------ velocity v2: distinct counts over three windows
+
+    /**
+     * @return list<array{at: int, value: string}>
+     */
+    private static function events(string $prefix, int $count, int $secondsAgo): array
+    {
+        $out = [];
+        for ($i = 0; $i < $count; $i++) {
+            $out[] = ['at' => self::NOW - $secondsAgo - $i, 'value' => $prefix.$i];
+        }
+
+        return $out;
+    }
+
+    #[Test]
+    public function distinct_accounts_on_one_device_are_counted_per_window(): void
+    {
+        $thresholds = new VelocityThresholds;
+        $events = [...self::events('a', 3, 60), ...self::events('b', 2, 5 * 3600), ...self::events('c', 3, 3 * 86400)];
+
+        $findings = Velocity::distinct(Velocity::ACCOUNTS_PER_DEVICE, 'dk1', $events, self::NOW, $thresholds);
+
+        $byWindow = [];
+        foreach ($findings as $finding) {
+            $this->assertSame(VelocityFinding::DISTINCT, $finding->code);
+            $this->assertSame('device_key', $finding->subjectKind);
+            $byWindow[$finding->evidence['window']] = $finding->evidence['distinct'];
+        }
+        // 1h: a0-a2 = 3 (limit 3); 24h: a0-a2 + b0-b1 = 5 (limit 4); 7d: + c0-c2 = 8 (limit 6)
+        $this->assertSame(['1h' => 3, '24h' => 5, '7d' => 8], $byWindow);
+        $this->assertSame(['vel_accounts_per_device_1h' => 1.0, 'vel_accounts_per_device_24h' => 1.0, 'vel_accounts_per_device_7d' => 1.0], Velocity::features($findings));
+    }
+
+    #[Test]
+    public function the_same_value_twice_counts_once_and_events_outside_a_window_are_ignored(): void
+    {
+        $thresholds = new VelocityThresholds;
+        $repeated = array_fill(0, 20, ['at' => self::NOW - 30, 'value' => 'acct-1']);
+
+        $this->assertSame([], Velocity::distinct(Velocity::ACCOUNTS_PER_DEVICE, 'dk1', $repeated, self::NOW, $thresholds), 'twenty logins of one account are one account');
+
+        $old = self::events('a', 3, 2 * 3600);
+        $windows = array_map(static fn (VelocityFinding $f): string => $f->evidence['window'], Velocity::distinct(Velocity::ACCOUNTS_PER_DEVICE, 'dk1', $old, self::NOW, $thresholds));
+        $this->assertSame([], $windows, 'three accounts two hours ago: not in the 1 hour window, under the 24 hour and 7 day limits');
+
+        $future = [...self::events('a', 2, 60), ['at' => self::NOW + 500, 'value' => 'later']];
+        $this->assertSame([], Velocity::distinct(Velocity::ACCOUNTS_PER_DEVICE, 'dk1', $future, self::NOW, $thresholds), 'an event from the future is not counted');
+    }
+
+    #[Test]
+    public function a_device_key_shared_by_the_k_floor_of_accounts_is_a_device_class_not_a_ring(): void
+    {
+        $thresholds = new VelocityThresholds(distinctKFloor: 20);
+
+        $this->assertNotSame([], Velocity::distinct(Velocity::ACCOUNTS_PER_DEVICE, 'dk1', self::events('a', 19, 60), self::NOW, $thresholds));
+        $this->assertSame([], Velocity::distinct(Velocity::ACCOUNTS_PER_DEVICE, 'dk1', self::events('a', 20, 60), self::NOW, $thresholds));
+        $this->assertNotSame([], Velocity::distinct(Velocity::DEVICES_PER_ACCOUNT, 'acct', self::events('d', 25, 60), self::NOW, $thresholds), 'the k-floor is about device keys shared by accounts only');
+    }
+
+    #[Test]
+    public function devices_per_account_and_emails_per_network_use_their_own_limits_and_severities(): void
+    {
+        $thresholds = new VelocityThresholds;
+
+        $devices = Velocity::distinct(Velocity::DEVICES_PER_ACCOUNT, 'acct-7', self::events('d', 6, 60), self::NOW, $thresholds);
+        $this->assertSame('account', $devices[0]->subjectKind);
+        $this->assertSame(ReviewItem::SEVERITY_HIGH, $devices[0]->severity, '6 devices in an hour is double the limit of 3');
+        $this->assertStringContainsString('second factor', $devices[0]->toReviewItem()->recommendation);
+
+        $five = Velocity::distinct(Velocity::EMAILS_PER_NETWORK, 'net1', self::events('e', 5, 60), self::NOW, $thresholds);
+        $this->assertSame([], $five, 'a campus puts five addresses behind one network honestly');
+        $six = Velocity::distinct(Velocity::EMAILS_PER_NETWORK, 'net1', self::events('e', 6, 60), self::NOW, $thresholds);
+        $this->assertSame('network_hash', $six[0]->subjectKind);
+        $this->assertSame(ReviewItem::SEVERITY_INFORMATIONAL, $six[0]->severity);
+        $this->assertSame(ReviewItem::SEVERITY_MEDIUM, Velocity::distinct(Velocity::EMAILS_PER_NETWORK, 'net1', self::events('e', 12, 60), self::NOW, $thresholds)[0]->severity);
+        $this->assertSame(['vel_emails_per_network_1h' => 1.0], Velocity::features($six));
+    }
+
+    #[Test]
+    public function the_distinct_limits_come_from_configuration_and_a_non_monotone_value_is_repaired_not_thrown(): void
+    {
+        Config::use(['fingerprint' => ['velocity' => ['distinct' => ['accounts_per_device' => ['1h' => 2, '24h' => 2, '7d' => 9]], 'distinct_k_floor' => 50]]]);
+        $thresholds = VelocityThresholds::fromConfig();
+
+        $this->assertSame(['1h' => 2, '24h' => 2, '7d' => 9], $thresholds->distinct['accounts_per_device']);
+        $this->assertSame(['1h' => 3, '24h' => 5, '7d' => 8], $thresholds->distinct['devices_per_account'], 'unconfigured relations keep their defaults');
+        $this->assertSame(50, $thresholds->distinctKFloor);
+
+        Config::use(['fingerprint' => ['velocity' => ['distinct' => ['accounts_per_device' => ['1h' => 9, '24h' => 3, '7d' => 4]]]]]);
+        $this->assertSame(['1h' => 9, '24h' => 9, '7d' => 9], VelocityThresholds::fromConfig()->distinct['accounts_per_device'], 'a longer window never has a lower limit');
+    }
+
+    #[Test]
+    public function an_unknown_relation_and_a_decreasing_limit_are_refused(): void
+    {
+        try {
+            Velocity::distinct('cookies_per_ip', 'x', [], self::NOW);
+            $this->fail('unknown relation');
+        } catch (\InvalidArgumentException) {
+            $this->addToAssertionCount(1);
+        }
+        $this->expectException(\InvalidArgumentException::class);
+        new VelocityThresholds(distinct: ['accounts_per_device' => ['1h' => 5, '24h' => 3, '7d' => 9]] + VelocityThresholds::DEFAULT_DISTINCT);
+    }
 }

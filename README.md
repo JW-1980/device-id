@@ -595,6 +595,61 @@ Cache cost: about 4,000 keys and 70 MB for the datasets (shards are base64 so a 
 
 Impossible travel judges the *smallest possible* distance between two countries (between their bounding boxes, overseas territories included, so neighbours and France or the USA are 0 km from much of the world). It under-detects by design and cannot raise a false alarm from a large country's centroid. A VPN, proxy, hosting or Tor session (`anonymised: true`) is skipped, because its country says nothing about the person.
 
+## E-mail, account novelty, velocity v2, feedback and reasons (minFraud lessons, 2026-10-31)
+
+All of this is soft evidence: features and reason codes, never a block by itself, and silent (`null`, `unknown`) when its data is missing. Nothing here shows a credit to a visitor. The pieces are pure functions or cache readers; the package stores nothing and runs no query, and no DNS or download runs on a request.
+
+### E-mail (`src/Email/`)
+
+| piece | what it does |
+|---|---|
+| `EmailNormalizer` | WelZoLekker's canonical form, ported and made strict: lower case, `+tag` removed everywhere, dots removed and `googlemail.com` folded for Gmail, a keyed HMAC `hash()` for equality, `aliasSpread()` (distinct typed addresses per mailbox, counts only) |
+| `DomainLists` + `DomainFeedCatalogue` | host-refreshed (same `RangeFetcher` and `CrawlerCache` as the network data) disposable domains from disposable-email-domains (CC0) and disposable/disposable `domains_mx.txt` (MIT, notice in `LICENSE-THIRD-PARTY.md`), and free-mailbox providers and alias services (Hide My Email, SimpleLogin, Firefox Relay, DuckDuckGo) from `mailservices.json` (MIT). Sharded by `crc32(domain) % 64`; a subdomain of a disposable domain is disposable; a stale list answers `null`, never "not disposable". The strict list is not used (it contains outlook.com) |
+| `DomainMailCheck` + `MailDnsResolver` | the optional "can this domain receive mail?" check. `refresh()` runs in a **host job** and stores the outcome; `peek()` reads the cache on the request. `no_mail` needs two resolver answers an hour apart (a DNS outage never flags a domain); a resolver failure is `unknown` and never changes a stored outcome. `NativeMailDnsResolver` is a fallback over `dns_get_record()` with a control lookup |
+| `GeneratedAddress` | random or machine-made local parts: five independent signs (digits, entropy, letter/digit switches, consonant runs, hex, letters plus a long number); one sign is `possible`, two are `likely`; not judged on a forwarding domain. `largestStemFamily()` counts `name123`, `name124`... among addresses from one network |
+| `EmailAssessor` / `EmailAssessment` | puts it together for one address: `domainClass` (disposable, forwarding, free, other, unknown, invalid), features (`email_disposable`, `email_free`, `email_forwarding_alias`, `email_domain_no_mx`, `email_generated`, `email_tagged`), reason codes with direction, and three training buckets. It has no score, band or weight: a disposable address alone never blocks |
+
+```php
+// Scheduled job: $lists = DomainLists::withDefaults($fetcher, $cache);  $lists->refreshStale();
+// Queue job after a sign-up:  $assessor->checkDomain($email);              // DNS happens here, with a MailDnsResolver
+// Request:                    $assessment = $assessor->assess($email);    // cache reads only
+$soft = $assessment->features() + ['email_multiple_aliases' => 1.0 /* from EmailNormalizer::aliasSpread */];
+$row  = $trainingRowBuilder->build($scored, $deviceKey, $engine, $mobile, $protected, $label, $source, $weight, $at, $soft, $facts, $assessment);
+```
+
+Training rows carry the e-mail facts only as feature names and numbers and as three buckets (`email.domain_class`, `email.mx`, `email.generated`); `assertDeidentified()` now also refuses any string that looks like a domain. Never an address, a domain or a hash of either.
+
+### Account novelty (`Signals\AccountNovelty`)
+
+`AccountNovelty::assess($history, $current)` over observations the host selects from its own tables (`device_key`, `country`, `asn`, `language`, `os`; history also `at`, `trusted`, `anonymised`) answers `acct_new_device`, `acct_new_country`, `acct_new_asn`, `acct_new_language`, `acct_new_os`, and the lowering `acct_known_device` / `acct_known_country`. Never on an account's first observation; a dimension the history never knew is unknown, not new; `trusted: false` and anonymised (VPN, hosting, Tor) entries do not become the baseline, and an anonymised current visit raises neither country nor network; history older than `fingerprint.novelty.history_days` (365) is ignored. A new device in a new country sets `suggestsStepUp` (ask for a challenge before a sensitive action, do not refuse). `AccountNovelty::observationFrom($deviceKey, $claims, $facts)` builds the current observation.
+
+### Velocity v2 (`Velocity::distinct()`)
+
+Distinct counts over three windows (1 hour, 24 hours, 7 days): distinct **accounts per device key**, distinct **device keys per account**, distinct **e-mail hashes per network**. One finding per window that reaches its limit, one model feature each (`vel_accounts_per_device_1h` ... `vel_emails_per_network_7d`). A device key shared by `distinct_k_floor` (20) accounts is a device class and stays silent; a network is shared by design (informational at the limit). Configuration `fingerprint.velocity.distinct.<relation>.<window>` (defaults: accounts per device 3/4/6, devices per account 3/5/8, e-mails per network 6/12/25; limits never decrease with the window) and `fingerprint.velocity.distinct_k_floor`.
+
+```php
+Velocity::distinct(Velocity::ACCOUNTS_PER_DEVICE, $deviceKey, $events /* [['at' => int, 'value' => $accountId], ...] */, time());   // list<VelocityFinding>
+```
+
+### First-party network history (`Signals\NetworkReputation`)
+
+`NetworkReputation::assess($devices, $confirmed, $suspected, $cleared)` turns the host's own labelled history of one network (distinct devices in 7 days) into `net_history_bad`, with a k-floor of 20, `suspected` worth half and `not_abuse` clearances subtracted. It replaces the removed credited abuse list. `fingerprint.network_reputation.{k_floor,minimum_bad,bad_share}`.
+
+### Feedback labels and shadow weights
+
+* `Feedback\FeedbackLabel` is a closed vocabulary: `confirmed_fraud` (training weight 1), `suspected` (0.5), `not_abuse` (label `honest`, weight 1) and `clear` (retract). `FeedbackResolver::resolve()` takes the reports on a subject (the last one wins, `clear` retracts the earlier ones) and `relabelRows()` applies the result to the training rows of that device in the reported week, so a false-positive report lowers the positive rows it contradicts. Notes are for people and never enter a row.
+* **Shadow weights** (minFraud's `test` disposition for a rule): put a code and a weight in `fingerprint.constraint_weights_shadow`; `ShadowWeights::compare($claims, $transport, $network, $liveVerdict)` returns the weight, score and band the visit WOULD have had next to the live ones, and which tested rules fired. A rule live at weight 0 shows what it would have added. Nothing shadow is ever summed into a verdict; promote by moving the number to `constraint_weights`.
+
+### Reason codes with direction (`Reasons\ReasonCatalogue`)
+
+Every rule code, every soft reason and the de-escalators have a **direction**, `raises` or `lowers` (minFraud's multiplier above or below one, kept additive here). Rule codes always raise; the lowering ones are `acct_known_device`, `acct_known_country`, `history_not_abuse`, `allow_listed` and a `model_adjustment` with a negative weight. `ReasonCatalogue::explain($verdict, $softFeatures, $extraCodes)` returns the list a review screen renders, raising reasons first by weight, identically in every host; `all()` is the catalogue for a documentation page. A test pins that every optional model feature has a reason or is declared context only (`email_free`, `email_tagged`, `sig_private_mode`).
+
+### Future work (documented, not built)
+
+* **Host composite rules** (`fingerprint.custom_rules`: `{all: [codes, features, thresholds], then: weight|review|allow, label, mode: shadow|active}`, capped, respecting the maximum of 45 and no-single-block): worth building once these features exist in production data, otherwise there is little to combine.
+* **Residential-proxy and relay heuristics** (TCP versus application round-trip gap, per-network share of locale-mismatching visitors over 7 days, iCloud Private Relay ranges): feature-only until the capture harness has measured them; needs `TCP_INFO` plumbing that is unverified on the hosts; no free licensed residential-proxy list exists.
+* Domain age through RDAP, first-seen-in-our-system for an e-mail hash, a per-device top-2 % activity percentile: host-side storage.
+
 ## Machine learning (`src/Model/`, `src/Scoring/ModelScorer.php`, `src/Matching/`, `src/Detectors/`, `src/Reputation/`, `tools/ml/`)
 
 Everything here is plain PHP 8.2: no extension, no Python, no network, no GPU. Training runs on the application's own server. The rules stay the decision-maker; the model is a bounded second opinion, and every part falls back to the rules when it is missing.

@@ -25,9 +25,30 @@ use DeviceId\Support\Config;
  * - `minSecondsBetween`: the time between two sessions is never taken below this, so two requests
  *   one second apart on a mobile network that changed country mid-handover do not produce an
  *   absurd speed.
+ * - `distinct`: velocity v2. For each relation ({@see Velocity::ACCOUNTS_PER_DEVICE},
+ *   {@see Velocity::DEVICES_PER_ACCOUNT}, {@see Velocity::EMAILS_PER_NETWORK}) the number of
+ *   DISTINCT values in each window ({@see WINDOWS}: `1h`, `24h`, `7d`) that makes a finding. A
+ *   household shares a device between two or three people; a campus puts many addresses behind one
+ *   network, hence the larger network limits. Limits never decrease with the window.
+ * - `distinctKFloor`: a device key shared by this many accounts or more is a device class (every
+ *   phone of a model with the same key), not a ring, and accounts-per-device stays silent
+ *   (the owner's k-floor of 20).
  */
 final readonly class VelocityThresholds
 {
+    /** @var array<string, int> window label => seconds */
+    public const WINDOWS = ['1h' => 3600, '24h' => 86400, '7d' => 604800];
+
+    /** @var array<string, array<string, int>> */
+    public const DEFAULT_DISTINCT = [
+        'accounts_per_device' => ['1h' => 3, '24h' => 4, '7d' => 6],
+        'devices_per_account' => ['1h' => 3, '24h' => 5, '7d' => 8],
+        'emails_per_network' => ['1h' => 6, '24h' => 12, '7d' => 25],
+    ];
+
+    /**
+     * @param  array<string, array<string, int>>  $distinct  relation => window label => distinct count that makes a finding
+     */
     public function __construct(
         public int $windowSeconds = 3600,
         public int $signupsPerDevice = 3,
@@ -37,7 +58,22 @@ final readonly class VelocityThresholds
         public float $maxSpeedKmh = 1000.0,
         public float $minDistanceKm = 500.0,
         public int $minSecondsBetween = 300,
+        public array $distinct = self::DEFAULT_DISTINCT,
+        public int $distinctKFloor = 20,
     ) {
+        foreach (self::DEFAULT_DISTINCT as $relation => $windows) {
+            $previous = 2;
+            foreach (array_keys($windows) as $window) {
+                $limit = $distinct[$relation][$window] ?? null;
+                if (! is_int($limit) || $limit < $previous) {
+                    throw new \InvalidArgumentException("velocity distinct limit {$relation}.{$window} out of range");
+                }
+                $previous = $limit;
+            }
+        }
+        if ($distinctKFloor < 2) {
+            throw new \InvalidArgumentException('velocity distinct k-floor out of range');
+        }
         if ($windowSeconds < 1 || $signupsPerDevice < 2 || $loginsPerDevice < 2 || $signupsPerNetwork < 2 || $loginsPerNetwork < 2
             || $maxSpeedKmh <= 0.0 || $minDistanceKm < 0.0 || $minSecondsBetween < 1) {
             throw new \InvalidArgumentException('velocity thresholds out of range');
@@ -57,6 +93,29 @@ final readonly class VelocityThresholds
             max(1.0, Config::float('fingerprint.velocity.max_speed_kmh', $defaults->maxSpeedKmh)),
             max(0.0, Config::float('fingerprint.velocity.min_distance_km', $defaults->minDistanceKm)),
             max(1, Config::int('fingerprint.velocity.min_seconds_between', $defaults->minSecondsBetween)),
+            self::distinctFromConfig(),
+            max(2, Config::int('fingerprint.velocity.distinct_k_floor', $defaults->distinctKFloor)),
         );
+    }
+
+    /**
+     * `fingerprint.velocity.distinct.<relation>.<window>`; a limit below the previous window's is
+     * raised to it (a typo must not throw on the request path).
+     *
+     * @return array<string, array<string, int>>
+     */
+    private static function distinctFromConfig(): array
+    {
+        $out = [];
+        foreach (self::DEFAULT_DISTINCT as $relation => $windows) {
+            $previous = 2;
+            foreach ($windows as $window => $default) {
+                $limit = max($previous, Config::int("fingerprint.velocity.distinct.{$relation}.{$window}", $default));
+                $out[$relation][$window] = $limit;
+                $previous = $limit;
+            }
+        }
+
+        return $out;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DeviceId\Rules;
 
 use DeviceId\Network\NetworkFacts;
+use DeviceId\Scoring\ShadowWeights;
 use DeviceId\Scoring\VerdictScorer;
 use DeviceId\Signals\SmartSignals;
 use DeviceId\Support\Config;
@@ -505,6 +506,25 @@ final class EnvironmentConsistency
         return array_values(array_map(static fn (array $rule): string => $rule['code'], $this->rules()));
     }
 
+    /**
+     * The shadow weights an operator is TESTING (`fingerprint.constraint_weights_shadow`, code =>
+     * weight, same bounds as the live ones). They never score: {@see ShadowWeights}
+     * evaluates them next to the live weights, like minFraud's `test` disposition.
+     *
+     * @return array<string, int>
+     */
+    public static function shadowWeights(): array
+    {
+        $out = [];
+        foreach (Config::array('fingerprint.constraint_weights_shadow') as $code => $weight) {
+            if (is_string($code) && is_numeric($weight)) {
+                $out[$code] = max(0, min(self::MAX_WEIGHT, (int) $weight));
+            }
+        }
+
+        return $out;
+    }
+
     public function weightOf(string $code): int
     {
         return self::weights()[$code] ?? 10;
@@ -518,10 +538,23 @@ final class EnvironmentConsistency
      */
     public function contradictions(array $claims, TransportIntegrityResult $transport, ?NetworkFacts $network = null): array
     {
-        $found = [];
         // Resolved once per claim set, not once per rule: each resolution reads the
         // settings store, and there are dozens of rules.
-        $weights = self::weights();
+        return $this->contradictionsWith(self::weights(), $claims, $transport, $network);
+    }
+
+    /**
+     * The same contradictions under an explicit weight table (a rule weighted 0 is silenced).
+     * {@see contradictions()} passes the live table; the shadow comparison passes the live table
+     * under the weights being tested.
+     *
+     * @param  array<string, int>  $weights  code => weight; a code missing from it weighs 10 as in {@see weightOf()}
+     * @param  array<array-key, mixed>  $claims  a decoded claim set
+     * @return list<array{code: string, detail: string, weight: int}>
+     */
+    public function contradictionsWith(array $weights, array $claims, TransportIntegrityResult $transport, ?NetworkFacts $network = null): array
+    {
+        $found = [];
 
         try {
             foreach ($this->rules() as $rule) {
