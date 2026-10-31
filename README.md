@@ -580,6 +580,17 @@ The same facts are model features (`net_hosting`, `net_vpn`, `net_tor_exit`, `si
 
 **What was deliberately skipped.** A WebRTC public-IP versus HTTP-IP mismatch needs ICE candidate gathering, which the collector does not do on purpose (it would expose the visitor's local and public addresses; the `webrtc` probe reads codecs from a local offer only). `hardwareConcurrency` against measured parallelism already exists as `cores_vs_measured_parallelism` (the `parallelism` probe is off by default because it costs CPU); a VM reports its configured vCPUs honestly, so no VM-specific cores rule was added. Corporate VDI is documented above as the honest cohort of the two VM rules.
 
+### Network keys for limits (`Network\NetworkKey`)
+
+The hosts compute their own network codes. For limits, use `NetworkKey` so IPv6 is aggregated where
+one party controls it: `NetworkKey::forLimits($ip)` is IPv4 /32 and IPv6 **/48** (business end sites
+and free tunnel brokers hand out a /48; at /56 one /48 held 256 counted guest votes per duel),
+`NetworkKey::endSite($ip)` is IPv4 /32 and IPv6 /56 (one household), and `NetworkKey::keyed($ip,
+$secret, endSite: false)` is the HMAC of either (null for an invalid address or a secret under 32
+bytes). Dedupe one-per-household by `endSite()` and cap aggregates (guest votes per item, rate limits)
+by `forLimits()` with a small N: a residential ISP's /48 holds up to 256 neighbouring /56 customers, so
+"one vote per /48" would drop honest neighbours. IPv4 stays one address in both.
+
 ### Private browsing is context, not fraud
 
 `storageProfile` (probe set 5, tier 2, no permission prompt) sends three coarse facts: the storage quota and the Chromium heap limit as half-octave steps (no byte count) and what the origin-private file system did. `SmartSignals::privateMode()` reads them per engine. Measured 2026-10-31 on the installed Chromium 153, Firefox 155 and WebKit 26.6, normal against private/ephemeral contexts, and by the real collector in the capture harness:
