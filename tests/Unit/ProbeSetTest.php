@@ -9,6 +9,7 @@ use DeviceId\Keys\DeviceKeyDeriver;
 use DeviceId\ProbeRegistry;
 use DeviceId\Scoring\ConfidenceScorer;
 use DeviceId\Scoring\ProbeOmission;
+use DeviceId\Settings;
 use DeviceId\Support\Config;
 use DeviceId\Support\TransportIntegrityResult;
 use PHPUnit\Framework\TestCase;
@@ -137,6 +138,25 @@ final class ProbeSetTest extends TestCase
             $this->assertArrayHasKey($name, ProbeRegistry::methods(3));
             $this->assertArrayNotHasKey($name, ProbeRegistry::methods(2), 'a probe-set-2 bundle never sent '.$name);
         }
+    }
+
+    public function test_behavior_is_off_by_default_and_a_default_disabled_probe_is_excused_from_coverage(): void
+    {
+        $this->assertContains('behavior', ProbeRegistry::disabled(), 'owner decision: the behaviour probe is off until an operator switches it on');
+        $this->assertNotContains('behavior', ProbeRegistry::disabled(new Settings(['disabled_probes' => []])), 'an explicit empty list switches it on');
+
+        $scorer = new ConfidenceScorer;
+        $withPolicy = $scorer->score([], null, ProbeRegistry::disabled());
+        $withoutPolicy = $scorer->score([], null, []);
+
+        foreach (['tier2:behavior', 'tier2:parallelism'] as $key) {
+            $this->assertNotContains($key, $withPolicy->missing, $key.' is excused by the default policy');
+            $this->assertContains($key, $withoutPolicy->missing, 'negative control: without the policy it is expected');
+        }
+        $this->assertSame(
+            $withoutPolicy->expected - ConfidenceScorer::catalogue()['tier2:behavior']['weight'] - ConfidenceScorer::catalogue()['tier2:parallelism']['weight'],
+            $withPolicy->expected,
+        );
     }
 
     public function test_the_integrity_probes_added_in_set_four_are_switchable_and_judged_only_for_bundles_that_have_them(): void

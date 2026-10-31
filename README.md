@@ -182,7 +182,7 @@ The collector is the merge of two collectors that had drifted apart. What was ke
 | Integrity probes, lie battery, phantom realm, worker/realm cross-checks, tier system, scheduler, canonicalisation, transport, protocol | NutriCompare's collector only: a strict superset of WelZoLekker's and the only one with tests |
 | `voices`, `permissions` (incl. `Notification.permission`), `gpu`, `uaClientHints`, `environment`, ... | NutriCompare's: same measurement as WelZoLekker's plus the fixes that one lacked (empty list is `unavailable`, listener cleanup, error names, WebGPU, WebGL1/2 agreement) |
 | `webrtc` (codec/extension hashes of a local offer) | ported from WelZoLekker's collector, changed: no `setLocalDescription` (no ICE gathering, no address can leak), locale-independent ordering; tier 2, no key |
-| `behavior` (passive input aggregates) | ported from WelZoLekker's collector, changed: listener lifecycle (stopped after the tier-2 snapshot), handlers cannot raise page errors; tier 2, `late`, no key (session data) |
+| `behavior` (passive input aggregates) | ported from WelZoLekker's collector, changed: listener lifecycle (stopped after the tier-2 snapshot), handlers cannot raise page errors; tier 2, `late`, no key (session data); **off by default** (`ProbeRegistry::DEFAULT_DISABLED`, owner decision), switch it on through `disabled_probes` |
 | `collectAndConfirm`, `boot.ts` | ported from WelZoLekker's collector; boot made host-configurable, retries after a transient failure |
 | `stackDepth` | **not ported**: a constant in V8, call-site dependent elsewhere, removed from NutriCompare's collector on evidence |
 | third "behaviour" envelope on page hide | **not ported**: the challenge store has two slots; behaviour rides in tier 2 |

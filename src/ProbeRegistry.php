@@ -177,9 +177,15 @@ final class ProbeRegistry
      * be here for want of a consumer; it is now the agree-only `keyboard` matcher component
      * (`DeviceComponents`), so the data is read and the probe runs.
      *
+     * `behavior` is off by default by the owner's decision (2026-10-31): it records how the
+     * visitor handles the page (pointer, keyboard, wheel, touch, motion), which is personal
+     * behavioural data, and nothing in the engine's rules or keys reads it. The collector code
+     * stays; an operator who has recorded the legal basis switches it on in `disabled_probes`.
+     * The confidence score treats it as excused, like `parallelism`, so it is no coverage loss.
+     *
      * @var list<string>
      */
-    public const DEFAULT_DISABLED = ['parallelism'];
+    public const DEFAULT_DISABLED = ['parallelism', 'behavior'];
 
     /**
      * Which method raises each client-side integrity finding, so a switched-off method's
