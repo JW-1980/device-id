@@ -117,6 +117,7 @@ final class ProbeRegistry
         'parallelism' => [self::TIER_HARDWARE, false, 'device', 'Measured parallel capacity from timed workers, compared with the reported core count; a CDP or Brave override of hardwareConcurrency cannot change the measurement. Costs CPU; off by default.'],
         'keyboardLayout' => [self::TIER_HARDWARE, false, 'device', 'A hash of the physical keyboard layout map (Chromium desktop only): the agree-only `keyboard` matcher component. An empty map (headless Chromium) and Brave (no navigator.keyboard) read as absent.'],
         'gpuMath' => [self::TIER_HARDWARE, false, 'device', 'How the GPU rounds transcendental arithmetic in a shader, read back as pixels; the same across browsers on the same driver, so a cross-browser matcher component. Absent on software renderers.'],
+        'storageProfile' => [self::TIER_TWO, false, 'environment', 'Coarse storage facts that differ in private browsing: half-octave steps of the storage quota and of the Chromium heap limit, and what the origin-private file system did (ok, SecurityError, other error, absent). No byte count and no permission prompt. A soft context for the server\'s private-mode signal, never a finding on its own.'],
         // --- Tier 2, merged in from the second host's collector (probe set 3) ---------
         // Neither feeds a key. `webrtc` moves with the browser build (a codec list changes at
         // a browser update), so it is no device fact; `behavior` is session data that differs
@@ -133,7 +134,7 @@ final class ProbeRegistry
      * ({@see PROBE_SET_ADDED}); without that, an honest page left open across a deploy reads
      * as a client that dropped every probe added since.
      */
-    public const PROBE_SET = 4;
+    public const PROBE_SET = 5;
 
     /**
      * The probe set a body WITHOUT a `probes` marker is judged against: the collector on
@@ -169,6 +170,7 @@ final class ProbeRegistry
         'behavior' => 3,
         'canvasPattern' => 4,
         'automationMarks' => 4,
+        'storageProfile' => 5,
     ];
 
     /**

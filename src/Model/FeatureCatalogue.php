@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace DeviceId\Model;
 
 use DeviceId\CheckRegistry;
+use DeviceId\Network\NetworkFacts;
 use DeviceId\Reputation\ReputationResult;
+use DeviceId\Signals\SmartSignals;
+use DeviceId\Signals\Velocity;
 
 /**
  * The names a model may use, and the one function that turns a scored visit into them.
@@ -39,6 +42,20 @@ final class FeatureCatalogue
     /** Soft IP-reputation features ({@see ReputationResult::features()}); absent means no signal. */
     public const REPUTATION = ['rep_datacenter', 'rep_tor_exit', 'rep_abuse_listed'];
 
+    /** Soft network features ({@see NetworkFacts::features()}); absent means no signal. */
+    public const NETWORK = ['net_hosting', 'net_vpn', 'net_tor_exit'];
+
+    /**
+     * Soft environment features ({@see SmartSignals::features()}): how many of the
+     * two locale settings (time zone, languages) disagree with the IP country (0-2), a hypervisor
+     * GPU, a default VM screen size, a software GPU, an Android emulator, and private browsing
+     * (1 when the engine evidence is medium, 0.5 when low). None of them is a verdict.
+     */
+    public const SIGNALS = ['sig_locale_disagreements', 'sig_vm_gpu', 'sig_vm_screen', 'sig_software_gpu', 'sig_emulator', 'sig_private_mode'];
+
+    /** Velocity features ({@see Velocity::features()}). */
+    public const VELOCITY = ['vel_burst', 'vel_impossible_travel'];
+
     /** Caps that keep one outlier from dominating a coefficient. */
     private const INTEGRITY_CAP = 5;
 
@@ -56,14 +73,24 @@ final class FeatureCatalogue
             $names[] = self::HIT_PREFIX.$code;
         }
         $names[] = self::UNLISTED_HIT;
-        array_push($names, 'family_count', 'integrity_count', 'coverage', 'untrusted_count', 'omission_count', 'protected', ...self::REPUTATION);
+        array_push($names, 'family_count', 'integrity_count', 'coverage', 'untrusted_count', 'omission_count', 'protected', ...self::optional());
 
         return $names;
     }
 
+    /**
+     * The optional, host-supplied soft features: reputation, network, signals, velocity.
+     *
+     * @return list<string>
+     */
+    public static function optional(): array
+    {
+        return [...self::REPUTATION, ...self::NETWORK, ...self::SIGNALS, ...self::VELOCITY];
+    }
+
     public static function knows(string $name): bool
     {
-        if (in_array($name, ['family_count', 'integrity_count', 'coverage', 'untrusted_count', 'omission_count', 'protected', self::UNLISTED_HIT, ...self::REPUTATION], true)) {
+        if (in_array($name, ['family_count', 'integrity_count', 'coverage', 'untrusted_count', 'omission_count', 'protected', self::UNLISTED_HIT, ...self::optional()], true)) {
             return true;
         }
 
@@ -86,7 +113,7 @@ final class FeatureCatalogue
      * @param  int  $untrustedCount  components the evidence made untrusted
      * @param  int  $omissionCount  probes the omission gate counted as omitted
      * @param  bool  $protected  a protected privacy mode (Firefox resistFingerprinting, Tor Browser)
-     * @param  array<string, float>  $reputation  {@see ReputationResult::features()}
+     * @param  array<string, float>  $reputation  the optional soft features ({@see optional()}): {@see ReputationResult::features()}, network facts, smart signals, velocity
      * @return array<string, float> only the non-zero features
      */
     public static function build(array $disagreements, int $integrityCount = 0, ?int $coverageScore = null, int $untrustedCount = 0, int $omissionCount = 0, bool $protected = false, array $reputation = []): array
@@ -121,10 +148,16 @@ final class FeatureCatalogue
             }
         }
 
-        foreach (self::REPUTATION as $name) {
-            if (($reputation[$name] ?? 0.0) > 0.0) {
-                $features[$name] = 1.0;
+        foreach (self::optional() as $name) {
+            $value = $reputation[$name] ?? 0.0;
+            if (! is_numeric($value) || $value <= 0.0) {
+                continue;
             }
+            $features[$name] = match ($name) {
+                'sig_locale_disagreements' => min(2.0, (float) $value),
+                'sig_private_mode' => min(1.0, (float) $value),
+                default => 1.0,
+            };
         }
 
         ksort($features);

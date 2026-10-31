@@ -13,6 +13,7 @@ use DeviceId\Model\ModelBuilder;
 use DeviceId\Model\ModelSpec;
 use DeviceId\Model\TrainingRow;
 use DeviceId\Model\TrainingRowBuilder;
+use DeviceId\Network\NetworkFacts;
 use DeviceId\Reputation\ReputationResult;
 use DeviceId\Scoring\ScoredClaims;
 use DeviceId\Support\Confidence;
@@ -101,7 +102,29 @@ final class FeaturesAndRowsTest extends TestCase
         $this->assertSame(45, $row['rules_weight']);
         $keys = array_keys($row);
         sort($keys);
-        $this->assertSame(['expires_on', 'features', 'group', 'id', 'label', 'label_weight', 'observed_week', 'retention_days', 'rules_weight', 'schema', 'slice', 'source'], $keys);
+        $this->assertSame(['expires_on', 'features', 'group', 'id', 'label', 'label_weight', 'network', 'observed_week', 'retention_days', 'rules_weight', 'schema', 'slice', 'source'], $keys);
+    }
+
+    #[Test]
+    public function a_training_row_carries_soft_signals_and_only_a_country_and_a_category_of_the_network(): void
+    {
+        $builder = new TrainingRowBuilder(str_repeat('k', 40), 365);
+        $network = new NetworkFacts(NetworkFacts::STATE_OK, 'NL', 14061, NetworkFacts::CATEGORY_HOSTING);
+
+        $row = $builder->build($this->scored(), 'device-key-abcdef', 'chromium', false, false, 'honest', 'none', 1.0, new \DateTimeImmutable('2026-10-31'), $network->features() + ['sig_vm_gpu' => 1.0, 'vel_burst' => 1.0], $network);
+
+        $this->assertSame(['country' => 'NL', 'asn_category' => 'hosting'], $row['network']);
+        $this->assertSame(1.0, $row['features']['net_hosting']);
+        $this->assertSame(1.0, $row['features']['sig_vm_gpu']);
+        $this->assertStringNotContainsString('14061', json_encode($row), 'the ASN number is not in the row');
+        TrainingRowBuilder::assertDeidentified($row);
+
+        $without = $builder->build($this->scored(), 'device-key-abcdef', 'chromium', false, false, null, 'none', 1.0, new \DateTimeImmutable('2026-10-31'));
+        $this->assertSame(['country' => 'unknown', 'asn_category' => 'unknown'], $without['network'], 'no network data is "unknown", never a guess');
+
+        $row['network']['address'] = '203.0.113.9';
+        $this->expectException(\UnexpectedValueException::class);
+        TrainingRowBuilder::assertDeidentified(['features' => [], 'network' => ['country' => '203.0.113.9']] + $row);
     }
 
     #[Test]

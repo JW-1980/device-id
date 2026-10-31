@@ -1655,6 +1655,77 @@ export function fontFallback(): ProbeResult<Record<string, unknown>> {
 }
 
 /**
+ * `tier2.storageProfile` on the wire: three coarse facts about the storage the browser grants,
+ * which differ between a normal profile and a private-browsing tab. No byte count is sent.
+ */
+export interface StorageProfileValue {
+    /** `round(2 * log2(quota in MiB))` of `navigator.storage.estimate().quota`, or null when it could not be read. */
+    readonly quotaStep: number | null;
+    /** The same step of Chromium's `performance.memory.jsHeapSizeLimit`, or null where the engine has none. */
+    readonly heapStep: number | null;
+    /**
+     * What `navigator.storage.getDirectory()` (the origin-private file system) did:
+     * `ok`, `security` (SecurityError: Firefox private browsing, or storage blocked), `error` (any other
+     * rejection: a WebKit non-persistent data store) or `absent` (no such API).
+     */
+    readonly opfs: 'ok' | 'security' | 'error' | 'absent';
+}
+
+/** A byte count as half-octave steps of MiB (a factor of 1.41 per step), so the exact disk-derived quota is not sent. */
+export function storageStep(bytes: unknown): number | null {
+    return typeof bytes === 'number' && Number.isFinite(bytes) && bytes >= 1048576
+        ? Math.round(2 * Math.log2(bytes / 1048576))
+        : null;
+}
+
+/**
+ * Does the tab look like private browsing? The probe only gathers the evidence; the server
+ * (`SmartSignals::privateMode`) decides per engine and treats it as a soft context, never as a
+ * finding on its own.
+ *
+ * Measured on 2026-10-31 with the capture harness, Chromium 153, Firefox 155 and WebKit 26.6:
+ *
+ * | engine   | normal profile                     | private / non-persistent                         |
+ * |----------|------------------------------------|--------------------------------------------------|
+ * | Chromium | quota 10 GiB, heap limit 3.5-4.1 G | `--incognito`: quota 3 GiB (below the heap limit) |
+ * | Firefox  | quota 10 GiB, OPFS ok              | `privatebrowsing.autostart`: OPFS SecurityError   |
+ * | WebKit   | quota 1000 MB, OPFS ok             | ephemeral context: OPFS UnknownError              |
+ *
+ * Firefox's and WebKit's quota did not differ. Safari itself could not be measured here.
+ *
+ * `estimate()` and `getDirectory()` raise no permission prompt. Both are bounded by a timeout so
+ * a hung storage stack cannot stall the collection.
+ */
+export function storageProfile(): Promise<ProbeResult<StorageProfileValue>> {
+    return probeAsync('storageProfile', async () => {
+        const within = <T>(promise: Promise<T>): Promise<T> =>
+            Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500))]);
+
+        const storage = (navigator as Navigator & { storage?: StorageManager }).storage;
+        let quota: unknown = null;
+        try {
+            quota = storage && typeof storage.estimate === 'function' ? (await within(storage.estimate())).quota : null;
+        } catch {
+            quota = null;
+        }
+
+        let opfs: StorageProfileValue['opfs'] = 'absent';
+        if (storage && typeof storage.getDirectory === 'function') {
+            try {
+                await within(storage.getDirectory());
+                opfs = 'ok';
+            } catch (error) {
+                opfs = error instanceof Error && error.name === 'SecurityError' ? 'security' : 'error';
+            }
+        }
+
+        const memory = (performance as Performance & { memory?: { jsHeapSizeLimit?: number } }).memory;
+
+        return { quotaStep: storageStep(quota), heapStep: storageStep(memory?.jsHeapSizeLimit), opfs };
+    });
+}
+
+/**
  * `navigator.measureUserAgentSpecificMemory`, gated on cross-origin isolation.
  *
  * Requires `COOP: same-origin` and `COEP: require-corp`, and measured 114-243 ms
@@ -3108,6 +3179,7 @@ export const VALUE_PROBES: readonly ValueProbe[] = [
     // with intl + timezoneLmt that slice measured 50-56 ms at 4x CPU throttling.
     { name: 'audioReadback', tier: TIER.TWO, run: audioReadback, heavy: true },    // 256-frame offline render, async
     { name: 'heapMemory', tier: TIER.TWO, run: heapMemory },                       // gated on COI
+    { name: 'storageProfile', tier: TIER.TWO, run: storageProfile },                // storage.estimate + OPFS: the private-mode evidence, no prompt
     // Moved from tier 1: 10-11 ms COLD (first ICU table load), <1 ms warm, and an engine
     // build signal nothing needs synchronously. It therefore no longer feeds the browser
     // key (tier 1 only) — a one-time re-key, inside the v3 protocol change.

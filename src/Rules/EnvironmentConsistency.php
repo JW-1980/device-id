@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace DeviceId\Rules;
 
+use DeviceId\Network\NetworkFacts;
 use DeviceId\Scoring\VerdictScorer;
+use DeviceId\Signals\SmartSignals;
 use DeviceId\Support\Config;
 use DeviceId\Support\FeatureShipVersions;
 use DeviceId\Support\ProbeEnvelope;
@@ -409,6 +411,16 @@ final class EnvironmentConsistency
         // fires on are an explicit table (see `contradictingGpuFamilies`). Weights of this rule
         // and the one above are reasoned from the failure cases, not measured on traffic.
         'ch_platform_vs_gpu' => 10,
+        // Smart signals (network, virtual machine, emulator, private browsing). All soft: each is
+        // an honest configuration for some real visitors (a VPN, a corporate VDI, a developer's
+        // emulator, a private tab), so none reaches the elevated band alone (5 scores 12).
+        'ip_country_vs_locale' => 5,
+        'network_hosting' => 5,
+        'network_vpn' => 4,
+        'vm_gpu_renderer' => 5,
+        'vm_software_gpu_screen' => 4,
+        'emulator_android' => 8,
+        'private_mode_with_other_signals' => 3,
         // Removed: `storage_quota_round` (no collector sends `storageEstimate`, and a round quota
         // is a plausible real answer, so the rule had no input and weak evidence) and
         // `stack_depth_anomalous` (the stackDepth probe is gone: a constant in V8).
@@ -454,6 +466,15 @@ final class EnvironmentConsistency
     ];
 
     /**
+     * The ISO region of an IANA time zone from the deliberately partial table, or null when the
+     * zone is not listed (an unlisted zone produces no finding anywhere that uses this).
+     */
+    public static function regionOfTimeZone(string $zone): ?string
+    {
+        return self::TIMEZONE_REGIONS[strtolower($zone)] ?? null;
+    }
+
+    /**
      * Weights as data: the shipped table under the operator's overrides (the `settings`
      * table first, `config()` second — `config()` alone is frozen by `config:cache`).
      *
@@ -495,7 +516,7 @@ final class EnvironmentConsistency
      * @param  array<array-key, mixed>  $claims  a decoded claim set
      * @return list<array{code: string, detail: string, weight: int}>
      */
-    public function contradictions(array $claims, TransportIntegrityResult $transport): array
+    public function contradictions(array $claims, TransportIntegrityResult $transport, ?NetworkFacts $network = null): array
     {
         $found = [];
         // Resolved once per claim set, not once per rule: each resolution reads the
@@ -520,7 +541,7 @@ final class EnvironmentConsistency
                     continue;
                 }
 
-                $hit = ($rule['rule'])($claims, $transport);
+                $hit = ($rule['rule'])($claims, $transport, $network);
 
                 if ($hit === null) {
                     continue;
@@ -544,7 +565,7 @@ final class EnvironmentConsistency
     /**
      * The rule table, as data.
      *
-     * @return list<array{code: string, rule: \Closure(mixed, TransportIntegrityResult): ?string}>
+     * @return list<array{code: string, rule: \Closure(mixed, TransportIntegrityResult, ?NetworkFacts=): ?string}>
      */
     private function rules(): array
     {
@@ -2355,6 +2376,115 @@ final class EnvironmentConsistency
                     }
 
                     return null;
+                },
+            ],
+
+            // ---------------------------------------------------------------
+            // Smart signals: network, virtual machines, emulators, private mode.
+            // ---------------------------------------------------------------
+
+            // ip_country_vs_locale: the IP's country against the clock's time zone AND the
+            // language list. Fires only when BOTH independent settings disagree with the
+            // country (see SmartSignals::localeAgainstCountry): an expat whose language is
+            // foreign and whose clock is local, or a traveller who only changed the clock, is
+            // silent. A VPN user who never touched either setting fires: that is the signal.
+            // Silent for a protected Gecko (resistFingerprinting reports UTC and en-US).
+            [
+                'code' => 'ip_country_vs_locale',
+                'rule' => function (mixed $c, TransportIntegrityResult $t, ?NetworkFacts $n = null): ?string {
+                    if ($n === null || $n->country === null || self::protectedGecko($c, $t)) {
+                        return null;
+                    }
+                    $locale = SmartSignals::localeAgainstCountry(is_array($c) ? $c : [], $n);
+
+                    return $locale['timezone'] === true && $locale['language'] === true
+                        ? 'The time zone and the language list both name regions other than the country the IP address is in.'
+                        : null;
+                },
+            ],
+
+            // network_vpn / network_hosting: the announcing ASN says VPN service, or hosting,
+            // cloud or colocation (or the address is in a published cloud range). Exclusive, so
+            // one address never pays twice. Silent for a protected Gecko (VPN users of Mullvad
+            // Browser and Tor are the honest majority there). A corporate gateway in a cloud and
+            // a person on a commercial VPN are the honest cohort; hence 4-5.
+            [
+                'code' => 'network_vpn',
+                'rule' => function (mixed $c, TransportIntegrityResult $t, ?NetworkFacts $n = null): ?string {
+                    return $n !== null && $n->isVpn() && ! self::protectedGecko($c, $t)
+                        ? 'The IP address belongs to an autonomous system whose registered name says it is a VPN service.'
+                        : null;
+                },
+            ],
+            [
+                'code' => 'network_hosting',
+                'rule' => function (mixed $c, TransportIntegrityResult $t, ?NetworkFacts $n = null): ?string {
+                    return $n !== null && $n->isHosting() && ! self::protectedGecko($c, $t)
+                        ? 'The IP address belongs to a hosting, cloud or colocation network, not an access network.'
+                        : null;
+                },
+            ],
+
+            // vm_gpu_renderer: a hypervisor's virtual GPU on a non-headless desktop browser.
+            // Corporate VDI (VMware Horizon, Parallels, Hyper-V desktops) is honest; weight 5.
+            [
+                'code' => 'vm_gpu_renderer',
+                'rule' => function (mixed $c): ?string {
+                    $vm = SmartSignals::virtualMachine(is_array($c) ? $c : []);
+
+                    return $vm['hypervisor_gpu']
+                        ? 'The WebGL renderer names a hypervisor\'s virtual GPU (VMware, VirtualBox, Parallels, QEMU/virtio or Hyper-V).'
+                        : null;
+                },
+            ],
+
+            // vm_software_gpu_screen: a software rasteriser alone is an honest Linux or driverless
+            // Windows desktop; with a screen size only a hypervisor offers before its guest
+            // tools are installed, it is a VM.
+            [
+                'code' => 'vm_software_gpu_screen',
+                'rule' => function (mixed $c): ?string {
+                    $vm = SmartSignals::virtualMachine(is_array($c) ? $c : []);
+
+                    return $vm['software_gpu'] && $vm['vm_screen']
+                        ? 'A software-rendered WebGL context and a default virtual-machine screen size occur together on a desktop browser.'
+                        : null;
+                },
+            ],
+
+            // emulator_android: an emulator token in the User-Agent or the device model, or an
+            // Android browser on a software GPU. Developers and testers are the honest cohort.
+            [
+                'code' => 'emulator_android',
+                'rule' => function (mixed $c): ?string {
+                    return SmartSignals::androidEmulator(is_array($c) ? $c : [])
+                        ? 'The Android device identifies as an emulator (an emulator token in the user agent or device model, or a software GPU).'
+                        : null;
+                },
+            ],
+
+            // private_mode_with_other_signals: private browsing is NOT fraud and never fires
+            // alone. It adds 3 only when a network, VM or emulator signal is also present, because
+            // privacy-minded visitors use VPNs and a private tab on a hosting network is the
+            // combination a bot farm produces. The model sees private mode as its own feature.
+            [
+                'code' => 'private_mode_with_other_signals',
+                'rule' => function (mixed $c, TransportIntegrityResult $t, ?NetworkFacts $n = null): ?string {
+                    $claims = is_array($c) ? $c : [];
+                    $private = SmartSignals::privateMode($claims, $t);
+                    if ($private === null || ! $private['likely']) {
+                        return null;
+                    }
+                    $vm = SmartSignals::virtualMachine($claims);
+                    $locale = SmartSignals::localeAgainstCountry($claims, $n);
+                    $other = ($n !== null && ($n->isHosting() || $n->isVpn()))
+                        || $vm['hypervisor_gpu']
+                        || SmartSignals::androidEmulator($claims)
+                        || ($locale['timezone'] === true && $locale['language'] === true);
+
+                    return $other
+                        ? 'The tab looks like private browsing and a network, virtual-machine, emulator or locale signal is present as well.'
+                        : null;
                 },
             ],
         ];

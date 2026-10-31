@@ -144,6 +144,15 @@ final class CheckRegistry
         'resistance_vs_engine' => [30, 'environment', 'The client reports a privacy mode (Firefox resistFingerprinting, Tor, Brave) that the engine marks, the User-Agent or the headers contradict; faking it would otherwise reduce what the matcher sees.'],
         'canvas_realm_mismatch' => [4, 'environment', 'The page and its worker rasterised the same geometry differently, so the page\'s canvas read-back is noised by something the worker realm does not see.'],
         'gpu_realm_mismatch' => [4, 'environment', 'The page and its dedicated worker rendered the same shader to different pixels at the same precision, so the page\'s WebGL read-back is hooked (a page-only readPixels or getParameter patch).'],
+
+        // --- Smart signals: network, virtual machine, emulator, private browsing (all soft) -----------
+        'ip_country_vs_locale' => [5, 'environment', 'The IP address geolocates to a country that neither the time zone nor the language list names; both settings must disagree, so an expat or a traveller who changed one of them is silent. Needs the host\'s local IP data.'],
+        'network_vpn' => [4, 'environment', 'The IP address belongs to an autonomous system whose registered name says VPN. A commercial VPN is an honest choice; the signal is soft. Needs the host\'s local IP data.'],
+        'network_hosting' => [5, 'environment', 'The IP address belongs to a hosting, cloud or colocation network (an ASN name or list, or a published cloud range). Corporate gateways and VPN egress are the honest cases. Needs the host\'s local IP data.'],
+        'vm_gpu_renderer' => [5, 'environment', 'The WebGL renderer names a hypervisor\'s virtual GPU (VMware, VirtualBox, Parallels, QEMU/virtio, Hyper-V) on a non-headless desktop browser. Corporate VDI users are honest and fire this.'],
+        'vm_software_gpu_screen' => [4, 'environment', 'A software-rendered WebGL context together with a default virtual-machine screen size (800x600, 1024x768, 1152x864). A software renderer alone, as on many Linux desktops, is silent.'],
+        'emulator_android' => [8, 'environment', 'An Android browser that identifies as an emulator (emulator token in the user agent or device model) or runs on a software GPU.'],
+        'private_mode_with_other_signals' => [3, 'environment', 'The tab looks like private browsing (storage profile) AND a network, virtual-machine, emulator or locale signal is present. Private browsing alone is never scored.'],
     ];
 
     /**

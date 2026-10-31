@@ -83,6 +83,9 @@ final class ConfidenceScorer
         // `webrtc` is `unavailable` where WebRTC is disabled (Tor, some privacy settings).
         'tier2:webrtc' => ['weight' => 150, 'charge' => 0.25],
         'tier2:behavior' => ['weight' => 100, 'charge' => 0.25],
+        // Probe set 5: private-browsing evidence for the server's soft private-mode signal. Nominal,
+        // unmeasured; `unavailable` (no StorageManager, as in some embedded views) earns half credit.
+        'tier2:storageProfile' => ['weight' => 50, 'charge' => 0.25],
 
         // Tier 2 — hardware probes (v3). Nominal weights, unmeasured.
         'tier2:fontMetrics' => ['weight' => 700, 'charge' => 0.25],

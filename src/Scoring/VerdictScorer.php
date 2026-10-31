@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DeviceId\Scoring;
 
+use DeviceId\Network\NetworkFacts;
 use DeviceId\Rules\EnvironmentConsistency;
 use DeviceId\Support\Confidence;
 use DeviceId\Support\Config;
@@ -78,6 +79,7 @@ final class VerdictScorer
 
     /**
      * @param  array<array-key, mixed>  $claims  a decoded claim set
+     * @param  NetworkFacts|null  $network  what the local IP data says about the address (null: no network rules run)
      */
     public function score(
         array $claims,
@@ -85,8 +87,9 @@ final class VerdictScorer
         ?string $deviceKey = null,
         int $saltVersion = 0,
         ?Confidence $confidence = null,
+        ?NetworkFacts $network = null,
     ): Verdict {
-        $disagreements = $this->consistency->contradictions($claims, $transport);
+        $disagreements = $this->consistency->contradictions($claims, $transport, $network);
 
         // Transport findings join the same list, at their own weights, so there is one
         // scoring path rather than a transport score and a claim score that then have
