@@ -50,6 +50,16 @@ final class SmartSignals
      * zone and the language/locale list. Each group is `true` (disagrees), `false` (agrees) or
      * `null` (cannot be checked: no region on the zone or the languages, no network country).
      *
+     * ## The country is a registration and routing country, so its errors may only make this quieter
+     *
+     * The shipped country source says where an address block is registered or routed, which for
+     * a multinational ISP, a mobile carrier or a CDN can be another country than the person's.
+     * When the lookup also carries the ASN's registration country ({@see NetworkFacts::$registrationCountry}),
+     * a region that equals EITHER country is agreement: a Dutch clock and Dutch languages on an
+     * address that the routing data places in Germany and the ASN registers in the Netherlands
+     * stay silent. A second country can only add a way to agree, never a way to disagree, so a
+     * wrong first country cannot make the rule fire where the old single-country rule would not.
+     *
      * Languages are one group however many fields carry them (`language`, `languages`, the Intl
      * locale): an expat with `en-US` everywhere would otherwise "disagree" three times from a
      * single setting. A region anywhere in the list that equals the IP country is agreement, so
@@ -64,6 +74,10 @@ final class SmartSignals
         $country = $network?->country;
         if ($country === null) {
             return ['timezone' => null, 'language' => null];
+        }
+        $countries = [$country => true];
+        if ($network?->registrationCountry !== null) {
+            $countries[$network->registrationCountry] = true;
         }
 
         $zone = EnvironmentConsistency::read($claims, 'tier2', 'intl', 'resolved', 'timeZone');
@@ -86,8 +100,8 @@ final class SmartSignals
         }
 
         return [
-            'timezone' => $zoneRegion === null ? null : $zoneRegion !== $country,
-            'language' => $regions === [] ? null : ! isset($regions[$country]),
+            'timezone' => $zoneRegion === null ? null : ! isset($countries[$zoneRegion]),
+            'language' => $regions === [] ? null : array_intersect_key($regions, $countries) === [],
         ];
     }
 

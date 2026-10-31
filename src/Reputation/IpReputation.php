@@ -20,7 +20,7 @@ use DeviceId\Crawlers\RangeFetcher;
  *   it is still used and a refresh is due (stale-while-failing). The result says which feeds
  *   were unusable; silence from them is never read as "clean".
  * - A fetch that fails or parses to nothing leaves the previous list untouched, and a feed is
- *   not fetched again before its `minimumRefreshSeconds` (Spamhaus asks for at least an hour).
+ *   not fetched again before its `minimumRefreshSeconds`.
  * - A feed whose licence is `unverified` is not loaded unless the host named it in
  *   `$acceptUnverified`; `not_compatible` is never loaded.
  */
@@ -74,7 +74,7 @@ final class IpReputation
         }
         $this->cache->put(self::ATTEMPT_PREFIX.$key, ['at' => $now], $feed->minimumRefreshSeconds);
 
-        $body = $this->fetcher->fetch($feed->url);
+        $body = $this->fetchBody($feed);
         $prefixes = $body === null ? null : FeedParser::parse($feed->format, $body);
         if ($prefixes === null) {
             return false;
@@ -84,6 +84,21 @@ final class IpReputation
         unset($this->sets[$key]);
 
         return true;
+    }
+
+    /**
+     * The body to parse. A directory feed (CollecTor) is two fetches: the index, then its newest
+     * file; either failing is a failed refresh, never a partial one.
+     */
+    private function fetchBody(FeedDefinition $feed): ?string
+    {
+        $body = $this->fetcher?->fetch($feed->url);
+        if ($body === null || $feed->format !== FeedDefinition::FORMAT_TORDNSEL_DIRECTORY) {
+            return $body;
+        }
+        $name = FeedParser::newestExitListName($body);
+
+        return $name === null ? null : $this->fetcher?->fetch(rtrim($feed->url, '/').'/'.$name);
     }
 
     /**

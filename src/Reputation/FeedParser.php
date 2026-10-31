@@ -26,6 +26,7 @@ final class FeedParser
             FeedDefinition::FORMAT_IP_LINES, FeedDefinition::FORMAT_CIDR_LINES => self::lines($body),
             FeedDefinition::FORMAT_NDJSON_CIDR => self::ndjson($body),
             FeedDefinition::FORMAT_CSV_FIRST_COLUMN => self::csvFirstColumn($body),
+            FeedDefinition::FORMAT_TORDNSEL_DIRECTORY => self::exitAddresses($body),
             FeedDefinition::FORMAT_AWS => self::json($body, static fn (array $d): array => [
                 ...array_column(is_array($d['prefixes'] ?? null) ? $d['prefixes'] : [], 'ip_prefix'),
                 ...array_column(is_array($d['ipv6_prefixes'] ?? null) ? $d['ipv6_prefixes'] : [], 'ipv6_prefix'),
@@ -65,6 +66,38 @@ final class FeedParser
         }
 
         return array_keys($prefixes);
+    }
+
+    /**
+     * The newest file name in a CollecTor exit-list directory index (`YYYY-MM-DD-HH-MM-SS`; the
+     * names sort in time order), or null when the page lists none.
+     */
+    public static function newestExitListName(string $index): ?string
+    {
+        if (preg_match_all('/href="(\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})"/', $index, $m) < 1) {
+            return null;
+        }
+        $names = $m[1];
+        sort($names, SORT_STRING);
+
+        return $names[count($names) - 1];
+    }
+
+    /**
+     * `ExitAddress <ip> <date> <time>` lines of a tordnsel exit list.
+     *
+     * @return list<string>
+     */
+    private static function exitAddresses(string $body): array
+    {
+        $out = [];
+        foreach (preg_split('/\R/', $body) ?: [] as $line) {
+            if (preg_match('/^ExitAddress\s+(\S+)\s/', $line, $m) === 1) {
+                $out[] = $m[1];
+            }
+        }
+
+        return $out;
     }
 
     /**

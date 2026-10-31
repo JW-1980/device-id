@@ -127,6 +127,53 @@ final class SmartSignalsTest extends TestCase
     }
 
     #[Test]
+    public function a_registration_country_that_names_the_visitors_country_keeps_the_locale_rule_silent(): void
+    {
+        // The routing data places the block in Germany, the ASN is registered in the Netherlands:
+        // a Dutch clock and Dutch languages agree with one of the two countries.
+        $routedElsewhere = new NetworkFacts(NetworkFacts::STATE_OK, 'DE', registrationCountry: 'NL');
+
+        $this->assertSame(['timezone' => false, 'language' => false], SmartSignals::localeAgainstCountry(self::claims(), $routedElsewhere));
+        $this->assertArrayNotHasKey('ip_country_vs_locale', self::fired(self::claims(), $routedElsewhere));
+        $this->assertArrayHasKey('ip_country_vs_locale', self::fired(self::claims(), new NetworkFacts(NetworkFacts::STATE_OK, 'DE', registrationCountry: 'FR')), 'both countries differ from the visitor: still the signal');
+        $this->assertArrayHasKey('ip_country_vs_locale', self::fired(self::claims(), new NetworkFacts(NetworkFacts::STATE_OK, 'DE')), 'no second opinion: the single-country rule as before');
+    }
+
+    #[Test]
+    public function a_second_country_can_only_make_the_locale_rule_quieter_never_noisier(): void
+    {
+        $visitors = [
+            'dutch' => self::claims(),
+            'expat' => self::claims(identity: ['language' => 'en-US', 'languages' => ['en-US', 'en']], tier2: ['intl' => ['state' => 'ok', 'value' => ['resolved' => ['locale' => 'en-US', 'timeZone' => 'Europe/Amsterdam']]]]),
+            'german' => self::claims(identity: ['language' => 'de-DE', 'languages' => ['de-DE']], tier2: ['intl' => ['state' => 'ok', 'value' => ['resolved' => ['locale' => 'de-DE', 'timeZone' => 'Europe/Berlin']]]]),
+            'bare' => self::claims(identity: ['language' => 'nl', 'languages' => ['nl']], tier2: ['intl' => ['state' => 'ok', 'value' => ['resolved' => ['locale' => 'nl', 'timeZone' => 'Europe/Amsterdam']]]]),
+        ];
+        $countries = ['NL', 'BE', 'DE', 'US', 'FR', 'ES'];
+
+        foreach ($visitors as $name => $claims) {
+            foreach ($countries as $routing) {
+                $alone = SmartSignals::localeAgainstCountry($claims, new NetworkFacts(NetworkFacts::STATE_OK, $routing));
+                foreach ([null, ...$countries] as $registration) {
+                    $both = SmartSignals::localeAgainstCountry($claims, new NetworkFacts(NetworkFacts::STATE_OK, $routing, registrationCountry: $registration));
+                    foreach (['timezone', 'language'] as $setting) {
+                        $this->assertFalse($both[$setting] === true && $alone[$setting] !== true, "{$name} routed {$routing} registered ".($registration ?? 'none').": {$setting} became noisier");
+                        $this->assertSame($alone[$setting] === null, $both[$setting] === null, 'a second country never changes whether a setting can be checked');
+                    }
+                }
+            }
+        }
+    }
+
+    #[Test]
+    public function the_feature_for_locale_disagreements_follows_the_same_quieter_rule(): void
+    {
+        $routedElsewhere = new NetworkFacts(NetworkFacts::STATE_OK, 'DE', registrationCountry: 'NL');
+
+        $this->assertSame([], SmartSignals::features(self::claims(), $routedElsewhere));
+        $this->assertSame(['sig_locale_disagreements' => 2.0], SmartSignals::features(self::claims(), new NetworkFacts(NetworkFacts::STATE_OK, 'DE')));
+    }
+
+    #[Test]
     public function a_spoofed_user_agent_does_not_hide_a_locale_mismatch(): void
     {
         $spoofed = self::claims(self::MAC_CHROME, ['platform' => 'MacIntel']);

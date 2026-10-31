@@ -18,12 +18,16 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The local IP data: parsing the real file formats (fixtures are real lines of the DB-IP,
- * IPtoASN and bad-asn-list downloads of 2026-10-31), shard boundaries, the freshness and
+ * The local IP data: parsing the real file formats (fixtures are real lines of the sapics
+ * user-country, IPtoASN and bad-asn-list downloads of 2026-10-31), shard boundaries, the freshness and
  * licence rules, and the guarantee that a lookup never touches the network.
  */
 final class NetworkDatabaseTest extends TestCase
 {
+    private const V4_URL = 'https://raw.githubusercontent.com/sapics/ip-location-db/main/user-country/user-country-ipv4.csv';
+
+    private const V6_URL = 'https://raw.githubusercontent.com/sapics/ip-location-db/main/user-country/user-country-ipv6.csv';
+
     private int $now = 1_793_000_000; // 2026-10-26
 
     private int $calls = 0;
@@ -65,12 +69,13 @@ final class NetworkDatabaseTest extends TestCase
     private function loadFixtures(): NetworkDatabase
     {
         $this->bodies = [
-            'https://download.db-ip.com/free/dbip-country-lite-2026-10.csv.gz' => gzencode($this->fixture('dbip-country-lite-sample.csv')),
+            self::V4_URL => $this->fixture('user-country-ipv4-sample.csv'),
+            self::V6_URL => $this->fixture('user-country-ipv6-sample.csv'),
             'https://iptoasn.com/data/ip2asn-combined.tsv.gz' => gzencode($this->fixture('ip2asn-sample.tsv')),
             'https://raw.githubusercontent.com/brianhama/bad-asn-list/master/bad-asn-list.csv' => $this->fixture('bad-asn-list-sample.csv'),
         ];
         $database = $this->database();
-        $this->assertSame(['dbip_country' => 'refreshed', 'iptoasn' => 'refreshed', 'bad_asn_list' => 'refreshed'], $database->refreshStale());
+        $this->assertSame(['country_ipv4' => 'refreshed', 'country_ipv6' => 'refreshed', 'iptoasn' => 'refreshed', 'bad_asn_list' => 'refreshed'], $database->refreshStale());
 
         return $database;
     }
@@ -87,19 +92,23 @@ final class NetworkDatabaseTest extends TestCase
         $this->assertSame(NetworkFacts::CATEGORY_HOSTING, $google->asnCategory, 'GOOGLE is in the hosting list');
 
         $vpn = $database->lookup('5.199.4.10');
-        $this->assertSame('GB', $vpn->country);
+        $this->assertSame('FI', $vpn->country, 'the routing data places this block in Finland');
+        $this->assertSame('GB', $vpn->registrationCountry, 'the ASN is registered in the United Kingdom: a second opinion');
         $this->assertSame(218799, $vpn->asn);
         $this->assertTrue($vpn->isVpn(), 'LITE-VPN-AS names itself a VPN');
         $this->assertFalse($vpn->isHosting(), 'one address never pays for both');
 
         $home = $database->lookup('81.30.1.1');
         $this->assertSame('IT', $home->country);
+        $this->assertSame('IT', $home->registrationCountry);
         $this->assertNull($home->asnCategory, 'no flag is not "residential", it is just no flag');
         $this->assertFalse($home->isHosting() || $home->isVpn());
 
-        $this->assertSame('DE', $database->lookup('2a00:1450:4001:81b::200e')->country, 'IPv6 shards');
-        $this->assertSame('US', $database->lookup('185.220.101.200')->country, 'a range split inside a /24');
+        $v6 = $database->lookup('2a00:1450:4001:81b::200e');
+        $this->assertSame('IE', $v6->country, 'IPv6 shards, from the IPv6 file');
+        $this->assertSame('US', $v6->registrationCountry);
         $this->assertSame('DE', $database->lookup('185.220.101.5')->country);
+        $this->assertSame('DE', $database->lookup('185.220.101.200')->registrationCountry);
     }
 
     #[Test]
@@ -139,20 +148,24 @@ final class NetworkDatabaseTest extends TestCase
     {
         $database = $this->loadFixtures();
 
-        $this->now += 20 * 86400; // the country file allows 75 days, the ASN file 14
-        $partial = $database->lookup('8.8.8.8');
-        $this->assertSame(NetworkFacts::STATE_PARTIAL, $partial->state);
-        $this->assertSame('US', $partial->country);
-        $this->assertNull($partial->asn, 'a stale ASN file is not consulted');
-        $this->assertNull($partial->asnCategory);
-        $this->assertContains('iptoasn', $partial->unusable);
-
-        $this->now += 70 * 86400;
+        $this->now += 20 * 86400; // the country files and the ASN file allow 14 days
         $stale = $database->lookup('8.8.8.8');
         $this->assertSame(NetworkFacts::STATE_PARTIAL, $stale->state, 'only the one-year hosting list is still usable');
         $this->assertNull($stale->country, 'an old file says nothing, not "domestic"');
-        $this->assertContains('dbip_country', $stale->unusable);
+        $this->assertNull($stale->asn, 'a stale ASN file is not consulted');
+        $this->assertNull($stale->registrationCountry);
+        $this->assertContains('country_ipv4', $stale->unusable);
         $this->assertContains('iptoasn', $stale->unusable);
+
+        $this->now -= 20 * 86400;
+        $this->bodies[self::V4_URL] = $this->fixture('user-country-ipv4-sample.csv');
+        $this->now += 10 * 86400;
+        $this->assertTrue($database->refresh('country_ipv4'), 'refreshing one family leaves the other as it was');
+        $this->now += 10 * 86400;
+        $partial = $database->lookup('8.8.8.8');
+        $this->assertSame('US', $partial->country, 'the freshly refreshed IPv4 file answers');
+        $this->assertNull($partial->asn, 'the ASN file is still stale');
+        $this->assertContains('iptoasn', $partial->unusable);
     }
 
     #[Test]
@@ -188,14 +201,15 @@ final class NetworkDatabaseTest extends TestCase
     }
 
     #[Test]
-    public function the_monthly_file_falls_back_to_last_month_when_this_months_is_not_published_yet(): void
+    public function a_country_file_falls_back_to_its_next_url_when_the_first_does_not_answer(): void
     {
-        $this->now = 1_793_664_000; // 2026-11-03
-        $this->bodies = ['https://download.db-ip.com/free/dbip-country-lite-2026-10.csv.gz' => gzencode($this->fixture('dbip-country-lite-sample.csv'))];
-        $database = $this->database(null, ['dbip_country' => NetworkFeedCatalogue::defaults()['dbip_country']]);
+        $this->bodies = [
+            'https://cdn.jsdelivr.net/gh/sapics/ip-location-db@main/user-country/user-country-ipv4.csv' => $this->fixture('user-country-ipv4-sample.csv'),
+        ];
+        $database = $this->database(null, ['country_ipv4' => NetworkFeedCatalogue::defaults()['country_ipv4']]);
 
-        $this->assertTrue($database->refresh('dbip_country'));
-        $this->assertSame(2, $this->calls, 'November first (404), then October');
+        $this->assertTrue($database->refresh('country_ipv4'));
+        $this->assertSame(2, $this->calls, 'the raw URL first (no answer), then the mirror');
         $this->assertSame('US', $database->lookup('8.8.8.8')->country);
     }
 
@@ -207,14 +221,40 @@ final class NetworkDatabaseTest extends TestCase
             $this->assertSame('2026-10-31', $feed->licence['checked_on']);
             $this->assertStringStartsWith('https://', $feed->urls[0]);
         }
-        $this->assertStringContainsString('CC BY 4.0', NetworkFeedCatalogue::defaults()['dbip_country']->attribution);
 
         $unverified = new NetworkFeed('x', 'X', ['https://x.test/a.csv'], NetworkFeed::KIND_COUNTRY, ['status' => 'unverified', 'note' => '', 'source' => '', 'checked_on' => '2026-10-31']);
-        $this->bodies = ['https://x.test/a.csv' => $this->fixture('dbip-country-lite-sample.csv')];
+        $this->bodies = ['https://x.test/a.csv' => $this->fixture('user-country-ipv4-sample.csv')];
 
         $this->assertFalse($this->database(null, ['x' => $unverified])->refresh('x'), 'not loaded without consent');
         $this->assertTrue($this->database(null, ['x' => $unverified], ['x'])->refresh('x'));
-        $this->assertCount(2, $this->database()->attribution(), 'DB-IP and bad-asn-list ask for credit; IPtoASN is public domain');
+    }
+
+    #[Test]
+    public function no_shipped_dataset_requires_public_credit_and_the_attribution_list_is_empty(): void
+    {
+        $this->assertSame([], $this->database()->attribution());
+        foreach (NetworkFeedCatalogue::defaults() as $feed) {
+            $this->assertSame('', $feed->attribution, $feed->key);
+            $this->assertNotSame('public_credit_required', $feed->licence['status'], $feed->key);
+            $this->assertStringNotContainsString('db-ip', strtolower(implode(' ', $feed->urls)), 'DB-IP asks for a link back');
+        }
+        $this->assertSame([], $this->loadFixtures()->lookup('8.8.8.8')->attribution, 'a lookup carries no credit line either');
+    }
+
+    #[Test]
+    public function a_dataset_that_demands_a_visible_credit_is_never_loaded(): void
+    {
+        $credit = new NetworkFeed('credit', 'Credit', ['https://credit.test/a.csv'], NetworkFeed::KIND_COUNTRY, ['status' => 'permitted', 'note' => '', 'source' => '', 'checked_on' => '2026-10-31'], 'IP Geolocation by Somebody');
+        $flagged = new NetworkFeed('flagged', 'Flagged', ['https://credit.test/b.csv'], NetworkFeed::KIND_COUNTRY, ['status' => 'public_credit_required', 'note' => '', 'source' => '', 'checked_on' => '2026-10-31']);
+        $this->bodies = ['https://credit.test/a.csv' => $this->fixture('user-country-ipv4-sample.csv'), 'https://credit.test/b.csv' => $this->fixture('user-country-ipv4-sample.csv')];
+        $database = $this->database(null, ['credit' => $credit, 'flagged' => $flagged], ['credit', 'flagged']);
+
+        $this->assertFalse($credit->isUsableWithout());
+        $this->assertFalse($flagged->isUsableWithout());
+        $this->assertFalse($database->refresh('credit'), 'even an accepted-by-key feed with a credit text stays off');
+        $this->assertFalse($database->refresh('flagged'));
+        $this->assertSame([], $database->attribution());
+        $this->assertSame(0, $this->calls, 'nothing was even fetched');
     }
 
     #[Test]

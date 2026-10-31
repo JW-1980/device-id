@@ -115,7 +115,7 @@ $database = NetworkDatabase::withDefaults($fetcher, $cache);
 
 if (isset($options['lookup'])) {
     $facts = $database->lookup($options['lookup']);
-    echo json_encode(['state' => $facts->state, 'country' => $facts->country, 'asn' => $facts->asn, 'category' => $facts->asnCategory, 'unusable' => $facts->unusable], JSON_PRETTY_PRINT)."\n";
+    echo json_encode(['state' => $facts->state, 'country' => $facts->country, 'registration_country' => $facts->registrationCountry, 'asn' => $facts->asn, 'category' => $facts->asnCategory, 'unusable' => $facts->unusable], JSON_PRETTY_PRINT)."\n";
     exit(0);
 }
 
@@ -125,5 +125,5 @@ foreach ($result as $key => $state) {
     echo sprintf("%-14s %s\n", $key, $state);
 }
 echo sprintf("done in %.1fs, peak %d MB\n", microtime(true) - $started, memory_get_peak_usage(true) / 1048576);
-echo "Attribution to display:\n  ".implode("\n  ", $database->attribution())."\n";
+echo 'Public credit required by an enabled dataset: '.($database->attribution() === [] ? "none\n" : implode(' | ', $database->attribution())."\n");
 exit(in_array('failed', $result, true) ? 1 : 0);

@@ -519,7 +519,7 @@ Soft, evidence-based signals that read a visitor's network, machine and storage.
 
 | rule code | weight | fires when | honest cases that fire it (why the weight is low) | honest cases it ignores |
 |---|---|---|---|---|
-| `ip_country_vs_locale` | 5 | the IP's country is named by **neither** the time zone **nor** any language/locale region (both independent settings must disagree) | a VPN user; a traveller who changed both | an expat (foreign language, local clock), a traveller who changed only one, a bare `nl` (no region), an unlisted time zone, a protected Firefox (UTC, en-US) |
+| `ip_country_vs_locale` | 5 | the IP's country (and the ASN's registration country, when the lookup has one) is named by **neither** the time zone **nor** any language/locale region (both independent settings must disagree). The country source is a registration and routing country, so a second country can only add ways to agree: its errors make the rule quieter, never noisier | a VPN user; a traveller who changed both | an expat (foreign language, local clock), a traveller who changed only one, a bare `nl` (no region), an unlisted time zone, a protected Firefox (UTC, en-US) |
 | `network_hosting` | 5 | the ASN is a hosting/cloud/colocation network (name classifier, bad-asn-list) or the address is in a published cloud range (`IpReputation`) | corporate gateways, VPN egress, cloud-hosted browsers | residential and mobile networks, unknown data, protected Firefox |
 | `network_vpn` | 4 | the ASN's registered name says VPN (exclusive with `network_hosting`) | everyone who bought a commercial VPN | as above |
 | `vm_gpu_renderer` | 5 | the WebGL renderer names VMware, VirtualBox, Parallels, QEMU/virtio/virgl, Hyper-V (non-headless desktop UA, no touch) | corporate VDI users, developers | real GPUs, Windows "Basic Render" (WARP), Linux llvmpipe, headless (other rules) |
@@ -545,24 +545,35 @@ The decision: private mode is **exposed as a feature (`sig_private_mode`, 1 or 0
 
 ### Data sources and licences (checked 2026-10-31; re-check, terms change)
 
+**No source that needs public credit is used**: a credit on a page would reveal a method. The catalogues refuse to load any feed with an attribution text or the status `public_credit_required` (a test pins it), `NetworkDatabase::attribution()` is always empty, and the licence notices that only have to travel with the data (MIT) are in [`LICENSE-THIRD-PARTY.md`](LICENSE-THIRD-PARTY.md). Nothing is shown to visitors or in a host's footer.
+
 | data | source | licence | account | used for |
 |---|---|---|---|---|
-| IP to country | DB-IP "IP to Country Lite", monthly CSV | CC BY 4.0, **attribution required** | none | the geolocation country |
-| IP to ASN and registered name | IPtoASN `ip2asn-combined.tsv.gz`, hourly | Public Domain (PDDL 1.0) | none | the ASN; the name is classified `vpn` or `hosting` at refresh. Its country column is the *registration* country and is never used as a location |
-| hosting/cloud ASN list | `brianhama/bad-asn-list` (about 740 ASNs) | MIT, keep the notice | none | extra hosting ASNs; ignored after a year |
+| IP to country | sapics/ip-location-db `user-country` (IPv4 and IPv6 CSV, daily) | PDDL 1.0, "free use without attribution" | none | the country. A **registration and routing** country, not a measurement: 97.5 % agreement with GeoLite2 on IPv4 (the maintainer's measurement, 2026-06-14) |
+| IP to ASN and registered name | IPtoASN `ip2asn-combined.tsv.gz`, hourly | Public Domain (PDDL 1.0) | none | the ASN; the name is classified `vpn` or `hosting` at refresh. Its country column is the ASN's *registration* country: stored as the second opinion `NetworkFacts::$registrationCountry`, never a location |
+| hosting/cloud ASN list | `brianhama/bad-asn-list` (about 740 ASNs) | MIT, notice in `LICENSE-THIRD-PARTY.md` | none | extra hosting ASNs; ignored after a year |
 | country bounding boxes | Natural Earth admin-0 1:50m | Public Domain | none | impossible travel (`tools/network/generate-country-bounds.php` regenerates `CountryBounds`) |
-| cloud ranges, Tor exits, abuse list | `src/Reputation` feeds | see `FeedCatalogue` | none | `datacenterRange`, `torExit` |
+| Tor exits | Tor Project CollecTor `tordnsel` exit list (newest file of the directory, hourly) | CC0 (Tor Metrics) | none | `torExit` |
+| cloud ranges | AWS, Google Cloud, Oracle, DigitalOcean | no licence text; `unverified`, host opt-in, none asks for credit | none | `datacenterRange` |
 
-Not used, with reasons: **MaxMind GeoLite2** needs an account and a licence key, its EULA grants use for "your own internal business purposes", forbids disclosing the data to third parties without consent and requires destroying superseded versions within 30 days (usable by one application on its own account, not something a shared package should fetch for its hosts). **DB-IP City/ASN Lite**: same licence as the country file, larger, not needed. **X4BNet/lists_vpn and IPLocate**: derived from a CC BY-SA 4.0 database (share-alike). **A licensed list of VPN ASNs**: none was found, so VPN detection is the name classifier (it finds a VPN company that says so in its name, and misses one that does not).
+Removed on 2026-10-31 because they require public credit: **DB-IP Lite** (a link back "on pages that display or use results") and **Spamhaus DROP** ("credit for the use must be given", and its name may not appear in commercial materials). No CC0 or PDDL replacement for a netblock drop list was found, so the abuse signal is first-party: `NetworkReputation` turns the host's own labelled history of a network (7-day distinct-device counts, k-floor 20, `not_abuse` clearances subtract) into the soft feature `net_history_bad`, next to the hosting, Tor and bad-asn signals. The `abuse_list` category remains for a list a host supplies under a licence of its own.
 
-**Attribution.** Show `NetworkDatabase::attribution()` in the host's notices: "IP Geolocation by DB-IP (https://db-ip.com), licensed CC BY 4.0." (DB-IP asks for `<a href='https://db-ip.com'>IP Geolocation by DB-IP</a>` on web pages that display results) and the bad-asn-list MIT credit. `NetworkFacts::$attribution` lists the lines of the datasets that answered a lookup.
+Not used, with reasons: **MaxMind GeoLite2** needs an account and a licence key, requires attribution of the use, forbids disclosing the data to third parties and requires destroying superseded versions within 30 days. **ipverse/rir-ip** (CC0, pure registration country) is a possible alternative key; not wired. **RIPE NCC delegated files** read directly: their copyright statement restricts use and its scope over the statistics files is unclear. **X4BNet/lists_vpn and IPLocate**: derived from a CC BY-SA 4.0 database (share-alike). **A licensed list of VPN ASNs**: none was found, so VPN detection is the name classifier (it finds a VPN company that says so in its name, and misses one that does not).
+
+**Caveat of the country source.** sapics compiles `user-country` from RIR delegated statistics, Route Views and RIPE RIS routing data and public geofeeds; its README says many geofeeds "lack explicitly defined licenses" and that the RIR input is subject to the NRO licence and the RIR copyright statements. The PDDL statement is the maintainer's. A lawyer should confirm that chain before launch.
+
+**Optional paid source (host-supplied, not integrated): MaxMind GeoIP Country.** USD 418 per year and legal entity at the time of checking, no attribution clause in the EULA or the GeoIP database addendum, daily updates, use limited to the licensee's internal business purposes (fraud prevention for yourself is named), old versions destroyed within 30 days, no passing the data to third parties. The package therefore never fetches it. A host that buys it reads its own copy and builds the facts itself, which replaces `NetworkDatabase::lookup()` for the country:
+
+```php
+$facts = new NetworkFacts(NetworkFacts::STATE_OK, $countryFromYourMaxMindCopy, $asn, $category);   // registrationCountry stays null: the rule then uses the single country
+```
 
 ### Host API
 
 ```php
-// 1. Scheduled job (daily is enough; the monthly file refreshes itself monthly). Never on a request.
+// 1. Scheduled job (daily is enough). Never on a request. The country files come from raw.githubusercontent.com (no redirect; the release URL redirects).
 $network = NetworkDatabase::withDefaults($yourRangeFetcher, $yourCrawlerCache);   // the same interfaces the crawlers and IpReputation use
-$network->refreshStale();            // ['dbip_country' => 'refreshed'|'fresh'|'failed', 'iptoasn' => ..., 'bad_asn_list' => ...]
+$network->refreshStale();            // ['country_ipv4' => 'refreshed'|'fresh'|'failed', 'country_ipv6' => ..., 'iptoasn' => ..., 'bad_asn_list' => ...]
 // Or from a shell:  php -d memory_limit=512M tools/network/refresh.php --cache-dir=/var/cache/device-id
 //                   php tools/network/refresh.php --cache-dir=/var/cache/device-id --lookup=8.8.8.8
 
@@ -580,7 +591,7 @@ Velocity::impossibleTravel($accountId, $sessions);   // [['at' => int, 'country'
 Velocity::features($findings);  $finding->toReviewItem();                                    // model features, review queue
 ```
 
-Cache cost: about 4,000 keys and 52 MB for the three datasets (shards are base64 so a JSON cache stores them); a refresh needs `ext-zlib` and about 120 MB of memory and took 5 seconds. Velocity configuration (`fingerprint.velocity.*`): `window_seconds` 3600, `signups_per_device` 3, `logins_per_device` 10, `signups_per_network` 8, `logins_per_network` 30, `max_speed_kmh` 1000, `min_distance_km` 500, `min_seconds_between` 300.
+Cache cost: about 4,000 keys and 70 MB for the datasets (shards are base64 so a JSON cache stores them); a refresh needs `ext-zlib` and about 120 MB of memory and took 5 seconds. Velocity configuration (`fingerprint.velocity.*`): `window_seconds` 3600, `signups_per_device` 3, `logins_per_device` 10, `signups_per_network` 8, `logins_per_network` 30, `max_speed_kmh` 1000, `min_distance_km` 500, `min_seconds_between` 300.
 
 Impossible travel judges the *smallest possible* distance between two countries (between their bounding boxes, overseas territories included, so neighbours and France or the USA are 0 km from much of the world). It under-detects by design and cannot raise a false alarm from a large country's centroid. A VPN, proxy, hosting or Tor session (`anonymised: true`) is skipped, because its country says nothing about the person.
 
@@ -652,6 +663,6 @@ Hand defaults from the 2026-10-31 literature survey, always on (`MatcherPolicy`,
 ### Detectors, reputation and the rest
 
 * `RingDetectors` are pure functions over aggregates the host computes with its own SQL (accounts per device key, devices per account, bursts per network), with a k-floor of 20: a key shared by 20 or more accounts is a device class, not a ring, and a burst is not judged against a baseline of fewer than 20 observations. They produce `ReviewItem`s for a review queue (`ReviewSink`); they enforce nothing. An anomaly model is deliberately **not built**: `AnomalyModel` is an interface and its docblock records the evidence that would justify one.
-* `IpReputation` loads free feeds through the crawler `RangeFetcher`/`CrawlerCache` interfaces. The licence finding for each feed is in `FeedCatalogue` (dated 2026-10-31): Spamhaus DROP is free with credit; AWS, Google Cloud, Oracle, DigitalOcean and the Tor exit list publish no licence text and are loaded only when the host accepts them by key (`$acceptUnverified`); FireHOL level1 is excluded because it contains DShield data (NonCommercial). A list older than 7 days is ignored, never read as clean; a failed fetch keeps the last good list. The result carries no score or band: it is a soft model feature and a rule input, and an address alone never blocks.
+* `IpReputation` loads free feeds through the crawler `RangeFetcher`/`CrawlerCache` interfaces. The licence finding for each feed is in `FeedCatalogue` (dated 2026-10-31): the Tor exit list (CollecTor, CC0) is on by default; AWS, Google Cloud, Oracle and DigitalOcean publish no licence text and are loaded only when the host accepts them by key (`$acceptUnverified`); Spamhaus DROP was removed because it requires credit; FireHOL level1 is excluded because it contains DShield data (NonCommercial). A list older than 7 days is ignored, never read as clean; a failed fetch keeps the last good list. The result carries no score or band: it is a soft model feature and a rule input, and an address alone never blocks.
 * Retention of training rows is metadata on the row (`retention_days`, default 365); the host's job deletes at `expires_on`.
 

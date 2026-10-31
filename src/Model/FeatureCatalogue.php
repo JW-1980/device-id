@@ -43,7 +43,7 @@ final class FeatureCatalogue
     public const REPUTATION = ['rep_datacenter', 'rep_tor_exit', 'rep_abuse_listed'];
 
     /** Soft network features ({@see NetworkFacts::features()}); absent means no signal. */
-    public const NETWORK = ['net_hosting', 'net_vpn', 'net_tor_exit'];
+    public const NETWORK = ['net_hosting', 'net_vpn', 'net_tor_exit', 'net_history_bad'];
 
     /**
      * Soft environment features ({@see SmartSignals::features()}): how many of the

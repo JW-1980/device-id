@@ -19,7 +19,7 @@ final class ReputationTest extends TestCase
 {
     private int $now = 1_000_000;
 
-    private function feed(string $key, string $format, string $category, string $licence = FeedDefinition::LICENCE_PERMITTED_WITH_ATTRIBUTION, int $minimum = 3600, string $attribution = ''): FeedDefinition
+    private function feed(string $key, string $format, string $category, string $licence = FeedDefinition::LICENCE_PERMITTED_WITH_NOTICE, int $minimum = 3600, string $attribution = ''): FeedDefinition
     {
         return new FeedDefinition($key, $key, 'https://feeds.test/'.$key, $format, $category, ['status' => $licence, 'note' => '', 'source' => '', 'checked_on' => '2026-10-31'], $attribution, $minimum);
     }
@@ -48,7 +48,8 @@ final class ReputationTest extends TestCase
     {
         $feeds = FeedCatalogue::defaults();
 
-        $this->assertArrayHasKey('spamhaus_drop_v4', $feeds);
+        $this->assertSame([], array_values(array_filter(array_keys($feeds), static fn (string $k): bool => str_contains($k, 'spamhaus') || str_contains($k, 'drop'))), 'Spamhaus needs credit and its name may not appear in commercial materials');
+        $this->assertSame([], array_filter($feeds, static fn (FeedDefinition $f): bool => $f->category === FeedDefinition::CATEGORY_ABUSE_LIST), 'no shipped list: the abuse signal is first-party');
         $this->assertArrayNotHasKey('firehol_level1', $feeds, 'FireHOL level1 carries DShield, a NonCommercial licence');
         $this->assertArrayNotHasKey('dshield', $feeds);
         foreach ($feeds as $feed) {
@@ -56,8 +57,13 @@ final class ReputationTest extends TestCase
             $this->assertSame('2026-10-31', $feed->licence['checked_on']);
             $this->assertStringStartsWith('https://', $feed->url);
         }
-        $this->assertNotSame('', $feeds['spamhaus_drop_v4']->attribution, 'Spamhaus requires credit');
-        $this->assertGreaterThanOrEqual(3600, $feeds['spamhaus_drop_v4']->minimumRefreshSeconds, 'Spamhaus: downloads at least an hour apart');
+        foreach ($feeds as $feed) {
+            $this->assertSame('', $feed->attribution, $feed->key.' must not need a public credit');
+            $this->assertNotSame(FeedDefinition::LICENCE_PUBLIC_CREDIT_REQUIRED, $feed->licence['status']);
+            $this->assertStringNotContainsStringIgnoringCase('spamhaus', json_encode($feed));
+        }
+        $this->assertSame(FeedDefinition::LICENCE_PERMITTED, $feeds['tor_exit']->licence['status'], 'CollecTor tordnsel is CC0 per Tor Metrics');
+        $this->assertSame(FeedDefinition::FORMAT_TORDNSEL_DIRECTORY, $feeds['tor_exit']->format);
     }
 
     #[Test]
@@ -96,11 +102,11 @@ final class ReputationTest extends TestCase
     }
 
     #[Test]
-    public function a_refreshed_feed_is_looked_up_with_its_category_source_and_attribution(): void
+    public function a_refreshed_feed_is_looked_up_with_its_category_and_source(): void
     {
         $bodies = ['https://feeds.test/drop' => '{"cidr":"198.51.100.0/24"}', 'https://feeds.test/aws' => '{"prefixes":[{"ip_prefix":"203.0.113.0/24"}]}'];
         $reputation = new IpReputation(
-            ['drop' => $this->feed('drop', FeedDefinition::FORMAT_NDJSON_CIDR, FeedDefinition::CATEGORY_ABUSE_LIST, attribution: 'Spamhaus DROP'), 'aws' => $this->feed('aws', FeedDefinition::FORMAT_AWS, FeedDefinition::CATEGORY_DATACENTER, FeedDefinition::LICENCE_PERMITTED)],
+            ['drop' => $this->feed('drop', FeedDefinition::FORMAT_NDJSON_CIDR, FeedDefinition::CATEGORY_ABUSE_LIST), 'aws' => $this->feed('aws', FeedDefinition::FORMAT_AWS, FeedDefinition::CATEGORY_DATACENTER, FeedDefinition::LICENCE_PERMITTED)],
             $this->fetcher($bodies), new ArrayCache(fn (): int => $this->now), clock: fn (): int => $this->now,
         );
 
@@ -110,7 +116,7 @@ final class ReputationTest extends TestCase
         $this->assertTrue($listed->isAbuseListed());
         $this->assertFalse($listed->isDatacenter());
         $this->assertSame(['drop'], $listed->sources);
-        $this->assertSame(['Spamhaus DROP'], $listed->attribution);
+        $this->assertSame([], $listed->attribution);
         $this->assertSame(ReputationResult::STATE_OK, $listed->state);
         $this->assertSame(['rep_abuse_listed' => 1.0], $listed->features());
         $this->assertTrue($reputation->lookup('203.0.113.1')->isDatacenter());
@@ -213,5 +219,42 @@ final class ReputationTest extends TestCase
         $this->assertSame(['attribution', 'categories', 'sources', 'state', 'unusableFeeds'], $properties);
         $this->assertFalse(method_exists(ReputationResult::class, 'band'));
         $this->assertFalse(method_exists(ReputationResult::class, 'weight'));
+    }
+
+    #[Test]
+    public function the_tor_exit_list_is_read_from_the_newest_file_of_the_collector_directory(): void
+    {
+        $index = '<a href="?C=N;O=D">Name</a><a href="2026-10-27-10-12-11">x</a><a href="2026-10-27-12-11-47">x</a><a href="2026-10-27-11-11-47">x</a>';
+        $list = "@type tordnsel 1.0\nDownloaded 2026-10-27 12:11:47\nExitNode AAAA\nPublished 2026-10-27 08:00:00\nLastStatus 2026-10-27 11:00:00\nExitAddress 171.25.193.25 2026-10-27 11:30:00\nExitNode BBBB\nExitAddress 2001:db8::7 2026-10-27 11:31:00\n";
+        $this->assertSame('2026-10-27-12-11-47', FeedParser::newestExitListName($index));
+        $this->assertNull(FeedParser::newestExitListName('<html>nothing here</html>'));
+        $this->assertSame(['171.25.193.25/32', '2001:db8::7/128'], FeedParser::parse(FeedDefinition::FORMAT_TORDNSEL_DIRECTORY, $list));
+
+        $calls = 0;
+        $bodies = ['https://collector.test/exit-lists/' => $index, 'https://collector.test/exit-lists/2026-10-27-12-11-47' => $list];
+        $feed = new FeedDefinition('tor', 'tor', 'https://collector.test/exit-lists/', FeedDefinition::FORMAT_TORDNSEL_DIRECTORY, FeedDefinition::CATEGORY_TOR_EXIT, ['status' => FeedDefinition::LICENCE_PERMITTED, 'note' => '', 'source' => '', 'checked_on' => '2026-10-31']);
+        $reputation = new IpReputation(['tor' => $feed], $this->fetcher($bodies, $calls), new ArrayCache(fn (): int => $this->now), clock: fn (): int => $this->now);
+
+        $this->assertTrue($reputation->refresh('tor'));
+        $this->assertSame(2, $calls, 'the index, then the newest file');
+        $this->assertTrue($reputation->lookup('171.25.193.25')->isTorExit());
+        $this->assertFalse($reputation->lookup('171.25.193.26')->isTorExit());
+
+        $this->now += 7200;
+        $bodies = ['https://collector.test/exit-lists/' => $index];
+        $this->assertFalse($reputation->refresh('tor'), 'the file missing is a failed refresh, never an empty list');
+        $this->assertTrue($reputation->lookup('171.25.193.25')->isTorExit(), 'the last good list survives');
+    }
+
+    #[Test]
+    public function a_feed_that_carries_a_credit_text_is_never_loaded(): void
+    {
+        $bodies = ['https://feeds.test/credit' => '{"cidr":"198.51.100.0/24"}'];
+        $calls = 0;
+        $reputation = new IpReputation(['credit' => $this->feed('credit', FeedDefinition::FORMAT_NDJSON_CIDR, FeedDefinition::CATEGORY_ABUSE_LIST, FeedDefinition::LICENCE_PERMITTED, attribution: 'Data by Somebody')], $this->fetcher($bodies, $calls), new ArrayCache(fn (): int => $this->now), clock: fn (): int => $this->now);
+
+        $this->assertSame([], $reputation->enabledFeeds());
+        $this->assertFalse($reputation->refresh('credit'));
+        $this->assertSame(0, $calls);
     }
 }

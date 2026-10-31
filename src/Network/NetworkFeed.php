@@ -13,7 +13,8 @@ use DeviceId\Reputation\FeedDefinition;
  * `urls` are tried in order; `{YYYY-MM}` is replaced with the current month and then the
  * previous one (a monthly file is published during the month, so the first days of a new month
  * may only have last month's). `licence` has the same shape and statuses as
- * {@see FeedDefinition}.
+ * {@see FeedDefinition}. A feed whose publisher requires a visible credit
+ * (`public_credit_required`, or a non-empty `attribution`) is never loaded.
  */
 final readonly class NetworkFeed
 {
@@ -36,6 +37,7 @@ final readonly class NetworkFeed
         public array $urls,
         public string $kind,
         public array $licence,
+        /** Non-empty means the publisher demands a visible credit: the feed is then never loaded. */
         public string $attribution = '',
         /** Never fetch again before this many seconds have passed since the last attempt. */
         public int $minimumRefreshSeconds = 86400,
@@ -47,6 +49,7 @@ final readonly class NetworkFeed
 
     public function isUsableWithout(): bool
     {
-        return in_array($this->licence['status'], ['permitted', 'permitted_with_attribution'], true);
+        return $this->attribution === ''
+            && in_array($this->licence['status'], ['permitted', 'permitted_with_notice'], true);
     }
 }

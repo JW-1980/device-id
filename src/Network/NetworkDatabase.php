@@ -43,7 +43,8 @@ final class NetworkDatabase
 
     private const COUNTRY_LENGTH = 2;
 
-    private const ASN_LENGTH = 4;
+    /** The ASN (4 bytes, big-endian) followed by its registration country (2 letters, `--` when the file has none). */
+    private const ASN_LENGTH = 6;
 
     /** @var array<string, array{loaded: int, manifest: array<string, mixed>|null}> */
     private array $manifests = [];
@@ -152,8 +153,7 @@ final class NetworkDatabase
             return new NetworkFacts(NetworkFacts::STATE_UNAVAILABLE, null, null, null, false, false, array_keys($feeds));
         }
 
-        $country = $asn = $category = null;
-        $attribution = [];
+        $country = $asn = $category = $registrationCountry = null;
         $usable = 0;
 
         foreach ($feeds as $key => $feed) {
@@ -170,17 +170,16 @@ final class NetworkDatabase
                     $value = $this->find($key, $manifest, $packed, self::COUNTRY_LENGTH);
                     if ($value !== null && preg_match('/^[A-Z]{2}$/', $value) === 1) {
                         $country = $value;
-                        if ($feed->attribution !== '') {
-                            $attribution[] = $feed->attribution;
-                        }
                     }
                     break;
                 case NetworkFeed::KIND_ASN:
                     $value = $this->find($key, $manifest, $packed, self::ASN_LENGTH);
                     if ($value !== null) {
                         /** @var array{1: int} $unpacked */
-                        $unpacked = unpack('N', $value);
+                        $unpacked = unpack('N', substr($value, 0, 4));
                         $asn = $unpacked[1] === 0 ? null : $unpacked[1];
+                        $registered = substr($value, 4, 2);
+                        $registrationCountry = preg_match('/^[A-Z]{2}$/', $registered) === 1 ? $registered : null;
                         if ($asn !== null) {
                             $flags = $this->flagsOf($key, $manifest);
                             $category = self::contains($flags['v'], $asn) ? NetworkFacts::CATEGORY_VPN
@@ -202,9 +201,6 @@ final class NetworkDatabase
                 $manifest = $this->manifest($key, true);
                 if ($manifest !== null && self::contains(base64_decode((string) ($manifest['asns'] ?? ''), true) ?: '', $asn)) {
                     $category = NetworkFacts::CATEGORY_HOSTING;
-                    if ($feed->attribution !== '') {
-                        $attribution[] = $feed->attribution;
-                    }
                 }
             }
         }
@@ -217,31 +213,29 @@ final class NetworkDatabase
             $unusable === [] ? NetworkFacts::STATE_OK : NetworkFacts::STATE_PARTIAL,
             $country, $asn, $category, false, false,
             array_values(array_unique($unusable)),
-            array_values(array_unique($attribution)),
+            [],
+            $country === null ? null : $registrationCountry,
         );
     }
 
     /**
-     * The credit lines the enabled datasets require, for a host's notice page.
+     * The public credit lines the enabled datasets require. ALWAYS EMPTY: a feed that demands a
+     * visible credit is never enabled ({@see NetworkFeed::isUsableWithout()}), because a credit
+     * would reveal a detection method. Licence notices that only travel with the data are in
+     * `LICENSE-THIRD-PARTY.md`. The method stays so a host's notice code keeps working, and a
+     * test pins that it returns nothing for the shipped catalogue.
      *
      * @return list<string>
      */
     public function attribution(): array
     {
-        $lines = [];
-        foreach ($this->enabledFeeds() as $feed) {
-            if ($feed->attribution !== '') {
-                $lines[] = $feed->attribution;
-            }
-        }
-
-        return $lines;
+        return [];
     }
 
     // ------------------------------------------------------------------ parsing (pure, public for tests)
 
     /**
-     * `start,end,CC` lines (DB-IP). Reserved ranges (`ZZ`) are dropped, not stored as a country.
+     * `start,end,CC` lines (sapics `user-country`; DB-IP used the same shape). Reserved ranges (`ZZ`) are dropped, not stored as a country.
      *
      * @return array{shards: array<string, string>, records: int}
      */
@@ -269,7 +263,8 @@ final class NetworkDatabase
 
     /**
      * `start end ASN country name` lines (IPtoASN, tab separated). Not-routed space (ASN 0) is
-     * dropped. The registered name is classified once per ASN and not stored.
+     * dropped. The registered name is classified once per ASN and not stored; the registration
+     * country is stored next to the ASN as a second opinion for the locale rule.
      *
      * @return array{shards: array<string, string>, records: int, vpn: list<int>, hosting: list<int>}
      */
@@ -291,7 +286,11 @@ final class NetworkDatabase
             if (! array_key_exists($asn, $category)) {
                 $category[$asn] = AsnClassifier::classify($parts[4] ?? '');
             }
-            if (self::addRange($buffers, $lastEnd, $parts[0], $parts[1], pack('N', $asn))) {
+            $registered = strtoupper(trim($parts[3]));
+            if (preg_match('/^[A-Z]{2}$/', $registered) !== 1 || $registered === 'ZZ') {
+                $registered = '--';
+            }
+            if (self::addRange($buffers, $lastEnd, $parts[0], $parts[1], pack('N', $asn).$registered)) {
                 $records++;
             }
         });

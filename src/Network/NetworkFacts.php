@@ -12,7 +12,7 @@ use DeviceId\Reputation\ReputationResult;
  * autonomous system that announces it and a coarse category of that system. It carries no
  * score. A rule or a model reads it as one soft fact among many, because a hosting address is
  * also a VPN, a corporate gateway and a developer's laptop, and a country is a database's
- * best guess (DB-IP states country accuracy as high, not perfect).
+ * best guess (the shipped source is a registration and routing country, not a measurement).
  *
  * Unknown stays unknown: a null country or category means "no data", never "clean" and never
  * "domestic". {@see $state}: `ok` every dataset answered, `partial` some were stale, missing or
@@ -40,7 +40,8 @@ final readonly class NetworkFacts
      * @param  string|null  $asnCategory  {@see CATEGORY_HOSTING}, {@see CATEGORY_VPN} or null (no flag; NOT "residential")
      * @param  bool  $datacenterRange  the address is inside a published cloud range ({@see ReputationResult})
      * @param  list<string>  $unusable  datasets that were stale, missing or unaccepted
-     * @param  list<string>  $attribution  credit lines the answering datasets require
+     * @param  list<string>  $attribution  always empty from {@see NetworkDatabase}: no dataset with a public-credit duty is loaded. Kept so a host that reads it keeps working.
+     * @param  string|null  $registrationCountry  the country the announcing ASN is REGISTERED in (a second opinion on `$country`); null when no second source answered or the host supplied the facts itself
      */
     public function __construct(
         public string $state = self::STATE_UNAVAILABLE,
@@ -51,6 +52,7 @@ final readonly class NetworkFacts
         public bool $torExit = false,
         public array $unusable = [],
         public array $attribution = [],
+        public ?string $registrationCountry = null,
     ) {}
 
     public static function unknown(): self
@@ -72,6 +74,7 @@ final readonly class NetworkFacts
             $this->torExit || $reputation->isTorExit(),
             $this->unusable,
             array_values(array_unique([...$this->attribution, ...$reputation->attribution])),
+            $this->registrationCountry,
         );
     }
 
