@@ -591,7 +591,7 @@ Velocity::impossibleTravel($accountId, $sessions);   // [['at' => int, 'country'
 Velocity::features($findings);  $finding->toReviewItem();                                    // model features, review queue
 ```
 
-Cache cost: about 4,000 keys and 70 MB for the datasets (shards are base64 so a JSON cache stores them); a refresh needs `ext-zlib` and about 120 MB of memory and took 5 seconds. Velocity configuration (`fingerprint.velocity.*`): `window_seconds` 3600, `signups_per_device` 3, `logins_per_device` 10, `signups_per_network` 8, `logins_per_network` 30, `max_speed_kmh` 1000, `min_distance_km` 500, `min_seconds_between` 300.
+Cache cost (measured 2026-10-31): about 470 keys and 35 MB for the network datasets (shards are base64 so a JSON cache stores them); a refresh needs `ext-zlib` and about 120 MB of memory and took 5 seconds. Velocity configuration (`fingerprint.velocity.*`): `window_seconds` 3600, `signups_per_device` 3, `logins_per_device` 10, `signups_per_network` 8, `logins_per_network` 30, `max_speed_kmh` 1000, `min_distance_km` 500, `min_seconds_between` 300.
 
 Impossible travel judges the *smallest possible* distance between two countries (between their bounding boxes, overseas territories included, so neighbours and France or the USA are 0 km from much of the world). It under-detects by design and cannot raise a false alarm from a large country's centroid. A VPN, proxy, hosting or Tor session (`anonymised: true`) is skipped, because its country says nothing about the person.
 
