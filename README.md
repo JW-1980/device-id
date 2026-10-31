@@ -133,12 +133,23 @@ screening are the host's job). Pending claims are resolved in the background wit
 `unverifiable`/`pending`, never `verified`. `forged` means DNS or a list that was read contradicts the claim.
 Suffix matching is on label boundaries (`evil-googlebot.com` and `googlebot.com.evil.net` do not match).
 `googleusercontent.com` is deliberately not a Google suffix (every Compute Engine VM has a forward-confirming
-PTR there); Google's user-triggered fetchers are covered by its published JSON ranges.
+PTR there). An entry with one `*` is a host pattern (`rate-limited-proxy-*.google.com`: one first label with
+that prefix, then exactly that domain); Google is verified only by its crawler names (`crawl-*.googlebot.com`,
+`geo-crawl-*.geo.googlebot.com`, `rate-limited-proxy-*.google.com`) and its crawler lists
+(`common-crawlers.json`, `special-crawlers.json`).
+
+**User-triggered fetchers are not crawlers.** Google's user-triggered fetchers (App Engine customer egress under
+`*.gae.googleusercontent.com`, `google-proxy-*.google.com`), Feedfetcher, Google-Read-Aloud,
+Google-Site-Verification, GoogleProducer, ChatGPT-User, Claude-User and Perplexity-User claim no crawler identity
+and their lists are not read: they are scored as ordinary traffic. Anthropic publishes one list for all its
+bots, so whether a ClaudeBot claim from a Claude-User address verifies is unknown. Range URLs must be final
+URLs, because the host fetchers refuse redirects.
 
 **Catalogue** (`CrawlerCatalogue::default()`, extend with `->with(new CrawlerDefinition(...))` or `fromArray()`):
-Google (all families: Googlebot, Google-InspectionTool, GoogleOther, Storebot-Google, AdsBot-Google,
-Mediapartners-Google, APIs-Google ...), Bingbot, Applebot, DuckDuckBot (recognised, no published method:
-config-only), YandexBot, Baiduspider, OpenAI, Anthropic and Perplexity (published lists). Sources are in the
+Google (common and special-case crawlers: Googlebot, Google-InspectionTool, GoogleOther, Storebot-Google,
+Google-CloudVertexBot, AdsBot-Google, Mediapartners-Google, APIs-Google, Google-Safety), Bingbot, Applebot,
+DuckDuckBot (recognised, no published method: config-only), YandexBot, Baiduspider, OpenAI (GPTBot,
+OAI-SearchBot), Anthropic (ClaudeBot, Claude-SearchBot) and PerplexityBot (published lists). Sources are in the
 `CrawlerCatalogue` docblock.
 
 **Uptime monitors** are provable ONLY by the provider's published IP list; a User-Agent never suffices. The

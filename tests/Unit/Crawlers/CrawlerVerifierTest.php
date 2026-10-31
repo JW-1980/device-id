@@ -296,7 +296,7 @@ final class CrawlerVerifierTest extends CrawlerTestCase
     #[Test]
     public function a_list_can_verify_a_dns_crawler_but_never_contradicts_it(): void
     {
-        $url = 'https://developers.google.com/static/search/apis/ipranges/googlebot.json';
+        $url = 'https://developers.google.com/static/crawling/ipranges/common-crawlers.json';
         $fetcher = new FakeFetcher([$url => '{"prefixes":[{"ipv4Prefix":"66.249.64.0/19"}]}']);
         $verifier = $this->verifier(new FakeDns, $fetcher);
 

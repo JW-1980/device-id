@@ -16,16 +16,36 @@ namespace DeviceId\Crawlers;
  *
  * ## Sources (retrieved 2026-10-31 unless noted; re-check before relying on a URL)
  *
- * Crawlers: developers.google.com/search/docs/crawling-indexing/verifying-googlebot (reverse DNS
- * `googlebot.com`/`google.com`, JSON ranges at developers.google.com/static/search/apis/ipranges/),
- * blogs.bing.com (Bingbot, `search.msn.com`, bing.com/toolbox/bingbot.json), support.apple.com/119829
- * (Applebot, `applebot.apple.com`), yandex.com/support/webmaster (`yandex.ru|net|com`),
- * Baidu webmaster docs (`baidu.com|baidu.jp`). DuckDuckGo documents an IP list on an HTML help page
- * only, and no reverse DNS, so DuckDuckBot is recognised but config-only.
+ * Crawlers: developers.google.com/crawling/docs/crawlers-fetchers/verify-google-requests (Google's
+ * three classes: common crawlers `crawl-*.googlebot.com` / `geo-crawl-*.geo.googlebot.com` with
+ * common-crawlers.json; special-case crawlers `rate-limited-proxy-*.google.com` with
+ * special-crawlers.json; user-triggered fetchers, see below), blogs.bing.com (Bingbot,
+ * `search.msn.com`, bing.com/toolbox/bingbot.json), support.apple.com/119829 (Applebot,
+ * `applebot.apple.com`), yandex.com/support/webmaster (`yandex.ru|net|com`), Baidu webmaster docs
+ * (`baidu.com|baidu.jp`). DuckDuckGo documents an IP list on an HTML help page only, and no reverse
+ * DNS, so DuckDuckBot is recognised but config-only. Range URLs must be the final URL: the hosts'
+ * fetchers refuse redirects (Google moved its lists from /static/search/apis/ipranges/ to
+ * /static/crawling/ipranges/, and Perplexity from perplexity.com to perplexity.ai; both old URLs
+ * answer 3xx).
+ *
+ * ## Only crawlers are crawlers
+ *
+ * A verified crawler skips the host's captcha, fingerprint and throttles, so only traffic the vendor
+ * itself originates and documents as a crawler may verify. USER-TRIGGERED fetchers are excluded,
+ * both their User-Agent tokens and their IP lists: Google's `user-triggered-fetchers.json` is App
+ * Engine egress (`*.gae.googleusercontent.com`) that any Google Cloud customer's site sends on behalf
+ * of its users, `user-triggered-fetchers-google.json` resolves to `google-proxy-*.google.com`, and
+ * ChatGPT-User, Claude-User and Perplexity-User fetch whatever a user asks. Such a request is
+ * ordinary traffic. For that reason `google.com` is accepted only as the special-case crawler
+ * pattern, never as a suffix.
  *
  * `googleusercontent.com` is deliberately NOT a suffix here: Compute Engine hands every customer VM a
  * PTR under `*.bc.googleusercontent.com` that forward-confirms, so it would verify any rented VM as
- * Google. The user-triggered fetchers are covered by their published JSON ranges instead.
+ * Google.
+ *
+ * Anthropic publishes one list (claude.com/crawling/bots.json) for its bots without saying which bot
+ * uses which prefix; whether Claude-User shares it is UNKNOWN, so a ClaudeBot claim from a Claude-User
+ * address may verify. The same holds for OpenAI's GPTBot vs OAI-SearchBot lists (both crawlers).
  *
  * Uptime monitors are provable ONLY by the provider's published IP list. A User-Agent alone is
  * spoofable and never sufficient. Official list URLs, as documented by each provider:
@@ -140,7 +160,7 @@ final class CrawlerCatalogue
      */
     public static function defaultCrawlers(): array
     {
-        $google = 'https://developers.google.com/static/search/apis/ipranges/';
+        $google = 'https://developers.google.com/static/crawling/ipranges/';
 
         return [
             new CrawlerDefinition(
@@ -148,12 +168,13 @@ final class CrawlerCatalogue
                 'Google',
                 CrawlerDefinition::KIND_CRAWLER,
                 [
-                    'googlebot', 'google-extended', 'googleother', 'apis-google', 'adsbot-google', 'storebot-google',
-                    'mediapartners-google', 'google-inspectiontool', 'google-safety', 'google-read-aloud',
-                    'feedfetcher-google', 'google-site-verification', 'google-cloudvertexbot', 'googleproducer',
+                    // Common crawlers, then special-case crawlers. No user-triggered fetcher tokens
+                    // (Feedfetcher, Google-Read-Aloud, Google-Site-Verification, GoogleProducer).
+                    'googlebot', 'googleother', 'storebot-google', 'google-inspectiontool', 'google-cloudvertexbot',
+                    'google-extended', 'apis-google', 'adsbot-google', 'mediapartners-google', 'google-safety',
                 ],
-                ['googlebot.com', 'google.com'],
-                [$google.'googlebot.json', $google.'special-crawlers.json', $google.'user-triggered-fetchers.json', $google.'user-triggered-fetchers-google.json'],
+                ['crawl-*.googlebot.com', 'geo-crawl-*.geo.googlebot.com', 'rate-limited-proxy-*.google.com'],
+                [$google.'common-crawlers.json', $google.'special-crawlers.json'],
             ),
             new CrawlerDefinition(
                 'bingbot',
@@ -191,11 +212,11 @@ final class CrawlerCatalogue
                 ['baiduspider'],
                 ['baidu.com', 'baidu.jp'],
             ),
-            new CrawlerDefinition('openai', 'OpenAI', CrawlerDefinition::KIND_CRAWLER, ['gptbot', 'chatgpt-user', 'oai-searchbot'], [], [
-                'https://openai.com/gptbot.json', 'https://openai.com/chatgpt-user.json', 'https://openai.com/searchbot.json',
+            new CrawlerDefinition('openai', 'OpenAI', CrawlerDefinition::KIND_CRAWLER, ['gptbot', 'oai-searchbot'], [], [
+                'https://openai.com/gptbot.json', 'https://openai.com/searchbot.json',
             ]),
-            new CrawlerDefinition('anthropic', 'Anthropic', CrawlerDefinition::KIND_CRAWLER, ['claudebot', 'claude-web', 'claude-user', 'claude-searchbot'], [], ['https://claude.com/crawling/bots.json']),
-            new CrawlerDefinition('perplexity', 'Perplexity', CrawlerDefinition::KIND_CRAWLER, ['perplexitybot'], [], ['https://www.perplexity.com/perplexitybot.json']),
+            new CrawlerDefinition('anthropic', 'Anthropic', CrawlerDefinition::KIND_CRAWLER, ['claudebot', 'claude-searchbot'], [], ['https://claude.com/crawling/bots.json']),
+            new CrawlerDefinition('perplexity', 'Perplexity', CrawlerDefinition::KIND_CRAWLER, ['perplexitybot'], [], ['https://www.perplexity.ai/perplexitybot.json']),
         ];
     }
 
