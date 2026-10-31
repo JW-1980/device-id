@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace DeviceId\Support;
 
+use DeviceId\CheckRegistry;
+
 /**
  * The outcome of evaluating a claim set: a band, a score, and the evidence.
  *
@@ -12,7 +14,7 @@ namespace DeviceId\Support;
  * That is a hard requirement, not a nicety. An automatic decision nobody can explain
  * is an automatic decision nobody can defend, and the person who has to defend it is
  * an operator at 03:00 looking at an admin screen. `VerdictScorerTest` therefore
- * asserts the identity `score === f(sum of disagreement weights)` as a property of
+ * asserts the identity `score === f(effective weight of the disagreements)` as a property of
  * every verdict it builds — if the scoring ever gains a term the disagreements do not
  * explain, the test fails rather than the audit trail quietly diverging from the
  * number.
@@ -137,12 +139,22 @@ final readonly class Verdict
     }
 
     /**
-     * The sum of disagreement weights, which the score is a function of.
+     * The effective weight the score is a function of: each evidence group counted once, at its
+     * heaviest member ({@see CheckRegistry::effectiveWeight()}).
      *
      * Public so the score's reconstructibility is assertable from outside rather than
      * taken on trust.
      */
     public function totalWeight(): int
+    {
+        return CheckRegistry::effectiveWeight($this->disagreements);
+    }
+
+    /**
+     * The plain sum of every listed disagreement's weight, for diagnostics only: rules that share
+     * evidence are listed at their own weights but do not stack in the score.
+     */
+    public function rawWeight(): int
     {
         $total = 0;
         foreach ($this->disagreements as $disagreement) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DeviceId\Scoring;
 
+use DeviceId\CheckRegistry;
 use DeviceId\Network\NetworkFacts;
 use DeviceId\Rules\EnvironmentConsistency;
 use DeviceId\Support\Confidence;
@@ -28,26 +29,20 @@ use DeviceId\Support\Verdict;
  * the transport proved. Counting contradictions inverts the incentive: a client can
  * only lower its score by *not lying*, and lying raises the count.
  *
- * ## Two independent contradictions beat one severe one — a stated LIMITATION
+ * ## Correlated rules count once: evidence groups
  *
- * True of the *system*, and false of this arithmetic.
+ * Two rules may be perfectly correlated (they read one underlying fact) or wholly
+ * independent, and a plain weighted sum cannot tell. The skeptical review (H2) measured
+ * the cost: one User-Agent override fired three rules on one fact, summed to 95 and
+ * blocked a real Chromium. The score is therefore computed from the EFFECTIVE weight
+ * ({@see CheckRegistry::effectiveWeight()}): rules that share evidence are declared in one
+ * evidence group and the group counts once, at its heaviest member. Independent groups
+ * still add up, so two independent contradictions still beat one.
  *
- * A fabrication has to satisfy every rule simultaneously, so spreading a forgery
- * across several independent sources is genuinely harder than concentrating on one. But
- * a weighted sum cannot express that: two rules of equal weight may be perfectly
- * correlated — the two readings of `navigator.languages`, say — or wholly independent,
- * and the total is the same either way.
- *
- * What would be needed is a weight that depends on how many *distinct sources* are
- * contradicted, not how much weight was accumulated. That is a bigger model and it
- * needs real traffic to calibrate; guessing at it now would be worse than the honest
- * limitation. The practical defence is a property of the rule set rather than the
- * arithmetic — the rules read independent sources, and `EnvironmentConsistencyTest`
- * keeps that honest by requiring every rule to be reachable.
- *
- * `VerdictScorerTest::the_same_total_weight_scores_the_same_however_it_is_distributed`
- * pins the limitation so it cannot be quietly "fixed" by someone who believes the
- * stronger claim.
+ * What remains a limitation: the groups are declared from the rules' inputs, not learned
+ * from traffic, and between groups the arithmetic is still a sum. Two groups of equal
+ * effective weight score the same however the weight is distributed
+ * (`VerdictScorerTest::the_same_total_weight_scores_the_same_however_it_is_distributed`).
  *
  * ## What actually keeps real visitors safe
  *
@@ -67,11 +62,10 @@ use DeviceId\Support\Verdict;
  *
  * `score = min(100, round(100 * (1 - exp(-weight / 40))))`
  *
- * Diminishing returns. The divisor of 40 is calibrated so the heaviest shipped single
- * contradiction (45: `transport_default`, `sec_ch_full_version_mismatch`; an operator may
- * raise a weight to 60 → 78) alone lands at 68 — `challenge` territory — and never
- * `block`. (This docblock used to cite `wrong_receiver_did_not_throw` at 40 → 63, which
- * was stale once the transport weights were added; round-2 CQ-10.)
+ * Diminishing returns. The divisor of 40 is calibrated so the heaviest single evidence
+ * group (45, `EnvironmentConsistency::MAX_WEIGHT`, which also clamps operator overrides)
+ * alone lands at 68 — `challenge` territory — and never `block`. A host that lowers the
+ * divisor or the block threshold can break that; {@see singleCauseCanBlock()} reports it.
  */
 final class VerdictScorer
 {
@@ -110,10 +104,9 @@ final class VerdictScorer
             );
         }
 
-        $weight = 0;
+        $weight = CheckRegistry::effectiveWeight($disagreements);
         $reasons = [];
         foreach ($disagreements as $disagreement) {
-            $weight += $disagreement['weight'];
             $reasons[] = $disagreement['code'];
         }
 
@@ -166,7 +159,7 @@ final class VerdictScorer
             return new Verdict(Verdict::BAND_PASS, 0, [], [], $deviceKey, $saltVersion, $confidence);
         }
 
-        $weight = array_sum(array_column($disagreements, 'weight'));
+        $weight = CheckRegistry::effectiveWeight($disagreements);
         $reasons = array_keys($byCode);
         sort($reasons, SORT_STRING);
         $score = $this->scoreFor($weight);
@@ -186,6 +179,16 @@ final class VerdictScorer
         $divisor = max(1, Config::int('fingerprint.score_divisor', 40));
 
         return (int) min(100, round(100 * (1 - exp(-$weight / $divisor))));
+    }
+
+    /**
+     * True when the host's scoring configuration (divisor and bands) lets ONE evidence group at
+     * the rule ceiling reach `block`, breaking the "no single root cause blocks" invariant. A
+     * settings screen should refuse such a configuration on save.
+     */
+    public function singleCauseCanBlock(): bool
+    {
+        return $this->bandFor($this->scoreFor(EnvironmentConsistency::MAX_WEIGHT)) === Verdict::BAND_BLOCK;
     }
 
     public function bandFor(int $score): string

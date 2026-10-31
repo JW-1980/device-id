@@ -29,11 +29,15 @@ use DeviceId\Support\Verdict;
  *    `Verdict::totalWeight()`.
  * 2. It is capped at `max_adjustment_weight` (default 20, never above the rule ceiling of 60).
  * 3. A POSITIVE adjustment is emitted only when the rules found contradictions in at least
- *    `min_rule_families_for_escalation` (default 2) distinct families. A visitor with no
- *    contradiction is never touched, whatever the model thinks.
+ *    `min_rule_families_for_escalation` (default 2) distinct families AND as many distinct
+ *    evidence groups ({@see CheckRegistry::groupsOf()}), so one root cause is never escalated.
+ *    A visitor with no contradiction is never touched, whatever the model thinks.
  * 4. The model never moves a verdict into `block` that the rules had not: the adjustment is
  *    reduced to stay below it and `suggestsReview` is set, so the host can open a
- *    human-reviewed hold instead. Rules-only blocks are unchanged.
+ *    human-reviewed hold instead. Rules-only blocks are unchanged. Together with the evidence
+ *    groups this proves that one root cause plus the model never blocks: one cause is one
+ *    group, at most `EnvironmentConsistency::MAX_WEIGHT` (45, score 68, not `block`), and the
+ *    adjustment is reduced until the band is not `block` (at 0 it is the rules' band).
  * 5. A NEGATIVE adjustment (the model vouching for the visitor) is bounded the same way and can
  *    never take a verdict below `elevated` while hard transport evidence is present: the
  *    client cannot rewrite that evidence, so no statistical model may argue it away.
@@ -154,7 +158,7 @@ final class ModelScorer
             $rules = array_values(array_filter($verdict->disagreements, static fn (array $d): bool => $d['code'] !== self::CODE));
             $features = FeatureCatalogue::build($rules, $integrityCount, $coverageScore, $untrustedCount, $omissionCount, $protected, $reputation);
             $prediction = $model->predict($features);
-            $rulesWeight = array_sum(array_column($rules, 'weight'));
+            $rulesWeight = CheckRegistry::effectiveWeight($rules);
             $rulesProbability = $model->rulesProbability($rulesWeight);
 
             [$weight, $review] = $this->boundedAdjustment($model, $verdict, $rules, $prediction->probability, $rulesProbability, $rulesWeight);
@@ -216,7 +220,10 @@ final class ModelScorer
         $raw = (LogisticModel::logit($probability) - LogisticModel::logit($rulesProbability)) / $model->rulesCalibration['a'];
         $weight = (int) max(-$cap, min($cap, round($raw)));
 
-        if ($weight > 0 && count(FeatureCatalogue::families($rules)) < $model->minRuleFamilies) {
+        // Escalation needs independent evidence: enough families AND enough evidence groups, so
+        // one root cause that shows up in two families (a UA lie: transport and environment)
+        // is never escalated by the model.
+        if ($weight > 0 && (count(FeatureCatalogue::families($rules)) < $model->minRuleFamilies || count(CheckRegistry::groupsOf($rules)) < $model->minRuleFamilies)) {
             return [0, false];
         }
         if ($weight < 0 && ! $this->allowDeescalation) {

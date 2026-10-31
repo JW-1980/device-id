@@ -167,7 +167,7 @@ not credentials: prefer IPs.
 
 **Impersonation**: a User-Agent claiming a crawler that DNS or the vendor's list contradicts is the hard
 transport finding `crawler_impersonation` (`TransportRequestFacts(crawler: $verification)`), weight
-`transport_crawler_impersonation` = 45: score 68, `challenge`, never `block` on its own.
+`transport_crawler_impersonation` = 45: score 68, `challenge`, never `block` on its own (no single root cause can block; see "No single root cause can block a device").
 
 ## Browser collector
 
@@ -508,10 +508,30 @@ score still moves and the operator has to work out why.
 deployment has not heard of cannot be assumed to be rare. The Laravel package enforces the
 same rule with a test, and the registry does it structurally.
 
-**No one check can block a device alone.** The heaviest contradiction is 40 and the block
-band is 80, so a device must contradict itself in two independent ways. That property lives
-in the weights, so it is preserved by the port — and `CheckRegistry` documents it next to the
-numbers rather than leaving it implicit.
+**No single root cause can block a device.** Several rules can read one fact: a User-Agent
+switcher trips `transport_sec_ch_full_version_mismatch` (45), `ua_vs_ch_major` (25) and
+`ua_vs_feature_version` (25) at once, and summed that blocked a real Chromium whose only change
+was its User-Agent (score 92). `CheckRegistry::EVIDENCE_GROUPS` declares which rules share their
+evidence (`claimed_identity`, `locale`, `display_metrics`, `readback_noise`, `network`,
+`virtual_machine`; every other code is its own group), and the score is computed from the
+effective weight: each group counts once, at its heaviest member (`Verdict::totalWeight()`;
+`rawWeight()` is the plain sum, for diagnostics). Every rule is still listed at its own weight.
+The heaviest weight, and the ceiling an operator override is clamped to, is 45
+(`EnvironmentConsistency::MAX_WEIGHT`, score 68, `challenge`), so one cause cannot block and a
+device must contradict itself in two independent ways. The same real capture now scores 72
+(`challenge`). `SingleRootCauseInvariantTest` enforces it on facts: every honest capture under
+~36 single-cause perturbations (UA version, family and OS, in the header, the page and the
+worker; language; Accept-Language; stripped Client-Hints or Sec-Fetch headers) stays below
+`block`, no perturbation of any capture adds more than one group's weight, and the red-team
+fixtures keep their bands. The honest fixtures are Chromium only (Firefox and WebKit honest
+captures are not in the set). A host that lowers `score_divisor` or the `block` threshold can
+break the invariant; `VerdictScorer::singleCauseCanBlock()` reports such a configuration, and a
+settings screen should refuse it.
+
+**One cause plus the model never blocks either.** In `bounded` mode the model escalates only when
+the rules fired in at least two families AND two evidence groups, and its adjustment is reduced
+until the band is not `block` (`ModelScorer`, bound 4). One cause is at most 45 (68), so the
+combination stays below 80.
 
 ## Relationship to the Laravel application
 

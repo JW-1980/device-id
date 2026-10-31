@@ -93,10 +93,16 @@ final class EnvironmentConsistency
      * @var array<string, int>
      */
     /**
-     * The largest weight any rule may carry, shipped or overridden: 100 × (1 − e^(−60/40))
-     * is 78, below the shipped `block` band of 80, so no single rule can block.
+     * The largest weight any rule, and therefore any evidence group, may carry, shipped or
+     * overridden: 100 × (1 − e^(−45/40)) is 68, 12 points below the shipped `block` band of 80,
+     * so no single root cause can block (CheckRegistry, "Evidence groups").
+     *
+     * It was 60 (score 78), which left a 2-point margin: a host that lowered the divisor to 37
+     * let one overridden rule block. 45 is the heaviest shipped weight, so the shipped
+     * behaviour is unchanged; only overrides above 45 are now clamped. The model's bounded
+     * adjustment is capped by this value too, and never moves a verdict into `block`.
      */
-    public const MAX_WEIGHT = 60;
+    public const MAX_WEIGHT = 45;
 
     /**
      * Releases of tolerance either side of the claimed version before a feature counts

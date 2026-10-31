@@ -30,11 +30,31 @@ namespace DeviceId;
  *
  * They come from the application's own scoring scale, where 80 is the block band and 60 the
  * challenge band, and are argued per rule in `EnvironmentConsistency` (notes/12 §2; one of
- * them is measured). The heaviest single contradiction is 45 (score 68, `challenge`; an
- * operator may raise a weight to 60, score 78), which is deliberately below the block
- * threshold: **no one check can block a device on its own.** A device has to contradict
- * itself in two independent ways. Learning the weights from the population is
- * notes/23 (not implemented).
+ * them is measured). The heaviest single contradiction is 45 (score 68, `challenge`), and
+ * `EnvironmentConsistency::MAX_WEIGHT` (45) is also the ceiling an operator override is
+ * clamped to. Learning the weights from the population is notes/23 (not implemented).
+ *
+ * ## Evidence groups: one root cause counts once
+ *
+ * A ceiling per RULE is not enough, because several rules can read one underlying fact. A
+ * User-Agent switcher makes the UA disagree with Sec-CH-UA-Full-Version-List
+ * (`transport_sec_ch_full_version_mismatch`, 45), with the JavaScript version list
+ * (`ua_vs_ch_major`, 25) and with the engine's feature set (`ua_vs_feature_version`, 25): one
+ * fact, three rules, 95 summed, `block` on a real Chromium whose only change was its UA
+ * (skeptical review H2). `EVIDENCE_GROUPS` declares which rules share their evidence, and
+ * {@see effectiveWeight()} counts each group once, at its heaviest member. A code in no group
+ * is its own group. Every rule is still listed in the verdict at its own weight; only the sum
+ * the score is computed from changes.
+ *
+ * The invariant, enforced by `SingleRootCauseInvariantTest` on facts rather than rules: one
+ * root cause is one group, one group weighs at most 45, and 45 scores 68, so **no single root
+ * cause can block a device**; a device has to contradict itself in two independent ways.
+ * Grouping is deliberately coarse where an honest tool touches several facts at once (a UA
+ * switcher rewrites the UA, the userAgentData values and the page-realm getters together; a
+ * noise extension noises canvas, audio, rectangles and text together).
+ *
+ * A group is NOT a family. Families (`integrity`, `transport`, `environment`) describe the
+ * kind of source; a group spans families when one cause shows up in several of them.
  *
  * ## What the JS-to-header checks are worth more than
  *
@@ -154,6 +174,114 @@ final class CheckRegistry
         'emulator_android' => [8, 'environment', 'An Android browser that identifies as an emulator (emulator token in the user agent or device model) or runs on a software GPU.'],
         'private_mode_with_other_signals' => [3, 'environment', 'The tab looks like private browsing (storage profile) AND a network, virtual-machine, emulator or locale signal is present. Private browsing alone is never scored.'],
     ];
+
+    /**
+     * group => codes that read one underlying fact (one root cause). Codes in no group are their
+     * own group. Each group is argued in a comment; `SingleRootCauseInvariantTest` checks that
+     * every member is a registered check and that perturbing one cause of an honest capture adds
+     * at most one group's weight.
+     *
+     * @var array<string, list<string>>
+     */
+    private const EVIDENCE_GROUPS = [
+        // The browser identity the client claims (User-Agent header, navigator.userAgent /
+        // appVersion / platform, userAgentData) against what the engine, the headers and the
+        // TLS stack prove. A UA switcher, an enterprise UA override or a spoofer's UA lie is ONE
+        // cause however many of these comparisons it trips: header vs page, version vs CH list,
+        // version vs features, family vs engine, OS vs platform/fonts/GPU, the page-realm getter
+        // wrap a switcher leaves (`lie_battery_privacy_tool`), and the page/worker split a
+        // page-only override leaves (`worker_vs_window_navigator`).
+        'claimed_identity' => [
+            'ua_vs_ua_header', 'brands_vs_ch_header', 'ua_vs_ch_brand', 'ua_vs_ch_major',
+            'transport_sec_ch_full_version_mismatch', 'ja4_vs_ua', 'ch_bitness_vs_js', 'ch_model_vs_js',
+            'lied_os', 'lied_browser', 'plugins_vs_ua', 'ua_vs_engine', 'ua_vs_feature_version',
+            'worker_vs_window_navigator', 'fonts_single_family_desktop', 'fonts_vs_ua_os',
+            'ua_reduced_shape_violation', 'webview_ua_shape', 'ch_platform_vs_gpu',
+            'lie_battery_privacy_tool', 'emulator_android',
+        ],
+        // The visitor's locale settings against each other and the network: an expat, a
+        // traveller or a server on UTC is one cause.
+        'locale' => ['tz_vs_lang_region', 'tz_utc_vs_language_region', 'ip_country_vs_locale', 'lang_vs_accept_language'],
+        // Browser zoom moves devicePixelRatio, innerWidth and the screen/DPR relation together.
+        'display_metrics' => ['dpr_vs_ch', 'viewport_vs_ch', 'screen_zoom_implausible'],
+        // One noise extension or privacy mode (Brave farbling, Firefox RFP/FPP, Safari advanced
+        // protection) noises every read-back surface at once.
+        'readback_noise' => [
+            'canvas_readback_perturbed', 'canvas_pattern_perturbed', 'audio_readback_perturbed', 'lie_battery_noise_tool',
+            'realm_tostring_noise_tool', 'canvas_realm_mismatch', 'gpu_realm_mismatch', 'domrect_inconsistent', 'svg_text_inconsistent',
+        ],
+        // A VPN exit is commonly also a hosting network.
+        'network' => ['network_vpn', 'network_hosting'],
+        // A virtual machine shows as a virtual GPU and as a VM default screen.
+        'virtual_machine' => ['vm_gpu_renderer', 'vm_software_gpu_screen'],
+    ];
+
+    /**
+     * @return array<string, list<string>>
+     */
+    public static function evidenceGroups(): array
+    {
+        return self::EVIDENCE_GROUPS;
+    }
+
+    /**
+     * The evidence group of a code: its declared group, or the code itself.
+     */
+    public static function evidenceGroupOf(string $code): string
+    {
+        static $index = null;
+        if ($index === null) {
+            $index = [];
+            foreach (self::EVIDENCE_GROUPS as $group => $codes) {
+                foreach ($codes as $member) {
+                    $index[$member] = $group;
+                }
+            }
+        }
+
+        return $index[$code] ?? $code;
+    }
+
+    /**
+     * The weight a score is computed from: per evidence group, the heaviest member's weight,
+     * summed over groups. A code outside every group (including `model_adjustment`, which may be
+     * negative) counts as its own group. Two disagreements with one code count once.
+     *
+     * @param  iterable<array-key, mixed>  $disagreements  `{code, weight}` entries
+     */
+    public static function effectiveWeight(iterable $disagreements): int
+    {
+        $byGroup = [];
+        foreach ($disagreements as $disagreement) {
+            if (! is_array($disagreement) || ! is_string($disagreement['code'] ?? null) || ! is_int($disagreement['weight'] ?? null)) {
+                continue;
+            }
+            $group = self::evidenceGroupOf($disagreement['code']);
+            $byGroup[$group] = isset($byGroup[$group]) ? max($byGroup[$group], $disagreement['weight']) : $disagreement['weight'];
+        }
+
+        return array_sum($byGroup);
+    }
+
+    /**
+     * Distinct evidence groups among disagreements with a positive weight.
+     *
+     * @param  iterable<array-key, mixed>  $disagreements
+     * @return list<string>
+     */
+    public static function groupsOf(iterable $disagreements): array
+    {
+        $groups = [];
+        foreach ($disagreements as $disagreement) {
+            if (is_array($disagreement) && is_string($disagreement['code'] ?? null) && ($disagreement['weight'] ?? 0) > 0) {
+                $groups[self::evidenceGroupOf($disagreement['code'])] = true;
+            }
+        }
+        $out = array_keys($groups);
+        sort($out);
+
+        return $out;
+    }
 
     /**
      * @return list<string>

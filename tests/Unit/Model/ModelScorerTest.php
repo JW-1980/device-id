@@ -161,8 +161,9 @@ final class ModelScorerTest extends TestCase
     public function the_model_never_moves_a_verdict_into_block_on_its_own_and_asks_for_review(): void
     {
         $scorer = $this->scorer(ModelScorer::MODE_BOUNDED);
-        // Weight 60 is score 78, challenge. The model wants +20, which would be 80, block.
-        $verdict = $this->verdict([['webdriver_missing', 25], ['ua_vs_ua_header', 20], ['lied_os', 15]]);
+        // Weight 60 is score 78, challenge. The model wants +20, which would be 80, block. Three
+        // independent evidence groups (lied_os would share claimed_identity with ua_vs_ua_header).
+        $verdict = $this->verdict([['webdriver_missing', 25], ['ua_vs_ua_header', 20], ['tz_intl_vs_date', 15]]);
         $this->assertSame(Verdict::BAND_CHALLENGE, $verdict->band);
 
         $opinion = $scorer->opinion($verdict, 5, 90);

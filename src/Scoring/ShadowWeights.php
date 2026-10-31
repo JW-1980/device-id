@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DeviceId\Scoring;
 
+use DeviceId\CheckRegistry;
 use DeviceId\Network\NetworkFacts;
 use DeviceId\Rules\EnvironmentConsistency;
 use DeviceId\Support\TransportIntegrityResult;
@@ -60,7 +61,7 @@ final class ShadowWeights
             }
         }
 
-        $shadowWeight = array_sum(array_column($disagreements, 'weight'));
+        $shadowWeight = CheckRegistry::effectiveWeight($disagreements);
         $shadowScore = $this->scorer->scoreFor($shadowWeight);
         $fired = array_column($disagreements, null, 'code');
         $liveFired = array_column($live->disagreements, null, 'code');

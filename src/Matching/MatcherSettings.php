@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace DeviceId\Matching;
 
 use DeviceId\Keys\DeviceComponents;
-use DeviceId\Rules\EnvironmentConsistency;
 use DeviceId\Support\Config;
 
 /**
@@ -30,6 +29,13 @@ use DeviceId\Support\Config;
 final class MatcherSettings
 {
     /**
+     * The ceiling of a matcher component weight. A matcher weight is a log-likelihood weight, not
+     * a scoring weight, so it is not tied to the scoring ceiling `EnvironmentConsistency::MAX_WEIGHT`
+     * (which was 60 when this clamp was introduced and is 45 now).
+     */
+    public const MAX_COMPONENT_WEIGHT = 60;
+
+    /**
      * The settings the engine runs with: `fingerprint.matcher` from {@see Config}, normalised.
      *
      * @return Normalised
@@ -45,7 +51,7 @@ final class MatcherSettings
      * The shipped weight table comes first and the overrides are laid over it, only for
      * components the table knows (round-2 BE2-14: a stored snapshot that REPLACED the table
      * made a component added in a later release weigh 0 on every deployment that had ever
-     * saved the screen). Every weight is clamped to 0..{@see EnvironmentConsistency::MAX_WEIGHT};
+     * saved the screen). Every weight is clamped to 0..{@see self::MAX_COMPONENT_WEIGHT};
      * every threshold to its range, falling back to the default when absent or not numeric.
      *
      * @param  array<array-key, mixed>  $configured  the `matcher` block (e.g. `config/security.php`)
@@ -58,12 +64,12 @@ final class MatcherSettings
         $weights = [];
         foreach (is_array($configured['weights'] ?? null) ? $configured['weights'] : [] as $component => $weight) {
             if (is_string($component) && is_numeric($weight)) {
-                $weights[$component] = max(0, min(EnvironmentConsistency::MAX_WEIGHT, (int) $weight));
+                $weights[$component] = max(0, min(self::MAX_COMPONENT_WEIGHT, (int) $weight));
             }
         }
         foreach (is_array($storedWeights) ? $storedWeights : [] as $component => $weight) {
             if (is_string($component) && is_numeric($weight) && array_key_exists($component, $weights)) {
-                $weights[$component] = max(0, min(EnvironmentConsistency::MAX_WEIGHT, (int) $weight));
+                $weights[$component] = max(0, min(self::MAX_COMPONENT_WEIGHT, (int) $weight));
             }
         }
 
