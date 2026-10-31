@@ -2,7 +2,7 @@
     "schema": "device-id.capture-dataset",
     "schema_version": 1,
     "id": "linux-container.linux.chromium.headless.default",
-    "captured_at": "2026-10-31T06:31:33.630Z",
+    "captured_at": "2026-10-31T06:57:05.659Z",
     "machine": {
         "id": "linux-container",
         "os": "linux",
@@ -30,14 +30,15 @@
         "envelope_version": 3,
         "probe_set": 4,
         "disabled_probes": [
-            "parallelism"
+            "parallelism",
+            "behavior"
         ]
     },
     "transport": {
         "claims_request_headers": [
             [
                 "Host",
-                "localhost:43239"
+                "localhost:37769"
             ],
             [
                 "Connection",
@@ -45,7 +46,7 @@
             ],
             [
                 "Content-Length",
-                "8255"
+                "8289"
             ],
             [
                 "sec-ch-ua-full-version-list",
@@ -113,7 +114,7 @@
             ],
             [
                 "Origin",
-                "http://localhost:43239"
+                "http://localhost:37769"
             ],
             [
                 "Sec-Fetch-Site",
@@ -129,7 +130,7 @@
             ],
             [
                 "Referer",
-                "http://localhost:43239/"
+                "http://localhost:37769/"
             ],
             [
                 "Accept-Encoding",
@@ -139,7 +140,7 @@
         "navigation_headers": [
             [
                 "Host",
-                "localhost:43239"
+                "localhost:37769"
             ],
             [
                 "Connection",
@@ -198,7 +199,11 @@
     "claims": {
         "tier1": {
             "integrity": {
-                "findings": [],
+                "findings": [
+                    {
+                        "code": "headless_shell_geometry"
+                    }
+                ],
                 "data": {
                     "wrongReceiver": {
                         "state": "ok",
@@ -365,7 +370,7 @@
                         }
                     }
                 },
-                "elapsedMs": 15.9
+                "elapsedMs": 18.6
             },
             "tier1": {
                 "dateParsing": {
@@ -596,7 +601,7 @@
                         }
                     }
                 },
-                "elapsedMs": 10.9
+                "elapsedMs": 17.4
             },
             "tier2": {
                 "workerScope": {
@@ -643,7 +648,7 @@
                         "gpuMathHash": "3ecaf193",
                         "gpuMathPrecision": "highp:23"
                     },
-                    "elapsedMs": 79.5
+                    "elapsedMs": 74.4
                 },
                 "textMetrics": {
                     "presentCount": 9,
@@ -932,118 +937,6 @@
                     "numberOfOutputs": 0
                 },
                 "audioOffline": 124.043477767,
-                "behavior": {
-                    "elapsedMs": 874.7,
-                    "pointer": {
-                        "moves": 0,
-                        "downs": 0,
-                        "ups": 0,
-                        "cancels": 0,
-                        "raw": 0,
-                        "types": [],
-                        "coalesced": {
-                            "count": 0
-                        },
-                        "coalescedMax": 0,
-                        "pressure": {
-                            "count": 0
-                        },
-                        "width": {
-                            "count": 0
-                        },
-                        "height": {
-                            "count": 0
-                        },
-                        "tiltX": {
-                            "count": 0
-                        },
-                        "tiltY": {
-                            "count": 0
-                        },
-                        "twist": {
-                            "count": 0
-                        },
-                        "path": 0,
-                        "speed": {
-                            "count": 0
-                        }
-                    },
-                    "touch": {
-                        "starts": 0,
-                        "moves": 0,
-                        "ends": 0,
-                        "force": {
-                            "count": 0
-                        },
-                        "radiusX": {
-                            "count": 0
-                        },
-                        "radiusY": {
-                            "count": 0
-                        },
-                        "altitude": {
-                            "count": 0
-                        },
-                        "azimuth": {
-                            "count": 0
-                        },
-                        "interval": {
-                            "count": 0
-                        }
-                    },
-                    "keyboard": {
-                        "down": 0,
-                        "up": 0,
-                        "repeat": 0,
-                        "codeCount": 0,
-                        "codesHash": "811c9dc5",
-                        "locationCount": 0,
-                        "dwell": {
-                            "count": 0
-                        },
-                        "flight": {
-                            "count": 0
-                        }
-                    },
-                    "wheel": {
-                        "count": 0,
-                        "modes": [],
-                        "deltaAbs": {
-                            "count": 0
-                        },
-                        "deltaY": {
-                            "count": 0
-                        },
-                        "deltaX": {
-                            "count": 0
-                        }
-                    },
-                    "motion": {
-                        "events": 1,
-                        "orientation": 1,
-                        "intervals": {
-                            "count": 0
-                        },
-                        "accel": {
-                            "count": 1,
-                            "mean": 0,
-                            "min": 0,
-                            "max": 0,
-                            "stddev": 0,
-                            "distinct": 0
-                        }
-                    },
-                    "events": {
-                        "copy": 0,
-                        "cut": 0,
-                        "paste": 0,
-                        "selection": 0,
-                        "scroll": 0,
-                        "focus": 0,
-                        "blur": 0,
-                        "visibility": 0
-                    }
-                },
                 "audioHardware": {
                     "sampleRate": 44100,
                     "maxChannelCount": 2

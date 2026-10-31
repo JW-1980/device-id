@@ -14,10 +14,13 @@
  *   --mode=...       headless | headed | both (default both). Headed needs a display; on Linux
  *                    without DISPLAY the harness re-runs itself under `xvfb-run` when that
  *                    exists, otherwise it falls back to headless and records that.
- *   --variants=...   honest,automation: for headed Chromium runs, `automation` keeps the
+ *   --variants=...   honest,automation,instrumented: for headed Chromium runs, `automation` keeps the
  *                    driver's default automation switches, `honest` suppresses them. Firefox and
- *                    WebKit have no suppressible switches: one headed run, labelled automation
- *                    (default both)
+ *                    WebKit have no suppressible switches: one headed run, labelled automation.
+ *                    `instrumented` adds a second HEADLESS run per Playwright browser whose driver
+ *                    exposes a binding to the page (page.exposeBinding), as most scraping scripts do;
+ *                    Playwright then leaves `__playwright__binding__` on window, the one driver global
+ *                    the collector's `automationMarks` probe exists to find (default honest,automation,instrumented)
  *   --out=dir        output directory (default tools/capture/out/<timestamp>)
  *   --machine=name   a label for this machine (default: a hash of hostname + hardware; the
  *                    hostname itself is never written)
@@ -51,7 +54,7 @@ const args = Object.fromEntries(
 const list = (value, fallback) => (value ? String(value).split(',').map((s) => s.trim()).filter(Boolean) : fallback);
 const wantedBrowsers = list(args.browsers, ['chromium', 'chrome', 'msedge', 'firefox', 'webkit', 'safari']);
 const mode = args.mode ?? 'both';
-const variants = list(args.variants, ['honest', 'automation']);
+const variants = list(args.variants, ['honest', 'automation', 'instrumented']);
 const timeoutMs = Number(args.timeout ?? 45000);
 if (!['headless', 'headed', 'both'].includes(mode)) {
     console.error(`--mode must be headless, headed or both (got ${mode})`);
@@ -127,10 +130,12 @@ function plan() {
                 out.push({ name, mode: 'headed', variant: 'default' });
             } else if (m === 'headless') {
                 out.push({ name, mode: 'headless', variant: 'default' });
+                if (variants.includes('instrumented')) out.push({ name, mode: 'headless', variant: 'instrumented' });
             } else {
                 // Only Chromium has switches that can be suppressed; Firefox and WebKit driven by
                 // Playwright always report an automated browser, so they have one headed variant.
-                const set = PW[name]?.type === 'chromium' ? variants : variants.includes('automation') ? ['automation'] : [];
+                const headed = variants.filter((v) => v !== 'instrumented');
+                const set = PW[name]?.type === 'chromium' ? headed : headed.includes('automation') ? ['automation'] : [];
                 for (const variant of set) out.push({ name, mode: 'headed', variant });
             }
         }
@@ -148,7 +153,9 @@ const PW = {
 
 /** Labels the dataset carries. `basis` says how the label was established. */
 function labelsFor(item) {
-    if (item.mode === 'headless') return { class: 'headless', basis: 'harness-declared: headless launch' };
+    if (item.mode === 'headless') {
+        return { class: 'headless', basis: item.variant === 'instrumented' ? 'harness-declared: headless launch, driver exposes a binding to the page' : 'harness-declared: headless launch' };
+    }
     if (item.name === 'safari') return { class: 'automation', basis: 'harness-declared: driven by safaridriver (navigator.webdriver cannot be hidden)' };
     if (item.variant === 'automation') return { class: 'automation', basis: 'harness-declared: headed, driver default automation switches' };
     return { class: 'honest', basis: 'harness-declared: headed, automation switches suppressed where the driver allows; still driven by Playwright' };
@@ -162,6 +169,7 @@ async function runPlaywright(item) {
     try {
         const context = await browser.newContext({ locale, ...(item.mode === 'headed' ? { viewport: null } : {}) });
         const page = await context.newPage();
+        if (item.variant === 'instrumented') await page.exposeBinding('reportToDriver', () => undefined);
         const version = browser.version();
         server.beginRun();
         await page.goto(`${server.origin}/`, { waitUntil: 'load' });

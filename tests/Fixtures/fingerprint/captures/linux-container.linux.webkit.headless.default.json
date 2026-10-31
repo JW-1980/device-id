@@ -2,7 +2,7 @@
     "schema": "device-id.capture-dataset",
     "schema_version": 1,
     "id": "linux-container.linux.webkit.headless.default",
-    "captured_at": "2026-10-31T06:32:18.419Z",
+    "captured_at": "2026-10-31T06:58:26.849Z",
     "machine": {
         "id": "linux-container",
         "os": "linux",
@@ -30,7 +30,8 @@
         "envelope_version": 3,
         "probe_set": 4,
         "disabled_probes": [
-            "parallelism"
+            "parallelism",
+            "behavior"
         ]
     },
     "transport": {
@@ -45,11 +46,11 @@
             ],
             [
                 "Referer",
-                "http://localhost:43239/"
+                "http://localhost:37769/"
             ],
             [
                 "Origin",
-                "http://localhost:43239"
+                "http://localhost:37769"
             ],
             [
                 "User-Agent",
@@ -73,7 +74,7 @@
             ],
             [
                 "Host",
-                "localhost:43239"
+                "localhost:37769"
             ],
             [
                 "Sec-Fetch-Dest",
@@ -119,7 +120,7 @@
             ],
             [
                 "Host",
-                "localhost:43239"
+                "localhost:37769"
             ],
             [
                 "Sec-Fetch-Dest",
@@ -305,7 +306,7 @@
                         }
                     }
                 },
-                "elapsedMs": 12
+                "elapsedMs": 16
             },
             "tier1": {
                 "dateParsing": {
@@ -484,7 +485,7 @@
                         }
                     }
                 },
-                "elapsedMs": 23
+                "elapsedMs": 17
             },
             "tier2": {
                 "workerScope": {
@@ -531,7 +532,7 @@
                         "gpuMathHash": null,
                         "gpuMathPrecision": null
                     },
-                    "elapsedMs": 464
+                    "elapsedMs": 457
                 },
                 "textMetrics": {
                     "presentCount": 11,
@@ -811,9 +812,6 @@
                     "numberOfOutputs": 0
                 },
                 "audioOffline": 124.043453745,
-                "behavior": {
-                    "state": "unavailable"
-                },
                 "audioHardware": {
                     "sampleRate": 44100,
                     "maxChannelCount": 0

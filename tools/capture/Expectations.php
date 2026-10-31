@@ -37,6 +37,7 @@ final class Expectations
         $class = (string) $record['labels']['class'];
         $browser = (string) $record['browser']['name'];
         $os = (string) $record['machine']['os'];
+        $variant = (string) ($record['browser']['variant'] ?? 'default');
 
         $allowed = array_fill_keys($rules['allowed'][$class] ?? [], true);
         foreach ($rules['environment_artefacts'] ?? [] as $artefact) {
@@ -68,7 +69,7 @@ final class Expectations
 
         $merged = $analysis['merged'];
         foreach ($rules['must_fire'] ?? [] as $assertion) {
-            if (! self::applies($assertion, $class, $browser, $os)) {
+            if (! self::applies($assertion, $class, $browser, $os, $variant)) {
                 continue;
             }
             if (array_intersect($assertion['any_of'], array_keys($merged['codes'])) === []) {
@@ -79,7 +80,7 @@ final class Expectations
             }
         }
         foreach ($rules['must_penalise'] ?? [] as $assertion) {
-            if (self::applies($assertion, $class, $browser, $os) && ! in_array($assertion['penalty'], $merged['confidence']['penalties'], true)) {
+            if (self::applies($assertion, $class, $browser, $os, $variant) && ! in_array($assertion['penalty'], $merged['confidence']['penalties'], true)) {
                 $failures[] = ['kind' => 'penalty_missing', 'code' => null, 'message' => sprintf(
                     'confidence penalty "%s" missing on a %s %s capture (%s); penalties: %s',
                     $assertion['penalty'], $class, $browser, $assertion['reason'], implode(', ', $merged['confidence']['penalties']) ?: 'none',
@@ -87,7 +88,7 @@ final class Expectations
             }
         }
         foreach ($rules['must_not_penalise'] ?? [] as $assertion) {
-            if (self::applies($assertion, $class, $browser, $os) && in_array($assertion['penalty'], $merged['confidence']['penalties'], true)) {
+            if (self::applies($assertion, $class, $browser, $os, $variant) && in_array($assertion['penalty'], $merged['confidence']['penalties'], true)) {
                 $failures[] = ['kind' => 'penalty_present', 'code' => null, 'message' => sprintf(
                     'confidence penalty "%s" on a %s %s capture (%s)', $assertion['penalty'], $class, $browser, $assertion['reason'],
                 )];
@@ -100,11 +101,12 @@ final class Expectations
     /**
      * @param  array<string, mixed>  $assertion
      */
-    private static function applies(array $assertion, string $class, string $browser, string $os): bool
+    private static function applies(array $assertion, string $class, string $browser, string $os, string $variant = 'default'): bool
     {
         return in_array($class, $assertion['class'], true)
             && in_array($browser, $assertion['browser'], true)
-            && (! isset($assertion['os']) || in_array($os, $assertion['os'], true));
+            && (! isset($assertion['os']) || in_array($os, $assertion['os'], true))
+            && (! isset($assertion['variant']) || in_array($variant, $assertion['variant'], true));
     }
 
     /**

@@ -811,6 +811,16 @@ export interface AutomationMarksValue {
 const AUTOMATION_NAME =
     /^\$?cdc_|^\$chrome_asyncScriptInfo$|^__playwright|^__pwInitScripts$|^__(?:webdriver|selenium|fxdriver|lastWatir)|^__driver(?:_|Unwrapped)|^(?:callPhantom|_phantom|domAutomation|domAutomationController|_Selenium_IDE_Recorder)$/i;
 
+/**
+ * The longest history a headless shell shows for the page it was just pointed at. Playwright and
+ * Puppeteer open a tab on `about:blank` and then navigate it, so a driven Chromium reports 2 (measured
+ * on Chromium 153, Firefox 155 and WebKit 26.6 under Playwright 1.63); only a freshly launched
+ * Gecko `-headless` reports 1. Requiring exactly 1 made the rule blind to the driver class it exists for.
+ * A person who reaches a page in a fullscreen window with this little history is rare and the rule
+ * is weight 8, never alone.
+ */
+export const HEADLESS_HISTORY_MAX = 2;
+
 /** The names `domBlockers` reports (`windowWebdriverEvaluate` etc.), not counted again here. */
 const COVERED_BY_DOM_BLOCKERS: ReadonlySet<string> = new Set(['__webdriver_evaluate', '__selenium_evaluate', '__nightmare']);
 
@@ -1256,7 +1266,8 @@ export function collectIntegrity(disabled: readonly string[] = []): IntegrityRep
         if (automationResult.value.globals > 0) {
             findings.push({ code: INTEGRITY_CODES.AUTOMATION_GLOBAL_PRESENT });
         }
-        if (automationResult.value.outerEqualsInner === true && automationResult.value.historyLength === 1) {
+        const history = automationResult.value.historyLength;
+        if (automationResult.value.outerEqualsInner === true && history !== null && history >= 1 && history <= HEADLESS_HISTORY_MAX) {
             findings.push({ code: INTEGRITY_CODES.HEADLESS_SHELL_GEOMETRY });
         }
     }

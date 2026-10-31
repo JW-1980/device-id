@@ -127,7 +127,78 @@ final class CaptureFixturesTest extends TestCase
         $answer = CaptureAnalysis::analyse(self::load('linux-container.linux.chromium.headless.default'))['merged'];
 
         $this->assertArrayHasKey('ua_headless_token', $answer['codes']);
-        $this->assertSame('challenge', $answer['band']);
+        // Four independent self-announcements (UA token, notification pair, shell geometry,
+        // navigator.webdriver) are a block together; no single one of them is (max 45).
+        $this->assertEqualsCanonicalizing(
+            ['ua_headless_token', 'notification_permission_vs_query', 'headless_shell_geometry', 'webdriver_true'],
+            array_keys($answer['codes']),
+        );
+        $this->assertSame('block', $answer['band']);
+    }
+
+    #[Test]
+    public function a_driven_headless_chromium_is_caught_by_its_shell_geometry_and_webdriver_without_the_token(): void
+    {
+        $record = self::load('linux-container.linux.chromium.headless.default');
+        /** @var array<string, mixed> $record */
+        $record = json_decode(str_replace('HeadlessChrome', 'Chrome', (string) json_encode($record)), true, 64, JSON_THROW_ON_ERROR);
+
+        $codes = array_keys(CaptureAnalysis::analyse($record)['merged']['codes']);
+
+        $this->assertContains('headless_shell_geometry', $codes);
+        $this->assertContains('webdriver_true', $codes);
+        $this->assertNotContains('ua_headless_token', $codes);
+    }
+
+    #[Test]
+    public function the_shell_geometry_rule_goes_blind_when_the_history_must_be_exactly_one(): void
+    {
+        // Negative control for the history fix: the captured driver tab has two entries.
+        $record = self::load('linux-container.linux.chromium.headless.default');
+        $marks = &$record['claims']['tier1']['integrity']['data']['automationMarks']['value'];
+        $this->assertSame(2, $marks['historyLength'], 'the real Playwright tab starts on about:blank');
+        $marks['historyLength'] = 3;
+        // The client's own finding list carries the code too (the server unites both).
+        foreach (['tier1', 'tier2'] as $slot) {
+            $record['claims'][$slot]['integrity']['findings'] = array_values(array_filter(
+                $record['claims'][$slot]['integrity']['findings'],
+                static fn (array $finding): bool => $finding['code'] !== 'headless_shell_geometry',
+            ));
+        }
+
+        $this->assertArrayNotHasKey('headless_shell_geometry', CaptureAnalysis::analyse($record)['merged']['codes']);
+    }
+
+    #[Test]
+    public function a_driver_that_exposes_a_binding_leaves_a_global_and_one_that_does_not_leaves_none(): void
+    {
+        foreach (['chromium', 'firefox', 'webkit'] as $browser) {
+            $instrumented = self::load("linux-container.linux.{$browser}.headless.instrumented");
+            $plain = self::load("linux-container.linux.{$browser}.headless.default");
+
+            $this->assertGreaterThan(0, $instrumented['claims']['tier1']['integrity']['data']['automationMarks']['value']['globals'], $browser);
+            $this->assertTrue($instrumented['claims']['tier1']['integrity']['data']['automationMarks']['value']['pw'], $browser);
+            $this->assertArrayHasKey('automation_global_present', CaptureAnalysis::analyse($instrumented)['merged']['codes'], $browser);
+
+            $this->assertSame(0, $plain['claims']['tier1']['integrity']['data']['automationMarks']['value']['globals'], $browser);
+            $this->assertArrayNotHasKey('automation_global_present', CaptureAnalysis::analyse($plain)['merged']['codes'], $browser);
+        }
+    }
+
+    #[Test]
+    public function headless_firefox_is_caught_by_its_virtual_screen_and_a_headed_one_is_not(): void
+    {
+        $headless = CaptureAnalysis::analyse(self::load('linux-container.linux.firefox.headless.default'))['merged'];
+        $headed = CaptureAnalysis::analyse(self::load('linux-container.linux.firefox.headed.automation'))['merged'];
+
+        $this->assertArrayHasKey('headless_gecko_screen', $headless['codes']);
+        $this->assertArrayNotHasKey('headless_gecko_screen', $headed['codes']);
+
+        // Negative control: an honest 1366x768 display with a panel is silent.
+        $record = self::load('linux-container.linux.firefox.headless.default');
+        $record['claims']['tier1']['tier1']['environment']['screen']['availHeight'] = 741;
+        $record['claims']['tier1']['tier1']['environment']['screen']['availTop'] = 27;
+        $this->assertArrayNotHasKey('headless_gecko_screen', CaptureAnalysis::analyse($record)['merged']['codes']);
     }
 
     #[Test]

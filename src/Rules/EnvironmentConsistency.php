@@ -180,6 +180,20 @@ final class EnvironmentConsistency
         // Outer size equals inner size and a one-entry history on a desktop browser that is not
         // WebKit: a headless shell. Weak on its own (kiosk modes exist), so it stays small.
         'headless_shell_geometry' => 8,
+        // `navigator.webdriver === true`: the browser itself says an automation protocol is attached
+        // (WebDriver, Marionette, CDP with `--enable-automation`). The WebDriver specification
+        // defines it as exactly that. Honest visitors essentially never carry it; the edge cases
+        // are managed enterprise test browsers and a developer with Safari's Remote Automation on.
+        // 20 alone scores 39 (pass, visible to an operator), and with the self-announced headless
+        // token it reaches challenge, never block on its own. It is the explicit rule for what
+        // the confidence score already penalised (`ConfidenceScorer`, reason `webdriver`).
+        'webdriver_true' => 20,
+        // Firefox's headless widget has a fixed 1366x768 screen with no panel (available area equal
+        // to the screen at the origin), so every headless Gecko (geckodriver, Marionette, Playwright's
+        // Firefox) reports exactly that on a Linux or macOS UA. Measured on Firefox 155, raw
+        // `-headless` and under Playwright 1.63. 10: a 1366x768 panel-less Linux desktop is the
+        // honest collision (Windows is excluded: an auto-hidden taskbar gives the same numbers).
+        'headless_gecko_screen' => 10,
         // Contract 2 integrity codes. The lie battery and the cross-realm toString are the
         // CreepJS `lies` module re-done without tables: a native function that is
         // constructible, owns a property other than length/name, or survives a cyclic
@@ -579,7 +593,41 @@ final class EnvironmentConsistency
                         return null;
                     }
 
-                    return 'The browser window has no chrome around its viewport and a one-entry history, the geometry of a headless shell.';
+                    return 'The browser window has no chrome around its viewport and a history of at most two entries, the geometry of a headless shell.';
+                },
+            ],
+            // The browser's own statement that an automation protocol is attached. Gecko's
+            // Marionette and WebKit's remote automation set it as well as Chromium's switches.
+            [
+                'code' => 'webdriver_true',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    return $this->value($c, 'tier1', 'environment', 'identity', 'webdriver') === true
+                        ? 'navigator.webdriver is true: the browser reports an attached automation protocol.'
+                        : null;
+                },
+            ],
+            // Headless Gecko has no tell in a header or a global (Playwright's Firefox, geckodriver and
+            // a bare `firefox -headless` are the same widget), but its fixed virtual screen is one.
+            [
+                'code' => 'headless_gecko_screen',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    if (! self::engineEvidence($c, $t)['gecko'] || self::claimsGeckoProtection($c)) {
+                        return null;
+                    }
+
+                    $ua = $this->value($c, 'tier1', 'environment', 'identity', 'userAgent');
+                    if (! is_string($ua) || ! in_array(self::uaOsFamily($ua), ['linux', 'macos'], true)) {
+                        return null;
+                    }
+
+                    $expected = ['width' => 1366, 'height' => 768, 'availWidth' => 1366, 'availHeight' => 768, 'availLeft' => 0, 'availTop' => 0];
+                    foreach ($expected as $field => $value) {
+                        if ($this->value($c, 'tier1', 'environment', 'screen', $field) !== $value) {
+                            return null;
+                        }
+                    }
+
+                    return 'The screen is the fixed 1366x768 panel-less screen of Firefox\'s headless widget.';
                 },
             ],
             // Contract 2 (notes/21 §2 items 5, 6, 11): the lie battery, the cross-realm

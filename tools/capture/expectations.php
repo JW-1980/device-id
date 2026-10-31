@@ -17,9 +17,12 @@ declare(strict_types=1);
  * - `must_fire` / `must_penalise`: detection that must keep working (a rule that stops
  *   catching headless Chromium is a regression, not a quiet improvement).
  *
- * Browsers whose headless mode the engine cannot tell apart from headed (Firefox, WebKit) have
- * no `must_fire` entry: that is the engine's measured limit, reported in the report as "no
- * headless signal", never turned into an assertion nobody can satisfy.
+ * `variant` narrows an assertion to one harness variant (`default`, `honest`, `automation`,
+ * `instrumented`). `instrumented` is a headless run whose driver exposes a binding to the page.
+ *
+ * WebKit's headless mode is still indistinguishable from headed (no `must_fire` entry): that is the
+ * engine's measured limit, reported as "no headless signal", never turned into an assertion nobody
+ * can satisfy. Headless Chromium and Firefox are caught (see `must_fire`).
  */
 $chromiumFamily = ['chromium', 'chrome', 'msedge'];
 
@@ -28,18 +31,24 @@ return [
 
     'max_band' => [
         'honest' => 'elevated',
-        'automation' => 'elevated',
+        // A driven headed browser is automation and now says so (`webdriver_true`, 20). `challenge`
+        // leaves room for the documented environment artefacts below to add to it, and still
+        // forbids `block` for a browser that merely has a driver attached and nothing else wrong.
+        'automation' => 'challenge',
     ],
 
     'allowed' => [
         'honest' => [],
-        'automation' => [],
-        // What a headless Chromium legitimately gives away.
+        // A headed browser under a driver's default switches reports navigator.webdriver = true.
+        'automation' => ['webdriver_true'],
+        // What a headless browser legitimately gives away.
         'headless' => [
             'ua_headless_token',
             'automation_global_present',
             'headless_shell_geometry',
+            'headless_gecko_screen',
             'notification_permission_vs_query',
+            'webdriver_true',
             'webdriver_missing',
         ],
     ],
@@ -60,6 +69,32 @@ return [
             'browser' => $chromiumFamily,
             'any_of' => ['ua_headless_token'],
             'reason' => 'headless Chromium announces itself as HeadlessChrome in the User-Agent',
+        ],
+        [
+            'class' => ['headless'],
+            'browser' => $chromiumFamily,
+            'variant' => ['default', 'instrumented'],
+            'any_of' => ['headless_shell_geometry'],
+            'reason' => 'a driven headless Chromium has outer = inner and a history of two (its tab starts on about:blank); measured on Chromium 153',
+        ],
+        [
+            'class' => ['headless'],
+            'browser' => ['firefox'],
+            'any_of' => ['headless_gecko_screen'],
+            'reason' => 'headless Firefox reports the fixed 1366x768 panel-less screen of its headless widget; measured on Firefox 155',
+        ],
+        [
+            'class' => ['headless'],
+            'browser' => ['chromium', 'chrome', 'msedge', 'firefox', 'webkit'],
+            'variant' => ['instrumented'],
+            'any_of' => ['automation_global_present'],
+            'reason' => 'Playwright defines __playwright__binding__ on window once the driver exposes a binding (page.exposeBinding)',
+        ],
+        [
+            'class' => ['automation', 'headless'],
+            'browser' => ['chromium', 'chrome', 'msedge', 'firefox', 'webkit', 'safari'],
+            'any_of' => ['webdriver_true'],
+            'reason' => 'every driven browser keeps navigator.webdriver = true unless the driver hides it',
         ],
     ],
 

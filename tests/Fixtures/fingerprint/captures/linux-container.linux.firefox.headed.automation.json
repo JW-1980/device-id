@@ -2,7 +2,7 @@
     "schema": "device-id.capture-dataset",
     "schema_version": 1,
     "id": "linux-container.linux.firefox.headed.automation",
-    "captured_at": "2026-10-31T06:32:16.706Z",
+    "captured_at": "2026-10-31T06:58:25.285Z",
     "machine": {
         "id": "linux-container",
         "os": "linux",
@@ -30,14 +30,15 @@
         "envelope_version": 3,
         "probe_set": 4,
         "disabled_probes": [
-            "parallelism"
+            "parallelism",
+            "behavior"
         ]
     },
     "transport": {
         "claims_request_headers": [
             [
                 "Host",
-                "localhost:43239"
+                "localhost:37769"
             ],
             [
                 "User-Agent",
@@ -65,7 +66,7 @@
             ],
             [
                 "Referer",
-                "http://localhost:43239/"
+                "http://localhost:37769/"
             ],
             [
                 "Content-Length",
@@ -73,7 +74,7 @@
             ],
             [
                 "Origin",
-                "http://localhost:43239"
+                "http://localhost:37769"
             ],
             [
                 "Connection",
@@ -99,7 +100,7 @@
         "navigation_headers": [
             [
                 "Host",
-                "localhost:43239"
+                "localhost:37769"
             ],
             [
                 "User-Agent",
@@ -317,7 +318,7 @@
                         }
                     }
                 },
-                "elapsedMs": 10
+                "elapsedMs": 26
             },
             "tier1": {
                 "dateParsing": {
@@ -491,7 +492,7 @@
                         }
                     }
                 },
-                "elapsedMs": 15
+                "elapsedMs": 17
             },
             "tier2": {
                 "workerScope": {
@@ -538,7 +539,7 @@
                         "gpuMathHash": "0a1f3839",
                         "gpuMathPrecision": "highp:23"
                     },
-                    "elapsedMs": 199
+                    "elapsedMs": 185
                 },
                 "textMetrics": {
                     "presentCount": 11,
@@ -813,9 +814,6 @@
                     "numberOfOutputs": 0
                 },
                 "audioOffline": 35.749972094,
-                "behavior": {
-                    "state": "unavailable"
-                },
                 "audioHardware": {
                     "sampleRate": 44100,
                     "maxChannelCount": 0

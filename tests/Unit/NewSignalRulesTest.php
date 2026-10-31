@@ -117,12 +117,97 @@ final class NewSignalRulesTest extends TestCase
     #[Test]
     public function a_windowed_browser_or_a_longer_history_is_not_a_headless_shell(): void
     {
-        foreach ([['outerEqualsInner' => false, 'historyLength' => 1], ['outerEqualsInner' => true, 'historyLength' => 4], ['outerEqualsInner' => null, 'historyLength' => 1]] as $shape) {
+        foreach ([['outerEqualsInner' => false, 'historyLength' => 1], ['outerEqualsInner' => true, 'historyLength' => 3], ['outerEqualsInner' => true, 'historyLength' => 4], ['outerEqualsInner' => true, 'historyLength' => 0], ['outerEqualsInner' => null, 'historyLength' => 1]] as $shape) {
             $claims = self::claims(['automationMarks' => ['state' => 'ok', 'value' => ['globals' => 0, 'cdc' => false, 'pw' => false] + $shape]]);
 
             $this->assertArrayNotHasKey('headless_shell_geometry', self::fired($claims), json_encode($shape, JSON_THROW_ON_ERROR));
         }
         $this->assertSame(8, EnvironmentConsistency::weights()['headless_shell_geometry']);
+    }
+
+    #[Test]
+    public function a_driven_headless_shell_whose_tab_started_on_about_blank_still_fires(): void
+    {
+        // Playwright and Puppeteer open `about:blank` and navigate: history.length is 2, measured
+        // on headless Chromium 153 under Playwright 1.63. Requiring exactly 1 missed that class.
+        foreach ([1, 2] as $history) {
+            $claims = self::claims(['automationMarks' => ['state' => 'ok', 'value' => ['globals' => 0, 'cdc' => false, 'pw' => false, 'outerEqualsInner' => true, 'historyLength' => $history]]]);
+
+            $this->assertArrayHasKey('headless_shell_geometry', self::fired($claims), 'history '.$history);
+        }
+    }
+
+    // ---------------------------------------------------------------- navigator.webdriver
+
+    #[Test]
+    public function navigator_webdriver_true_fires_and_an_ordinary_browser_is_silent(): void
+    {
+        $this->assertArrayHasKey('webdriver_true', self::fired(self::claims([], ['webdriver' => true])));
+
+        foreach ([false, null, 'true', 1] as $value) {
+            $this->assertArrayNotHasKey('webdriver_true', self::fired(self::claims([], ['webdriver' => $value])), var_export($value, true));
+        }
+        $this->assertArrayNotHasKey('webdriver_true', self::fired(self::claims()), 'an absent claim is no evidence');
+
+        $weight = EnvironmentConsistency::weights()['webdriver_true'];
+        $this->assertLessThanOrEqual(30, $weight);
+        $this->assertSame($weight, CheckRegistry::describe()['webdriver_true']['default_weight']);
+    }
+
+    #[Test]
+    public function navigator_webdriver_alone_never_reaches_a_band_above_pass_and_with_a_headless_token_never_blocks(): void
+    {
+        // 20 alone is score 39: visible to an operator, below `elevated` (40).
+        $this->assertSame(39, (int) round(100 * (1 - exp(-EnvironmentConsistency::weights()['webdriver_true'] / 40))));
+        $this->assertLessThan(EnvironmentConsistency::MAX_WEIGHT, EnvironmentConsistency::weights()['webdriver_true']);
+    }
+
+    // ---------------------------------------------------------------- headless Gecko
+
+    private const FIREFOX_LINUX = 'Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0';
+
+    /**
+     * @param  array<string, int>  $screen
+     * @return array<string, mixed>
+     */
+    private static function geckoClaims(array $screen, string $userAgent = self::FIREFOX_LINUX, bool $rfp = false): array
+    {
+        $claims = self::claims(
+            $rfp ? ['resistance' => ['state' => 'ok', 'value' => ['rfp' => true]]] : [],
+            ['webdriver' => false],
+            ['engine' => 'spidermonkey', 'errorOwnProps' => 'columnNumber,fileName,lineNumber,message', 'stackShape' => 'at-sign', 'internalError' => true],
+            $userAgent,
+        );
+        $claims['tier1']['environment']['value']['screen'] = $screen;
+        $claims['tier1']['environment']['value']['identity']['platform'] = str_contains($userAgent, 'Macintosh') ? 'MacIntel' : 'Linux x86_64';
+
+        return $claims;
+    }
+
+    private const HEADLESS_GECKO_SCREEN = ['width' => 1366, 'height' => 768, 'availWidth' => 1366, 'availHeight' => 768, 'availLeft' => 0, 'availTop' => 0];
+
+    #[Test]
+    public function headless_gecko_fires_on_the_fixed_virtual_screen_and_stays_silent_for_every_honest_shape(): void
+    {
+        $this->assertArrayHasKey('headless_gecko_screen', self::fired(self::geckoClaims(self::HEADLESS_GECKO_SCREEN)));
+
+        $silent = [
+            'a headed Firefox on a full HD display' => self::geckoClaims(['width' => 1920, 'height' => 1080, 'availWidth' => 1920, 'availHeight' => 1080, 'availLeft' => 0, 'availTop' => 0]),
+            'a 1366x768 laptop with a panel' => self::geckoClaims(['availHeight' => 741, 'availTop' => 27] + self::HEADLESS_GECKO_SCREEN),
+            'a 1366x768 laptop with a docked panel on the left' => self::geckoClaims(['availWidth' => 1300, 'availLeft' => 66] + self::HEADLESS_GECKO_SCREEN),
+            'Windows with an auto-hidden taskbar has the same numbers' => self::geckoClaims(self::HEADLESS_GECKO_SCREEN, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0'),
+            'resistFingerprinting spoofs the screen' => self::geckoClaims(self::HEADLESS_GECKO_SCREEN, self::FIREFOX_LINUX, true),
+            'a missing avail origin is no evidence' => self::geckoClaims(['width' => 1366, 'height' => 768, 'availWidth' => 1366, 'availHeight' => 768]),
+        ];
+        foreach ($silent as $name => $claims) {
+            $this->assertArrayNotHasKey('headless_gecko_screen', self::fired($claims), $name);
+        }
+
+        // The same numbers in a Chromium are not Firefox's headless widget.
+        $chromium = self::claims();
+        $chromium['tier1']['environment']['value']['screen'] = self::HEADLESS_GECKO_SCREEN;
+        $this->assertArrayNotHasKey('headless_gecko_screen', self::fired($chromium));
+        $this->assertSame(10, EnvironmentConsistency::weights()['headless_gecko_screen']);
     }
 
     // ---------------------------------------------------------------- canvas pattern
@@ -237,7 +322,7 @@ final class NewSignalRulesTest extends TestCase
     #[Test]
     public function the_new_rules_are_registered_and_no_single_check_can_block(): void
     {
-        $new = ['automation_global_present' => 30, 'headless_shell_geometry' => 8, 'canvas_pattern_perturbed' => 4, 'device_memory_vs_ch' => 15, 'ch_bitness_vs_js' => 15, 'ch_model_vs_js' => 15, 'dpr_vs_ch' => 8, 'viewport_vs_ch' => 6, 'lie_battery_privacy_tool' => 15];
+        $new = ['automation_global_present' => 30, 'headless_shell_geometry' => 8, 'canvas_pattern_perturbed' => 4, 'device_memory_vs_ch' => 15, 'ch_bitness_vs_js' => 15, 'ch_model_vs_js' => 15, 'dpr_vs_ch' => 8, 'viewport_vs_ch' => 6, 'lie_battery_privacy_tool' => 15, 'webdriver_true' => 20, 'headless_gecko_screen' => 10];
         foreach ($new as $code => $weight) {
             $this->assertSame($weight, EnvironmentConsistency::weights()[$code], $code);
             $this->assertSame($weight, CheckRegistry::describe()[$code]['default_weight'], $code);

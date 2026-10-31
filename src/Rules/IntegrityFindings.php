@@ -125,6 +125,9 @@ final class IntegrityFindings
     private const MATH_EPSILON = 1e-15;
 
     /** integrity.ts `domBlockers` globals that only an automation driver injects. */
+    /** The longest history a driven headless shell shows (its tab starts on `about:blank`); see `HEADLESS_HISTORY_MAX` in integrity.ts. */
+    private const HEADLESS_HISTORY_MAX = 2;
+
     private const AUTOMATION_GLOBALS = ['windowWebdriverEvaluate', 'windowSeleniumEvaluate', 'windowNightmare'];
 
     /**
@@ -429,7 +432,7 @@ final class IntegrityFindings
 
     /**
      * `collectIntegrity`: `automationMarks.globals > 0`, and `outerEqualsInner === true` with
-     * `historyLength === 1`. The server rule adds the operating-system and engine gates.
+     * a `historyLength` of 1 or 2 (a driver's tab starts on `about:blank`). The server rule adds the operating-system and engine gates.
      *
      * @param  array<array-key, mixed>  $claims
      * @param  array<string, true>  $found
@@ -446,7 +449,8 @@ final class IntegrityFindings
             $found['automation_global_present'] = true;
         }
 
-        if (($marks['outerEqualsInner'] ?? null) === true && ($marks['historyLength'] ?? null) === 1) {
+        $history = $marks['historyLength'] ?? null;
+        if (($marks['outerEqualsInner'] ?? null) === true && self::isNumber($history) && $history >= 1 && $history <= self::HEADLESS_HISTORY_MAX) {
             $found['headless_shell_geometry'] = true;
         }
     }

@@ -192,6 +192,24 @@ describe('automationMarks', () => {
         expect((automationMarks() as { value: { outerEqualsInner: unknown } }).value.outerEqualsInner).toBeNull();
     });
 
+    it('raises headless_shell_geometry for a driven tab (history 2) and not for a long history', () => {
+        defineOwn(window, 'matchMedia', vi.fn((query: string) => ({ matches: query.includes('display-mode') })));
+        defineOwn(window, 'innerWidth', 1280);
+        defineOwn(window, 'innerHeight', 720);
+        defineOwn(window, 'outerWidth', 1280);
+        defineOwn(window, 'outerHeight', 720);
+        const codes = () => collectIntegrity().findings.map((f) => f.code);
+
+        for (const length of [1, 2]) {
+            defineOwn(history, 'length', length);
+            expect(codes(), `history ${length}`).toContain(INTEGRITY_CODES.HEADLESS_SHELL_GEOMETRY);
+        }
+        for (const length of [3, 12]) {
+            defineOwn(history, 'length', length);
+            expect(codes(), `history ${length}`).not.toContain(INTEGRITY_CODES.HEADLESS_SHELL_GEOMETRY);
+        }
+    });
+
     it('has no geometry verdict where matchMedia is missing, and is skipped by the policy', () => {
         defineOwn(window, '__playwright__binding__', 1);
         const report = collectIntegrity(['automationMarks']);
