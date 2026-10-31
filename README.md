@@ -465,3 +465,75 @@ here — see "How the Laravel application depends on it" above.
 `CheckRegistry` is also where the admin panel's per-check toggles come from: the application
 renders them from `describe()` and writes them to the same `constraint_weights` the engine reads
 through the resolver.
+
+## Machine learning (`src/Model/`, `src/Scoring/ModelScorer.php`, `src/Matching/`, `src/Detectors/`, `src/Reputation/`, `tools/ml/`)
+
+Everything here is plain PHP 8.2: no extension, no Python, no network, no GPU. Training runs on the application's own server. The rules stay the decision-maker; the model is a bounded second opinion, and every part falls back to the rules when it is missing.
+
+### What the model is
+
+A calibrated logistic regression over **rule hits and facts the client did not type**: one indicator per `CheckRegistry` code, the number of distinct rule families, integrity findings, coverage, untrusted components, omitted probes, a protected-privacy-mode flag, and optional soft IP-reputation flags. **Never** the User-Agent or any token of it, brands, claimed OS, a declared crawler, an IP, an id or a device key (`FeatureCatalogue::EXCLUDED`; a test pins it). A silenced (weight 0) rule is silent to the model too.
+
+The model is a sealed JSON file (`ModelSpec`, schema 1, sha256 over the content). The package ships none; the host points `fingerprint.model.path` at one. Any file problem is a state, never an exception: `absent`, `stale` (older than `fingerprint.model.max_age_days`, default 45), `incompatible` (wrong schema or a feature this engine cannot produce), `corrupt` (hash mismatch, a tampered model is never evaluated), `error`. In every state the rules decide.
+
+### Modes (`fingerprint.model.mode`)
+
+| mode | effect |
+|---|---|
+| `off` (default) | nothing computed |
+| `shadow` | the opinion is computed and returned for logging (`ModelOpinion::toArray()`), the verdict is untouched |
+| `advise` | as shadow; the host shows the opinion and its top contributions beside the rule list |
+| `bounded` | the opinion becomes ONE disagreement, `model_adjustment`, inside the verdict |
+
+`bounded` is limited by construction (each bound has a test): the score still reconstructs from `Verdict::totalWeight()`; the weight is capped at `fingerprint.model.max_adjustment_weight` (20, never above 60); a positive adjustment needs rule hits in at least 2 distinct families; a visitor with no contradiction is never touched; the model never moves a verdict into `block` that the rules had not reached (the adjustment is reduced and `ModelOpinion::$suggestsReview` is set so the host can open a 48-hour human-reviewed hold); a negative adjustment can never take a verdict below `elevated` while transport evidence is present; allowed traffic (verified crawler, monitor, operator list) is never adjusted; `fingerprint.model.allow_deescalation` can forbid negative adjustments.
+
+### The API a host calls
+
+```php
+$scorer  = ModelScorer::fromConfig($verdictScorer);            // reads fingerprint.model.*
+$scored  = ...;                                                  // the host's existing ScoredClaims
+[$verdict, $opinion] = $scorer->score($scored, $reputation?->features() ?? []);
+// store $opinion->toArray() with the observation; act on $verdict as before
+```
+
+### Training on the server
+
+```
+php tools/ml/train.php --rows=training-rows.jsonl --out=storage/fingerprint/models/verdict.json
+```
+
+`training-rows.jsonl` is one `TrainingRowBuilder::build()` result per line (de-identified: features, label, a KEYED group hash, an ISO week, bucketed context, `retention_days` and `expires_on`, no IP, no User-Agent, no id; `assertDeidentified()` enforces it). The trainer splits **by group, never by row** (a machine or evasion recipe is held out whole), fits L2 logistic regression by Newton's method (a rule-hit coefficient may not be negative), calibrates on the held-out side (Platt), measures, and writes the sealed model plus a report with the learned-versus-shipped weight proposal and bootstrap intervals. The calibration is to the training prevalence unless `--assumed-prevalence` is given. With no `--rows` it trains on the committed harness dataset.
+
+### Evaluation
+
+```
+php tools/ml/evaluate.php --model=verdict.json --fail-on-slice-regression
+```
+
+Offline. Reports, for the rules alone and the model on the same held-out rows, overall and per slice (engine, mobile/desktop, privacy mode, label class): recall and false-positive rate at the shipped challenge band, precision and recall at fixed false-positive rates (1 %, 0.5 %, 0.1 %, flagged `resolution-limited` when there are fewer honest rows than 1/target), AUC, and calibration (ECE with the reliability bins). A rate with no honest rows in the slice is `n/a`, never 0. `--fail-on-slice-regression` exits 1 when the model's false-positive rate exceeds the rules' on any slice.
+
+Harness data: `npm run ml:variants` runs the real collector in Playwright browsers over honest context variants and spoof recipes (user agent and navigator patches, WebGL, screen, time zone, canvas noise, a stealth bundle, device emulation) written as plain init scripts; `php tools/ml/make-dataset.php` turns the runs into dataset records (`tests/Fixtures/ml/dataset`). Its honest class is scripted browsers on one machine, not people, and it has no honest WebKit, mobile or privacy-mode rows.
+
+### Promotion criteria (all required, on held-out rows the model never trained on)
+
+1. At the rules' false-positive rate the model's recall is at least 10 points higher and its false-positive rate is not higher.
+2. On every slice (Chromium, Gecko, WebKit, protected modes, mobile) the model's false-positive rate is not higher than the rules'.
+3. ECE of at most 0.05 per slice.
+4. At least 1,000 labelled honest rows per slice and at least 200 non-honest rows from at least two label sources.
+5. Two consecutive retrains agree on the sign of every coefficient.
+6. A person has read the top 20 coefficients and none is a self-reported or privacy-protective feature with a positive weight.
+
+Until then keep `shadow` or `advise`. A model blocks nothing on its own.
+
+### Learned matcher (Fellegi-Sunter)
+
+`DeviceMatcher::comparisons()` is the one place the component comparison rules live. `tools/ml/fit-matcher.php --pairs=pairs.jsonl` estimates `m` and `u` by EM (labelled where the host knows, unlabelled otherwise) into asymmetric agree/disagree weights in bits (`LearnedWeights`, loaded through a `MatcherWeightsSource`). `fingerprint.matcher_learned.mode` is `off`, `shadow` (the learned posterior is returned on `MatchResult::$shadowPosterior`, the decision is the hand matcher's) or `active`, which is honoured only when every slice has 1,000 pairs; otherwise it runs as `shadow`.
+
+Hand defaults from the 2026-10-31 literature survey, always on (`MatcherPolicy`, `fingerprint.matcher_policy`): `gpuCaps` (static) weighs more than `gpuMath` (an output hash) when the host did not configure it; `gpuMath`, `keyboard`, `gpuCaps` never veto; a mobile (touch) or WebKit match needs a posterior of 0.9 to link (`mobile_webkit_link_posterior`), below that it is `possible` with veto `stricter_threshold`; keyboard layout is not counted on top of an agreeing voice set (`keyboard_independent_of_language` switches that off).
+
+### Detectors, reputation and the rest
+
+* `RingDetectors` are pure functions over aggregates the host computes with its own SQL (accounts per device key, devices per account, bursts per network), with a k-floor of 20: a key shared by 20 or more accounts is a device class, not a ring, and a burst is not judged against a baseline of fewer than 20 observations. They produce `ReviewItem`s for a review queue (`ReviewSink`); they enforce nothing. An anomaly model is deliberately **not built**: `AnomalyModel` is an interface and its docblock records the evidence that would justify one.
+* `IpReputation` loads free feeds through the crawler `RangeFetcher`/`CrawlerCache` interfaces. The licence finding for each feed is in `FeedCatalogue` (dated 2026-10-31): Spamhaus DROP is free with credit; AWS, Google Cloud, Oracle, DigitalOcean and the Tor exit list publish no licence text and are loaded only when the host accepts them by key (`$acceptUnverified`); FireHOL level1 is excluded because it contains DShield data (NonCommercial). A list older than 7 days is ignored, never read as clean; a failed fetch keeps the last good list. The result carries no score or band: it is a soft model feature and a rule input, and an address alone never blocks.
+* Retention of training rows is metadata on the row (`retention_days`, default 365); the host's job deletes at `expires_on`.
+
