@@ -43,7 +43,15 @@ final class TrafficGate
 
     public function classify(string $ip, ?string $userAgent, ?string $deviceKey = null): TrafficClassification
     {
-        $verification = $this->safeLookup($ip, $userAgent);
+        return $this->classifyWith($this->safeLookup($ip, $userAgent), $ip, $userAgent, $deviceKey);
+    }
+
+    /**
+     * As `classify()`, for a host that already resolved the crawler verification (to apply its own
+     * mode switch or queue) and must not read the cache a second time.
+     */
+    public function classifyWith(CrawlerVerification $verification, string $ip, ?string $userAgent, ?string $deviceKey = null): TrafficClassification
+    {
 
         $entry = $this->allowlist->matchIp($ip);
         if ($entry !== null) {
