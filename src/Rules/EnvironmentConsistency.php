@@ -370,6 +370,9 @@ final class EnvironmentConsistency
         // test `a_soft_transport_finding_is_scored_too_but_far_lower` caught that.
         'transport_sec_ch_full_version_mismatch' => 45,
         'transport_default' => 45,
+        // A User-Agent claiming a search crawler that DNS or the vendor's published list contradicts.
+        // 45 like every heaviest single check: challenge (68), never block on its own.
+        'transport_crawler_impersonation' => 45,
         'transport_soft_default' => 6,
     ];
 

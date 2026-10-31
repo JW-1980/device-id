@@ -88,6 +88,7 @@ final class CheckRegistry
         'transport_temporal_ja4_changed_without_ua_change' => [25, 'transport', 'The ClientHello changed between observations while the reported browser did not.'],
         'transport_sec_ch_full_version_mismatch' => [45, 'transport', 'The full version list contradicts the reported User-Agent.'],
         'transport_default' => [45, 'transport', 'A hard transport finding with no more specific rule.'],
+        'transport_crawler_impersonation' => [45, 'transport', 'The User-Agent claims a search crawler (Googlebot, Bingbot, ...) and reverse DNS or the vendor\'s published IP list contradicts it.'],
         'transport_soft_default' => [6, 'transport', 'A soft transport finding with no more specific rule.'],
         'engine_vs_ch_header' => [30, 'transport', 'The browser sent a Sec-CH-UA header (only Chromium does) while the JavaScript engine is not V8.'],
 

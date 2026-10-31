@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NutriCompare\Fingerprint\Support;
 
+use NutriCompare\Fingerprint\Crawlers\CrawlerVerification;
 use NutriCompare\Fingerprint\Transport\Ja4;
 use NutriCompare\Fingerprint\Transport\RawHeaderCapture;
 use NutriCompare\Fingerprint\Transport\TransportIntegrity;
@@ -48,5 +49,11 @@ final class TransportRequestFacts
          * (round-2 WS2-1).
          */
         public readonly bool $headersAreClientFrame = false,
+        /**
+         * The crawler verification for this request, when the host resolved one. A `forged` result
+         * (the User-Agent claims a crawler and DNS or the vendor's list contradicts it) becomes the
+         * `crawler_impersonation` finding. Null, pending and unverifiable add nothing.
+         */
+        public readonly ?CrawlerVerification $crawler = null,
     ) {}
 }

@@ -108,6 +108,58 @@ never counts against a link); none of the three is part of `browser_key` or `har
 (`hardware_key` stays `os|arch|touch`), and none counts towards coverage. Give `gpuCaps` and
 `codecsHw` a weight only after a three-engine capture on one real machine shows they agree.
 
+## Verified crawlers, uptime monitors and the operator allowlist (`src/Crawlers/`)
+
+Googlebot and the other search crawlers must never be challenged or blocked by fingerprinting or
+bot defences, and neither must the operator's uptime monitors. `TrafficGate::classify($ip, $userAgent, $deviceKey)`
+gives a host one answer, from caches only (no DNS, no HTTP on the request path):
+
+| `decision` | Meaning |
+|---|---|
+| `ALLOW_LISTED` | the operator allowlist matched (IP/CIDR or device key) |
+| `ALLOW_VERIFIED_CRAWLER` | the User-Agent claims a known crawler and reverse DNS + forward confirm (or the vendor's published list) proves it |
+| `ALLOW_VERIFIED_MONITOR` | an uptime monitor the host enabled, and the address is in that provider's published list |
+| `SCORE` | score it normally |
+
+`$classification->applyTo($verdict, keepAnalysis: false)` returns the engine `Verdict` with `allowance` set and
+band `pass` (so a host that reads only the band skips challenge and block); `Verdict::decision()` returns the
+marker or `SCORE`. A crawler has no fingerprint: `fingerprintExpected()` is false for it.
+
+**The host supplies three small interfaces**: `DnsResolver` (`NativeDnsResolver` is the pure-PHP default;
+`gethostbyaddr`/`dns_get_record` use the system resolver with no timeout, so call from a worker or after the
+response), `CrawlerCache` (`ArrayCache` for tests) and `RangeFetcher` (HTTPS, no redirects, size cap, SSRF
+screening are the host's job). Pending claims are resolved in the background with
+`CrawlerVerifier::verifyAndCache()`; `claimResolution()` makes one caller per address dispatch it.
+
+**Fail closed.** No PTR, a DNS exception, an empty forward set, an unreadable list or a dead cache all yield
+`unverifiable`/`pending`, never `verified`. `forged` means DNS or a list that was read contradicts the claim.
+Suffix matching is on label boundaries (`evil-googlebot.com` and `googlebot.com.evil.net` do not match).
+`googleusercontent.com` is deliberately not a Google suffix (every Compute Engine VM has a forward-confirming
+PTR there); Google's user-triggered fetchers are covered by its published JSON ranges.
+
+**Catalogue** (`CrawlerCatalogue::default()`, extend with `->with(new CrawlerDefinition(...))` or `fromArray()`):
+Google (all families: Googlebot, Google-InspectionTool, GoogleOther, Storebot-Google, AdsBot-Google,
+Mediapartners-Google, APIs-Google ...), Bingbot, Applebot, DuckDuckBot (recognised, no published method:
+config-only), YandexBot, Baiduspider, OpenAI, Anthropic and Perplexity (published lists). Sources are in the
+`CrawlerCatalogue` docblock.
+
+**Uptime monitors** are provable ONLY by the provider's published IP list; a User-Agent never suffices. The
+host enables monitors by key (default none): UptimeRobot, Pingdom, Better Stack, StatusCake, Oh Dear, Checkly,
+Datadog Synthetics, HetrixTools have official lists; Site24x7 and Freshping are config-only (no official
+machine-readable list found: enter their CIDRs in the allowlist). Lists are cached; a failed refresh keeps the
+last good list for up to 30 days, and with no list the answer is "not listed". A monitor User-Agent from an
+unlisted address is never an impersonation signal (monitors change addresses); it is returned in
+`unlistedMonitorClaim` for logging. Refresh with `TrafficGate::refreshMonitorLists()` after the response or
+from a scheduler.
+
+**Operator allowlist**: `new OperatorAllowlist($ips, $deviceKeys)` (IPv4/IPv6 addresses and CIDRs). Invalid
+entries never match and are listed in `invalidEntries()`; a `/0` is refused. Device keys are recognition handles,
+not credentials: prefer IPs.
+
+**Impersonation**: a User-Agent claiming a crawler that DNS or the vendor's list contradicts is the hard
+transport finding `crawler_impersonation` (`TransportRequestFacts(crawler: $verification)`), weight
+`transport_crawler_impersonation` = 45: score 68, `challenge`, never `block` on its own.
+
 ## Browser collector
 
 One collector runs in the visitor's browser, shipped as TypeScript sources under

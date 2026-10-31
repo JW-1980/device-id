@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NutriCompare\Fingerprint\Transport;
 
+use NutriCompare\Fingerprint\Crawlers\TrafficClassification;
 use NutriCompare\Fingerprint\Rules\EnvironmentConsistency;
 use NutriCompare\Fingerprint\Support\TransportFinding;
 use NutriCompare\Fingerprint\Support\TransportIntegrityResult;
@@ -239,6 +240,16 @@ final class TransportIntegrity
         $versionMismatch = $this->checkFullVersionList($get('sec-ch-ua-full-version-list'), $get('user-agent'));
         if ($versionMismatch !== null) {
             $findings[] = $versionMismatch;
+        }
+
+        // A User-Agent that claims a search crawler whose identity the vendor's DNS or published
+        // list contradicts. Hard: it is a statement the request cannot make honestly. It scores 45
+        // (challenge, never block) like every other single check.
+        $impersonation = $facts->crawler === null
+            ? null
+            : TrafficClassification::impersonationFindingFor($facts->crawler);
+        if ($impersonation !== null) {
+            $findings[] = $impersonation;
         }
 
         // ---------------------------------------------------------------- soft

@@ -34,6 +34,18 @@ final readonly class Verdict
     public const BAND_BLOCK = 'block';
 
     /**
+     * The traffic decision, one answer for a host (see `TrafficGate`). An allowed request is
+     * never challenged or blocked, whatever its fingerprint says.
+     */
+    public const ALLOW_VERIFIED_CRAWLER = 'ALLOW_VERIFIED_CRAWLER';
+
+    public const ALLOW_VERIFIED_MONITOR = 'ALLOW_VERIFIED_MONITOR';
+
+    public const ALLOW_LISTED = 'ALLOW_LISTED';
+
+    public const DECISION_SCORE = 'SCORE';
+
+    /**
      * @param  list<array{code: string, detail: string, weight: int}>  $disagreements
      * @param  list<string>  $reasons  stable codes, sorted
      * @param  Confidence|null  $confidence  how much of the measurement surface
@@ -49,6 +61,8 @@ final readonly class Verdict
         public ?string $deviceKey = null,
         public int $saltVersion = 0,
         public ?Confidence $confidence = null,
+        /** One of the `ALLOW_*` markers when the traffic is allowed, else null. */
+        public ?string $allowance = null,
     ) {}
 
     /**
@@ -78,6 +92,38 @@ final readonly class Verdict
     public static function nothingCollected(): self
     {
         return new self(self::BAND_PASS, 0, [], [], null, 0);
+    }
+
+    /**
+     * This verdict marked as allowed traffic: the band is `pass`, so a host that only reads the
+     * band skips challenge and block. Without `$keepAnalysis` the score, reasons and disagreements
+     * are cleared (a crawler is not expected to have a fingerprint, so there is nothing to explain);
+     * with it they are kept for analysis only, and the score still reconstructs from the
+     * disagreements even though the band no longer follows from it.
+     */
+    public function withAllowance(string $allowance, bool $keepAnalysis = false): self
+    {
+        return new self(
+            self::BAND_PASS,
+            $keepAnalysis ? $this->score : 0,
+            $keepAnalysis ? $this->reasons : [],
+            $keepAnalysis ? $this->disagreements : [],
+            $this->deviceKey,
+            $this->saltVersion,
+            $this->confidence,
+            $allowance,
+        );
+    }
+
+    public function isAllowed(): bool
+    {
+        return $this->allowance !== null;
+    }
+
+    /** `ALLOW_*` when allowed, else `SCORE`: the band is then the decision. */
+    public function decision(): string
+    {
+        return $this->allowance ?? self::DECISION_SCORE;
     }
 
     public function isPass(): bool
@@ -111,12 +157,18 @@ final readonly class Verdict
      */
     public function toArray(): array
     {
-        return [
+        $array = [
             'band' => $this->band,
             'score' => $this->score,
             'reasons' => $this->reasons,
             'disagreements' => $this->disagreements,
             'salt_version' => $this->saltVersion,
         ];
+
+        if ($this->allowance !== null) {
+            $array['allowance'] = $this->allowance;
+        }
+
+        return $array;
     }
 }
