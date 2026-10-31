@@ -43,6 +43,13 @@ use DeviceId\Scoring\ScoredClaims;
  * string, no account or user id (only its keyed `account_group`), no device key, no timestamp finer than a week, no component
  * value. {@see assertDeidentified()} checks a row against that and the host should call it
  * before insert; the tests pin that the builder cannot emit them.
+ *
+ * ## Pseudonymous, not anonymous (skeptical review M7)
+ *
+ * The row is de-identified as JSON. Stored next to a foreign key to an observation that carries the
+ * account, the address hash or the device key (welzolekker's `observation_id`), it is joinable to
+ * the person for as long as that observation is kept. Hosts should drop or null such a key once the
+ * label is final, and describe the rows as pseudonymous.
  */
 final class TrainingRowBuilder
 {
