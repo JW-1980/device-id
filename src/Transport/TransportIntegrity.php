@@ -294,10 +294,50 @@ final class TransportIntegrity
             );
         }
 
-        if ($protocol === 'none' && $get('referer') !== null) {
+        // The Referer against Sec-Fetch-Site. Measured on Chromium 153, Firefox 155 and WebKit 26.6
+        // (Playwright 1.63, a link click, a reload, a same-origin link, `goto` with a referer):
+        //
+        //  - `none` (typed address, bookmark, reload of a typed address) carries no Referer. The one way
+        //    to get both is a driver setting it (`page.goto(url, {referer})`), or an embedder that adds
+        //    the header itself, so an `android-app://` Referer (Custom Tabs) and a WebView are excluded.
+        //  - `same-origin` carries a Referer of its own origin in Chromium and Firefox. WebKit does NOT
+        //    keep that: a Safari reload of a page reached cross-origin sends `same-origin` with the old
+        //    cross-origin Referer. So the same-origin test is gated to Chromium and Gecko by the
+        //    User-Agent token (iOS Chrome and Firefox are WebKit and carry CriOS/FxiOS).
+        $site = $get('sec-fetch-site');
+        $referer = $get('referer');
+        $userAgent = $get('user-agent') ?? '';
+        $webKit = ! (str_contains($userAgent, 'Firefox/') || str_contains($userAgent, 'Chrome/'))
+            || str_contains($userAgent, 'CriOS/') || str_contains($userAgent, 'FxiOS/') || str_contains($userAgent, 'EdgiOS/');
+        $embedded = str_contains($userAgent, '; wv)');
+        $refererHost = ($referer !== null && preg_match('~^https?://~i', $referer) === 1) ? parse_url($referer, PHP_URL_HOST) : null;
+
+        if ($site === 'none' && $refererHost !== null && ! $webKit && ! $embedded) {
             $findings[] = TransportFinding::soft(
                 'fetch_none_with_referer',
-                'Sec-Fetch-Mode is none yet a Referer is present. The fetch standard sends no referrer with mode none.',
+                'Sec-Fetch-Site is none (a navigation the user started) yet a web Referer is present. The browser sends no referrer for it.',
+            );
+        }
+
+        // Only where the Host is the client's own (behind a proxy that rewrites it, every request would
+        // judge the proxy: the D4 lesson).
+        $host = $get('host');
+        $hostName = $host === null ? null : parse_url('//'.$host, PHP_URL_HOST);
+        if ($site === 'same-origin' && $facts->headersAreClientFrame && ! $webKit && ! $embedded
+            && is_string($refererHost) && is_string($hostName) && strcasecmp($refererHost, $hostName) !== 0) {
+            $findings[] = TransportFinding::soft(
+                'referer_implausible',
+                'Sec-Fetch-Site is same-origin yet the Referer names another site. A same-origin request never carries a third-party referrer.',
+            );
+        }
+
+        // Self-identifying AI agents sign their requests (HTTP Message Signatures, RFC 9421; the
+        // `Signature-Agent` header of the Web Bot Auth drafts). Weight 0: a label for policy and the
+        // operator's panel, not a fraud finding. The detail names headers, never their values.
+        if ($get('signature-agent') !== null || ($get('signature') !== null && $get('signature-input') !== null)) {
+            $findings[] = TransportFinding::soft(
+                'agent_self_identified',
+                'The request carries HTTP message-signature headers (Signature-Agent or Signature with Signature-Input): the client identifies itself as an automated agent.',
             );
         }
 

@@ -700,7 +700,9 @@ function permissionErrorName(error: unknown): string {
  * `Notification.permission`, for the server's comparison with the `notifications` entry of
  * the `states` vector above. Null when `Notification` is undefined (Android WebView, and
  * iOS Safari outside a home-screen web app — BCD `api.Notification.permission_static`) or
- * when the value is not one of the three the specification defines.
+ * the getter throws. A value that is not one of the three the WebIDL enum defines is
+ * reported as the fixed marker `invalid` (never the page-controlled string): the engine
+ * cannot return one, so only a patched getter does (`notification_permission_nonstandard`).
  *
  * Why it is here: headless Chromium answered `permissions.query({name:'notifications'})`
  * with `prompt` while `Notification.permission` said `denied` — two views of ONE setting
@@ -709,11 +711,11 @@ function permissionErrorName(error: unknown): string {
  * disagrees is the server's rule, so a fix in a future headless build does not need a
  * client release.
  */
-function readNotificationPermission(): 'default' | 'denied' | 'granted' | null {
+function readNotificationPermission(): 'default' | 'denied' | 'granted' | 'invalid' | null {
     try {
         if (typeof Notification === 'undefined') return null;
         const value: unknown = Notification.permission;
-        return value === 'default' || value === 'denied' || value === 'granted' ? value : null;
+        return value === 'default' || value === 'denied' || value === 'granted' ? value : 'invalid';
     } catch {
         return null;
     }

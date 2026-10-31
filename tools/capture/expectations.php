@@ -55,6 +55,13 @@ return [
 
     'environment_artefacts' => [
         [
+            'code' => 'tz_utc_vs_language_region',
+            'os' => ['linux'],
+            'browser' => ['chromium', 'chrome', 'msedge', 'firefox', 'webkit'],
+            'reason' => 'The capture container runs in UTC with an en-US locale, the exact pair the rule scores (weight 6). '
+                .'Real users in the US or UK are not on UTC; servers, CI and developer machines are, which is why the weight is 6 and never alone.',
+        ],
+        [
             'code' => 'lied_os',
             'os' => ['linux'],
             'browser' => ['webkit'],

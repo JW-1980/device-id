@@ -7,23 +7,30 @@ namespace DeviceId\Support;
 /**
  * The one previous observation `TemporalConsistency` needs.
  *
- * ## Why a two-field value object rather than an interface over the model
+ * ## Why a three-field value object rather than an interface over the model
  *
- * The rule reads exactly TWO things off a previous row: `ja4_correlator` and
- * `user_agent_summary`. Nothing else. So the honest dependency is two nullable strings, and
+ * The rules read exactly THREE things off a previous row: `ja4_correlator`, `user_agent_summary`
+ * and the `block_tuple` hash. Nothing else. So the honest dependency is three nullable strings, and
  * an interface that let a host pass anything with a `->ja4_correlator` property would be a
  * wider contract than the code actually uses — wider contracts are what let a refactor break
  * something that was never touched.
  *
- * Making it a value object also means the package's storage adapter is one `SELECT` of two
+ * Making it a value object also means the package's storage adapter is one `SELECT` of three
  * columns rather than a whole Eloquent model, and the rule cannot accidentally come to depend
- * on a third field.
+ * on a fourth field.
  */
 final class PreviousObservation
 {
     public function __construct(
         public readonly ?string $ja4Correlator = null,
         public readonly ?string $userAgentSummary = null,
+        /**
+         * The unkeyed `block_tuple` hash the host already stores per observation
+         * (`DeviceComponents::blockTuple()`: sha256 of os|arch|touch). Not a claim value; read only
+         * by `temporal_hard_component_changed`, and only when the host picked this row by cookie or
+         * browser key.
+         */
+        public readonly ?string $blockTuple = null,
     ) {}
 
     /**
@@ -37,6 +44,7 @@ final class PreviousObservation
     public function isInformative(): bool
     {
         return ($this->ja4Correlator !== null && $this->ja4Correlator !== '')
-            || ($this->userAgentSummary !== null && $this->userAgentSummary !== '');
+            || ($this->userAgentSummary !== null && $this->userAgentSummary !== '')
+            || ($this->blockTuple !== null && $this->blockTuple !== '');
     }
 }

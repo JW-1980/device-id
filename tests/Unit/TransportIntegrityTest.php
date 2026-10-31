@@ -616,12 +616,14 @@ final class TransportIntegrityTest extends TestCase
     #[Test]
     public function fetch_none_with_referer_is_soft(): void
     {
-        // Sec-Fetch-Mode: none with a Referer is impossible per the fetch spec,
-        // but it classifies as soft rather than hard: an extension or a privacy
-        // tool can produce it legitimately, and refusing a request over it would
-        // punish the visitor for their own tooling.
+        // Sec-Fetch-Site: none (a user-started navigation) with a web Referer does not
+        // happen in a browser (measured with a driver's `goto(url, {referer})` only), but it
+        // classifies as soft rather than hard: an embedder or a privacy tool can add the
+        // header, and refusing a request over it would punish the visitor for their tooling.
+        // (The earlier version of this test used Sec-Fetch-Mode: none, a value the fetch
+        // standard does not define, so the check it covered could never fire in a browser.)
         $headers = self::realChromiumDocument();
-        $headers[11] = ['sec-fetch-mode', 'none'];
+        $this->assertContains(['sec-fetch-site', 'none'], $headers);
         $headers[] = ['referer', 'https://example.com/'];
         $result = $this->analyse->analyse($headers, new TransportRequestFacts);
 

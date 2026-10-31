@@ -25,6 +25,9 @@ final readonly class TemporalConsistency
     /** Stored as `transport_temporal_ja4_changed_without_ua_change` (VerdictScorer prefixes). */
     public const JA4_CHANGED_WITHOUT_UA_CHANGE = 'temporal_ja4_changed_without_ua_change';
 
+    /** Stored as `transport_temporal_hard_component_changed`. */
+    public const HARD_COMPONENT_CHANGED = 'temporal_hard_component_changed';
+
     /** One observation back: a wider window fires on honest browsers that updated. */
 
     /**
@@ -35,17 +38,62 @@ final readonly class TemporalConsistency
      * shape to handle, which they are: both mean nothing to add.
      *
      * @param  string|null  $userAgentSummary  what THIS observation reported
+     * @param  string|null  $blockTuple  `DeviceComponents::blockTuple()` of THIS observation (null when a hard component is unknown)
      * @return list<TransportFinding>
      */
     public function findings(
         ?PreviousObservation $previous,
         ?TransportIntegrityResult $transport,
         ?string $userAgentSummary,
+        ?string $blockTuple = null,
     ): array {
         if ($previous === null) {
             return [];
         }
 
+        return [
+            ...$this->ja4Findings($previous, $transport, $userAgentSummary),
+            ...$this->hardComponentFindings($previous, $blockTuple),
+        ];
+    }
+
+    /**
+     * `temporal_hard_component_changed`: the OS family, CPU architecture or touch class (the HARD
+     * components) differ from the previous observation of the SAME cookie or browser key. A
+     * physical device cannot change them; a User-Agent switch, an emulator or a cookie replayed on
+     * another machine can. Compared through `DeviceComponents::blockTuple()`, the unkeyed hash the
+     * host already stores, so nothing new is kept. Either side null (a hard component unknown) is
+     * silence, never a difference.
+     *
+     * Only meaningful when the host chose `$previous` by the cookie or the browser key. A host that
+     * picks it through the matcher's own candidates gets the same tuple by construction (the
+     * candidate query blocks on it), and the rule stays silent rather than wrong.
+     *
+     * @return list<TransportFinding>
+     */
+    private function hardComponentFindings(PreviousObservation $previous, ?string $blockTuple): array
+    {
+        if ($blockTuple === null || $blockTuple === '' || $previous->blockTuple === null || $previous->blockTuple === '') {
+            return [];
+        }
+
+        if (hash_equals($previous->blockTuple, $blockTuple)) {
+            return [];
+        }
+
+        return [
+            TransportFinding::soft(
+                self::HARD_COMPONENT_CHANGED,
+                'The operating system, CPU architecture or touch class changed since the previous observation of the same cookie or browser key.',
+            ),
+        ];
+    }
+
+    /**
+     * @return list<TransportFinding>
+     */
+    private function ja4Findings(PreviousObservation $previous, ?TransportIntegrityResult $transport, ?string $userAgentSummary): array
+    {
         $ja4 = $transport?->witnessString('ja4');
 
         // Either side missing means there is nothing to compare. See the class docblock:

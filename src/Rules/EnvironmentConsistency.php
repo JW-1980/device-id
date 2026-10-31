@@ -248,6 +248,18 @@ final class EnvironmentConsistency
         // weight in this table is chosen to preserve, and the reason a single
         // cross-visit rule cannot be turned into a one-signal ban.
         'transport_temporal_ja4_changed_without_ua_change' => 25,
+        // The hard components (`os`, `arch`, `touch`: what one physical device cannot change) differ
+        // between two observations the host linked by something other than those components (the same
+        // first-party cookie, the same browser key). Stored as the existing unkeyed `block_tuple`
+        // hash, so no claim value is kept. 25: a cookie jar shared across devices is the honest
+        // collision, so it is never the 45 of a protocol violation.
+        'transport_temporal_hard_component_changed' => 25,
+        // The Referer against Sec-Fetch-Site (see TransportIntegrity). Both are improbable rather
+        // than impossible (an embedder or a privacy tool can add a header), hence soft and 8.
+        'transport_fetch_none_with_referer' => 8,
+        'transport_referer_implausible' => 8,
+        // A self-identified AI agent: weight 0, logged for policy and the operator's panel only.
+        'transport_agent_self_identified' => 0,
         'plugins_vs_ua' => 12,
         'touch_vs_ch_mobile' => 15,
         // The NaN-sign architecture probe against the Sec-CH-UA-Arch header.
@@ -301,6 +313,27 @@ final class EnvironmentConsistency
         // review). 15: a headful browser with notifications refused at OS level is
         // UNVERIFIED, so it stays below the conformance tier.
         'notification_permission_vs_query' => 15,
+        // A value outside the enumeration of its own API: `Notification.permission` is a WebIDL enum
+        // (`default|granted|denied`) and `permissions.query` resolves `prompt|granted|denied`, so
+        // no engine returns anything else (puppeteer-extra-style overrides answer `default` to the
+        // query, the DOM word). A lie rather than a setting, but the pair is cheap to forge both
+        // ways, so 25 and not the conformance tier.
+        'notification_permission_nonstandard' => 25,
+        // A consumer-desktop UA (Windows or macOS) on a browser that loads at most one of the
+        // OS-indicative font families: ChatGPT Agent's single-font list, Manus's empty one (agent-fingerprinting survey, item
+        // #18). A real Windows or macOS has most of the ten probed. Minimal containers claiming
+        // Windows are the honest collision, hence 10.
+        'fonts_single_family_desktop' => 10,
+        // The Intl zone is UTC while the language tag names a country: servers, kiosks and Linux
+        // developers are honest UTC users, so 6 and never alone (survey #18, Manus).
+        'tz_utc_vs_language_region' => 6,
+        // A Chromium UA from release 110 on carries a frozen OS version (UA reduction): Windows NT
+        // 10.0, Mac OS X 10_15_7, Android 10 with the model K. Plain-Chrome shape only, with
+        // Sec-CH-UA present so the client really is Chromium; pasted pre-reduction UAs break it.
+        'ua_reduced_shape_violation' => 15,
+        // An Android WebView UA (`; wv`) carries the device model and a Build token (arXiv 2208.01968);
+        // a fabricated one usually has neither. OEM overrides are the honest collision: 8, never alone.
+        'webview_ua_shape' => 8,
         // A rendered constant that does not read back as the constant: audio read-back is
         // noised. Same reasoning and weight as `canvas_readback_perturbed`.
         'audio_readback_perturbed' => 4,
@@ -1926,6 +1959,152 @@ final class EnvironmentConsistency
                     return ($queried === 'prompt' && $permission === 'denied')
                         ? 'permissions.query reports the notifications permission as not yet decided while Notification.permission reports it refused.'
                         : null;
+                },
+            ],
+
+            // notification_permission_nonstandard: see the weight. Two halves: the DOM side (the
+            // collector reports the fixed marker `invalid` for any value outside the enum) and the
+            // Permissions-API side (the `notifications` entry of the state vector, which is
+            // `prompt|granted|denied` or the NAME of the error the engine rejected with).
+            [
+                'code' => 'notification_permission_nonstandard',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $permission = $this->value($c, 'tier2', 'permissions', 'notificationPermission');
+                    if (is_string($permission) && ! in_array($permission, ['default', 'granted', 'denied'], true)) {
+                        return 'Notification.permission is outside the values its specification defines.';
+                    }
+
+                    $states = $this->value($c, 'tier2', 'permissions', 'states');
+                    if (! is_string($states)) {
+                        return null;
+                    }
+
+                    foreach (explode(',', $states) as $pair) {
+                        if (! str_starts_with($pair, 'notifications=')) {
+                            continue;
+                        }
+                        $queried = substr($pair, strlen('notifications='));
+                        // A rejected query reports the error's name (`TypeError`, `NotSupportedError`) or the
+                        // sentinel `unsupported`; those are an engine's answer, not a state.
+                        $isEngineAnswer = in_array($queried, ['prompt', 'granted', 'denied', 'unsupported'], true)
+                            || preg_match('/^[A-Z][A-Za-z]{0,40}(?:Error|Exception)$/', $queried) === 1;
+                        if (! $isEngineAnswer) {
+                            return 'permissions.query reports the notifications permission as a value the Permissions API does not define.';
+                        }
+                    }
+
+                    return null;
+                },
+            ],
+
+            // fonts_single_family_desktop: see the weight. Windows and macOS only (the fonts the probe
+            // asks for are those OSes' base set); WebKit is skipped because Safari restricts what
+            // `local()` reveals, and so is every privacy mode that restricts fonts on purpose.
+            [
+                'code' => 'fonts_single_family_desktop',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $ua = $this->value($c, 'tier1', 'environment', 'identity', 'userAgent');
+                    if (! is_string($ua)) {
+                        return null;
+                    }
+
+                    $column = match (self::uaOsFamily($ua)) {
+                        'windows' => 'windows',
+                        'macos' => 'mac',
+                        default => null,
+                    };
+                    $marks = $this->value($c, 'tier1', 'engineIdentity');
+                    $engine = is_array($marks) ? self::engineFromMarks($marks) : null;
+                    if ($column === null || $engine === 'webkit' || self::uaEngineFamily($ua) === 'webkit') {
+                        return null;
+                    }
+
+                    if (self::claimsGeckoProtection($c) || $this->value($c, 'integrity', 'data', 'resistance', 'brave') === true) {
+                        return null;
+                    }
+
+                    $total = $this->value($c, 'tier2', 'fontFaces', 'count');
+                    $own = $this->value($c, 'tier2', 'fontFaces', $column);
+                    if (! is_int($total) || ! is_int($own)) {
+                        return null;
+                    }
+
+                    return ($total <= 1 && $own <= 1)
+                        ? 'The User-Agent names Windows or macOS but at most one of the operating system\'s base font families is installed.'
+                        : null;
+                },
+            ],
+
+            // tz_utc_vs_language_region: see the weight. The region comes from the language tag's own
+            // region subtag (no ICU needed), preferring the Accept-Language header the browser sent.
+            // resistFingerprinting and Tor pin the zone to UTC and the language to en-US by design.
+            [
+                'code' => 'tz_utc_vs_language_region',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $timezone = $this->value($c, 'tier2', 'intl', 'resolved', 'timeZone');
+                    if (! is_string($timezone) || ! in_array(strtolower($timezone), ['utc', 'etc/utc', 'etc/uct', 'etc/universal', 'etc/zulu'], true)) {
+                        return null;
+                    }
+
+                    if (self::claimsGeckoProtection($c)) {
+                        return null;
+                    }
+
+                    $header = $t->witnessString('accept_language');
+                    $tag = $header !== null ? trim(explode(',', $header)[0]) : $this->value($c, 'tier1', 'environment', 'identity', 'language');
+                    if (! is_string($tag)) {
+                        return null;
+                    }
+
+                    return preg_match('/^[A-Za-z]{2,3}(?:-[A-Za-z]{4})?-([A-Za-z]{2})(?:[-;]|$)/', trim($tag)) === 1
+                        ? 'The resolved time zone is UTC while the language tag names a country.'
+                        : null;
+                },
+            ],
+
+            // ua_reduced_shape_violation / webview_ua_shape: see the weights. Server-only, over the
+            // claimed User-Agent, so a header-only client is judged by `ua_vs_ua_header` instead.
+            [
+                'code' => 'ua_reduced_shape_violation',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $ua = $this->value($c, 'tier1', 'environment', 'identity', 'userAgent');
+                    $hint = $t->witnessString('sec_ch_ua');
+                    if (! is_string($ua) || $hint === null || trim($hint) === '') {
+                        return null;
+                    }
+
+                    // The exact shape of Google Chrome's reduced UA. Anything with another product token
+                    // (Edg/, OPR/, SamsungBrowser/, a WebView's Version/4.0 and `; wv`) is not matched, so
+                    // forks that keep the model and the Android version stay silent.
+                    if (preg_match('~^Mozilla/5\.0 \(([^)]*)\) AppleWebKit/537\.36 \(KHTML, like Gecko\) Chrome/(\d+)\.0\.0\.0 (?:Mobile )?Safari/537\.36$~', $ua, $m) !== 1
+                        || (int) $m[2] < 110 || str_contains($m[1], '; wv')) {
+                        return null;
+                    }
+
+                    $platform = $m[1];
+                    $violates = match (true) {
+                        preg_match('/Windows NT ([\d.]+)/', $platform, $v) === 1 => $v[1] !== '10.0',
+                        preg_match('/Mac OS X ([\d_.]+)/', $platform, $v) === 1 => $v[1] !== '10_15_7',
+                        preg_match('/Android ([\d.]+); ([^;)]*)$/', $platform, $v) === 1 => $v[1] !== '10' || $v[2] !== 'K',
+                        default => false,
+                    };
+
+                    return $violates
+                        ? 'A Chromium 110 or newer User-Agent carries an operating-system version or device model that Chromium freezes.'
+                        : null;
+                },
+            ],
+            [
+                'code' => 'webview_ua_shape',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $ua = $this->value($c, 'tier1', 'environment', 'identity', 'userAgent');
+                    if (! is_string($ua) || preg_match('/\(([^)]*; wv)\)/', $ua, $m) !== 1 || ! str_contains($m[1], 'Android')) {
+                        return null;
+                    }
+
+                    return (preg_match('/; ([^;]+) Build\/[^;)]+; wv$/', $m[1], $model) === 1 && trim($model[1]) !== '' && trim($model[1]) !== 'K')
+                        ? null
+                        : 'The Android WebView User-Agent carries no device model and Build token, which every WebView ships.';
                 },
             ],
 

@@ -489,9 +489,9 @@ describe('permissions.notificationPermission', () => {
         expect(String(result.value.states)).toContain('notifications=prompt');
     });
 
-    it('reports each specified value, and null for anything else', async () => {
+    it('reports each specified value, and the fixed marker invalid for anything else', async () => {
         defineOwn(navigator, 'permissions', { value: queryAll('prompt') });
-        for (const [permission, expected] of [['default', 'default'], ['granted', 'granted'], ['denied', 'denied'], ['allowed', null], [1, null]] as const) {
+        for (const [permission, expected] of [['default', 'default'], ['granted', 'granted'], ['denied', 'denied'], ['allowed', 'invalid'], [1, 'invalid'], [undefined, 'invalid']] as const) {
             defineOwn(globalThis, 'Notification', { value: { permission } });
             const result = await permissions();
             expect(result.state === 'ok' && result.value.notificationPermission).toBe(expected);

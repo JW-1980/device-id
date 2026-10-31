@@ -117,7 +117,10 @@ final class CaptureFixturesTest extends TestCase
         $answer = CaptureAnalysis::analyse(self::load('linux-container.linux.chromium.headed.honest'))['merged'];
 
         $this->assertSame('pass', $answer['band']);
-        $this->assertSame([], array_keys($answer['codes']));
+        // The one documented harness artefact: the capture container is UTC with an en-US locale
+        // (tools/capture/expectations.php, environment_artefacts), weight 6.
+        $this->assertSame(['tz_utc_vs_language_region'], array_keys($answer['codes']));
+        $this->assertSame(6, $answer['score'] > 0 ? array_sum(array_column($answer['codes'], 'weight')) : 0);
         $this->assertSame([], $answer['confidence']['penalties']);
     }
 
@@ -130,7 +133,7 @@ final class CaptureFixturesTest extends TestCase
         // Four independent self-announcements (UA token, notification pair, shell geometry,
         // navigator.webdriver) are a block together; no single one of them is (max 45).
         $this->assertEqualsCanonicalizing(
-            ['ua_headless_token', 'notification_permission_vs_query', 'headless_shell_geometry', 'webdriver_true'],
+            ['ua_headless_token', 'notification_permission_vs_query', 'headless_shell_geometry', 'webdriver_true', 'tz_utc_vs_language_region'],
             array_keys($answer['codes']),
         );
         $this->assertSame('block', $answer['band']);
