@@ -746,7 +746,7 @@ $scored  = ...;                                                  // the host's e
 php tools/ml/train.php --rows=training-rows.jsonl --out=storage/fingerprint/models/verdict.json
 ```
 
-`training-rows.jsonl` is one `TrainingRowBuilder::build()` result per line (de-identified: features, label, a KEYED group hash, an ISO week, bucketed context, `retention_days` and `expires_on`, no IP, no User-Agent, no id; `assertDeidentified()` enforces it). The trainer splits **by group, never by row** (a machine or evasion recipe is held out whole), fits L2 logistic regression by Newton's method (a rule-hit coefficient may not be negative), calibrates on the held-out side (Platt), measures, and writes the sealed model plus a report with the learned-versus-shipped weight proposal and bootstrap intervals. The calibration is to the training prevalence unless `--assumed-prevalence` is given. With no `--rows` it trains on the committed harness dataset.
+`training-rows.jsonl` is one `TrainingRowBuilder::build()` result per line (de-identified: features, label, a KEYED group hash, an ISO week, bucketed context, `retention_days` and `expires_on`, no IP, no User-Agent, no id; `assertDeidentified()` enforces it). The trainer splits **by linked unit, never by row**: the connected components of "same `group`" (a device, machine or evasion recipe) and "same `account_group`" (the keyed account hash `TrainingRowBuilder::build(..., accountKey:)` adds, because labels are per account), so no account and no device is on two sides. It splits three ways (`--calibration=0.25`, `--validation=0.25`): it fits L2 logistic regression by Newton's method on train (a rule-hit coefficient may not be negative), fits the Platt calibration and the rules' calibration on the calibration split, and measures every reported metric on the validation split, which neither trained nor calibrated the model (before 2026-10-31 the calibration was fitted on the validation rows themselves, so ECE was in-sample). Platt needs at least 20 calibration rows with both classes; below that the identity is used and the document says so (`calibration.fitted_on`). It writes the sealed model plus a report with the learned-versus-shipped weight proposal and bootstrap intervals. The calibration is to the training prevalence unless `--assumed-prevalence` is given. With no `--rows` it trains on the committed harness dataset.
 
 ### Evaluation
 
@@ -758,7 +758,15 @@ Offline. Reports, for the rules alone and the model on the same held-out rows, o
 
 Harness data: `npm run ml:variants` runs the real collector in Playwright browsers over honest context variants and spoof recipes (user agent and navigator patches, WebGL, screen, time zone, canvas noise, a stealth bundle, device emulation) written as plain init scripts; `php tools/ml/make-dataset.php` turns the runs into dataset records (`tests/Fixtures/ml/dataset`). Its honest class is scripted browsers on one machine, not people, and it has no honest WebKit, mobile or privacy-mode rows.
 
-### Promotion criteria (all required, on held-out rows the model never trained on)
+**Honest metrics on the committed harness set (66 rows, run 2026-10-31, after the split fix):** train 32 /
+calibration 17 / validation 17 rows. 17 calibration rows are below Platt's minimum of 20, so the model is
+UNcalibrated (identity) on this set. On the 17 validation rows (5 honest): rules recall 0.75, FPR 0, AUC 0.967;
+model recall 0.917 and FPR 0 at p = 0.5, AUC 0.967, ECE 0.093 (above the 0.05 criterion). Before the fix the
+same command reported ECE 0.082 measured on the rows it was calibrated on, and model FPR 0.8 at p = 0.5. Five
+honest rows cannot support any FPR claim; the harness rows carry no account linkage, so for them the unit is
+the group. These numbers say the pipeline works, not that a model is ready.
+
+### Promotion criteria (all required, on held-out rows the model never trained on or was calibrated on)
 
 1. At the rules' false-positive rate the model's recall is at least 10 points higher and its false-positive rate is not higher.
 2. On every slice (Chromium, Gecko, WebKit, protected modes, mobile) the model's false-positive rate is not higher than the rules'.

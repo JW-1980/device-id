@@ -21,6 +21,11 @@ use DeviceId\Scoring\ScoredClaims;
  *   truncated to 16 hex characters). It exists only so a train/validation split can keep one
  *   device on one side; it cannot be reversed to the device key without the secret, and
  *   rotating the secret severs it. It is pseudonymous data and is treated as such.
+ * - `account_group` (only when the host passes the account): a keyed hash of the account, under
+ *   the same secret with its own domain prefix, truncated to 16 hex characters. Labels are per
+ *   account, so the split keeps every row of one account, across all its devices, on one side
+ *   (`Splitter`; skeptical review M8). Pseudonymous like `group`, and it links an account's rows
+ *   to each other inside the training set; it never contains the account id.
  * - `observed_week` (ISO year-week) instead of a date or time, `slice` buckets (engine family,
  *   mobile or desktop, protected mode), `rules_weight`.
  * - `network`: the country code the address geolocates to and a category bucket of its network
@@ -35,7 +40,7 @@ use DeviceId\Scoring\ScoredClaims;
  * ## What it never contains
  *
  * No IP address or network token, no User-Agent or any token of it, no brand or version
- * string, no account or user id, no device key, no timestamp finer than a week, no component
+ * string, no account or user id (only its keyed `account_group`), no device key, no timestamp finer than a week, no component
  * value. {@see assertDeidentified()} checks a row against that and the host should call it
  * before insert; the tests pin that the builder cannot emit them.
  */
@@ -43,7 +48,7 @@ final class TrainingRowBuilder
 {
     public const DEFAULT_RETENTION_DAYS = 365;
 
-    private const ALLOWED_KEYS = ['id', 'features', 'label', 'label_weight', 'source', 'group', 'slice', 'rules_weight', 'observed_week', 'retention_days', 'expires_on', 'schema', 'network', 'email'];
+    private const ALLOWED_KEYS = ['id', 'features', 'label', 'label_weight', 'source', 'group', 'slice', 'rules_weight', 'observed_week', 'retention_days', 'expires_on', 'schema', 'network', 'email', 'account_group'];
 
     public function __construct(private readonly string $secret, private readonly int $retentionDays = self::DEFAULT_RETENTION_DAYS)
     {
@@ -58,9 +63,10 @@ final class TrainingRowBuilder
      * @param  array<string, float>  $softFeatures  the optional features ({@see FeatureCatalogue::optional()}): reputation, network, smart signals, velocity
      * @param  NetworkFacts|null  $network  reduced to a country code and an ASN category bucket; the address and the ASN number never enter the row
      * @param  EmailAssessment|null  $email  reduced to three buckets; the address and its domain never enter the row
+     * @param  string|null  $accountKey  the host's account identifier, hashed into `account_group`, never stored; null for a guest
      * @return array<string, mixed> JSON-ready, see the class docblock
      */
-    public function build(ScoredClaims $scored, string $deviceKey, string $engine, bool $mobile, bool $protected, ?string $label, string $labelSource, float $labelWeight, \DateTimeImmutable $observedAt, array $softFeatures = [], ?NetworkFacts $network = null, ?EmailAssessment $email = null): array
+    public function build(ScoredClaims $scored, string $deviceKey, string $engine, bool $mobile, bool $protected, ?string $label, string $labelSource, float $labelWeight, \DateTimeImmutable $observedAt, array $softFeatures = [], ?NetworkFacts $network = null, ?EmailAssessment $email = null, ?string $accountKey = null): array
     {
         $omitted = 0;
         foreach ($scored->omission as $entry) {
@@ -97,6 +103,9 @@ final class TrainingRowBuilder
             'retention_days' => $this->retentionDays,
             'expires_on' => $observedAt->modify('+'.$this->retentionDays.' days')->format('Y-m-d'),
         ];
+        if ($accountKey !== null && $accountKey !== '') {
+            $row['account_group'] = substr(hash_hmac('sha256', 'account:'.$accountKey, $this->secret), 0, 16);
+        }
 
         self::assertDeidentified($row);
 

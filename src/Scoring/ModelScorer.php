@@ -47,8 +47,9 @@ use DeviceId\Support\Verdict;
  *
  * ## How the weight is chosen
  *
- * The rules' total weight is turned into a probability by a calibration fitted on the same rows
- * as the model (`rules_calibration`, slope `a` per weight unit). The adjustment is the weight
+ * The rules' effective weight is turned into a probability by a calibration fitted on the same
+ * calibration split as the model's own Platt scaling (`rules_calibration`, slope `a` per weight
+ * unit); neither is fitted on the validation rows the promotion metrics are measured on. The adjustment is the weight
  * the rules would have needed to say what the model says:
  * `(logit(p_model) - logit(p_rules)) / a`. Both probabilities share one training prior, so the
  * prior cancels.

@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  *   php tools/ml/train.php [--dataset=dir[,dir]] [--rows=export.jsonl] [--out=model.json]
  *                          [--report=report.md] [--lambda=1.0] [--seed=device-id]
- *                          [--validation=0.3] [--assumed-prevalence=0.02]
+ *                          [--validation=0.25] [--calibration=0.25] [--assumed-prevalence=0.02]
  *                          [--max-adjustment=20] [--retention-days=365] [--bootstrap=40]
  *
  * Inputs (either or both):
@@ -68,7 +68,8 @@ $trainedAt = isset($options['trained-at']) ? (int) strtotime($options['trained-a
 $build = ModelBuilder::build($rows, [
     'lambda' => (float) ($options['lambda'] ?? 1.0),
     'seed' => $options['seed'] ?? 'device-id',
-    'validation_fraction' => (float) ($options['validation'] ?? 0.3),
+    'validation_fraction' => (float) ($options['validation'] ?? 0.25),
+    'calibration_fraction' => (float) ($options['calibration'] ?? 0.25),
     'training_set_sha256' => hash_final($hash),
     'trained_at' => $trainedAt,
     'retention_days' => (int) ($options['retention-days'] ?? 365),
@@ -95,4 +96,4 @@ $report = Report::training($document, $build['report'], $proposal, count($rows))
 $reportPath = $options['report'] ?? preg_replace('/\.json$/', '', $out).'.report.md';
 file_put_contents($reportPath, $report);
 
-echo "model:    {$out}\nreport:   {$reportPath}\nid:       {$document['model_id']}\nrows:     ".count($rows)." (train {$document['split']['train_rows']}, validation {$document['split']['validation_rows']})\nsha256:   {$document['sha256']}\n";
+echo "model:    {$out}\nreport:   {$reportPath}\nid:       {$document['model_id']}\nrows:     ".count($rows)." (train {$document['split']['train_rows']}, calibration {$document['split']['calibration_rows']}, validation {$document['split']['validation_rows']})\nsha256:   {$document['sha256']}\n";

@@ -20,12 +20,12 @@ final class Report
     {
         $out = "# Model training report\n\n";
         $out .= "- model: `{$document['model_id']}` (schema {$document['schema']}, {$document['kind']}), trained {$document['trained_at']}\n";
-        $out .= "- training set sha256: `{$document['training_set_sha256']}`; rows: {$rows} (train {$document['split']['train_rows']}, validation {$document['split']['validation_rows']})\n";
+        $out .= "- training set sha256: `{$document['training_set_sha256']}`; rows: {$rows} (train {$document['split']['train_rows']}, calibration ".($document['split']['calibration_rows'] ?? 0).", validation {$document['split']['validation_rows']})\n";
         $out .= "- split unit: {$document['split']['unit']}; validation groups: ".count($document['split']['validation_groups'])."\n";
-        $out .= '- calibration: Platt a='.round($document['calibration']['a'], 4).', b='.round($document['calibration']['b'], 4).($document['calibration']['fitted'] ? '' : ' (NOT fitted: validation too small, identity used)').", calibrated to {$document['calibration']['calibrated_to']}\n";
+        $out .= '- calibration: Platt a='.round($document['calibration']['a'], 4).', b='.round($document['calibration']['b'], 4).($document['calibration']['fitted'] ? ' (fitted on the calibration split)' : ' (NOT fitted: calibration split too small, identity used)').", calibrated to {$document['calibration']['calibrated_to']}\n";
         $out .= '- coefficients frozen at 0 (negative rule hit): '.(implode(', ', $document['training']['frozen_at_zero']) ?: 'none').'; clipped: '.(implode(', ', $document['training']['clipped']) ?: 'none')."\n";
         $out .= '- converged: '.($document['training']['converged'] ? 'yes' : 'NO').", iterations {$document['training']['iterations']}\n\n";
-        $out .= "## Held-out evaluation (validation groups only)\n\n".self::sliceTable($report['held_out']);
+        $out .= "## Held-out evaluation (validation groups only: neither trained nor calibrated the model)\n\n".self::sliceTable($report['held_out']);
         $out .= "\n## Learned weights against the shipped weights\n\n";
         $out .= 'Proposal only; nothing applies it. Scale: the largest learned rule-hit coefficient maps to '.WeightProposal::ANCHOR_WEIGHT.". Interval: bootstrap over groups, 5th-95th percentile.\n\n";
         $out .= "| rule | current | learned coef | proposed | interval | fired (non-honest / honest) | note |\n|---|---|---|---|---|---|---|\n";
