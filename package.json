@@ -7,7 +7,8 @@
         "test": "vitest run",
         "typecheck": "tsc --noEmit",
         "capture": "node tools/capture/capture.mjs",
-        "capture:report": "php tools/capture/engine-report.php"
+        "capture:report": "php tools/capture/engine-report.php",
+        "ml:variants": "node tools/ml/variants.mjs"
     },
     "devDependencies": {
         "@types/node": "^26.6.3",

@@ -1,0 +1,826 @@
+{
+    "schema": "device-id.capture-dataset",
+    "schema_version": 1,
+    "id": "linux-container.linux.webkit.headless.instrumented",
+    "captured_at": "2026-10-31T06:58:28.515Z",
+    "machine": {
+        "id": "linux-container",
+        "os": "linux",
+        "os_release": "6.18.44-fc-v185",
+        "arch": "x64",
+        "cpu_count": 4,
+        "node": "v22.22.0",
+        "display": "xvfb"
+    },
+    "browser": {
+        "name": "webkit",
+        "channel": null,
+        "engine": "webkit",
+        "version": "26.6",
+        "driver": "playwright 1.63.0",
+        "mode": "headless",
+        "variant": "instrumented",
+        "locale": "en-US"
+    },
+    "labels": {
+        "class": "headless",
+        "basis": "harness-declared: headless launch, driver exposes a binding to the page"
+    },
+    "collector": {
+        "envelope_version": 3,
+        "probe_set": 4,
+        "disabled_probes": [
+            "parallelism",
+            "behavior"
+        ]
+    },
+    "transport": {
+        "claims_request_headers": [
+            [
+                "Content-Type",
+                "application/json"
+            ],
+            [
+                "Accept",
+                "application/json"
+            ],
+            [
+                "Referer",
+                "http://localhost:37769/"
+            ],
+            [
+                "Origin",
+                "http://localhost:37769"
+            ],
+            [
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15"
+            ],
+            [
+                "Accept-Language",
+                "en-US"
+            ],
+            [
+                "Content-Length",
+                "7657"
+            ],
+            [
+                "Accept-Encoding",
+                "gzip, deflate"
+            ],
+            [
+                "Connection",
+                "Keep-Alive"
+            ],
+            [
+                "Host",
+                "localhost:37769"
+            ],
+            [
+                "Sec-Fetch-Dest",
+                "empty"
+            ],
+            [
+                "Sec-Fetch-Mode",
+                "cors"
+            ],
+            [
+                "Sec-Fetch-Site",
+                "same-origin"
+            ],
+            [
+                "X-XSRF-TOKEN",
+                ""
+            ]
+        ],
+        "navigation_headers": [
+            [
+                "Accept",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            ],
+            [
+                "Upgrade-Insecure-Requests",
+                "1"
+            ],
+            [
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15"
+            ],
+            [
+                "Accept-Language",
+                "en-US"
+            ],
+            [
+                "Accept-Encoding",
+                "gzip, deflate"
+            ],
+            [
+                "Connection",
+                "Keep-Alive"
+            ],
+            [
+                "Host",
+                "localhost:37769"
+            ],
+            [
+                "Sec-Fetch-Dest",
+                "document"
+            ],
+            [
+                "Sec-Fetch-Mode",
+                "navigate"
+            ],
+            [
+                "Sec-Fetch-Site",
+                "none"
+            ]
+        ]
+    },
+    "claims": {
+        "tier1": {
+            "integrity": {
+                "findings": [
+                    {
+                        "code": "automation_global_present"
+                    }
+                ],
+                "data": {
+                    "wrongReceiver": {
+                        "state": "ok",
+                        "value": {
+                            "screen.width": "threw:TypeError",
+                            "screen.availWidth": "threw:TypeError",
+                            "screen.availHeight": "threw:TypeError",
+                            "screen.colorDepth": "threw:TypeError",
+                            "screen.pixelDepth": "threw:TypeError",
+                            "navigator.userAgent": "threw:TypeError",
+                            "navigator.language": "threw:TypeError",
+                            "navigator.onLine": "threw:TypeError",
+                            "navigator.maxTouchPoints": "threw:TypeError",
+                            "navigator.hardwareConcurrency": "threw:TypeError",
+                            "intl.format": "threw:TypeError"
+                        }
+                    },
+                    "descriptorIntegrity": {
+                        "state": "ok",
+                        "value": {
+                            "userAgent": "NS-ce-",
+                            "appVersion": "NS-ce-",
+                            "appName": "NS-ce-",
+                            "platform": "NS-ce-",
+                            "product": "NS-ce-",
+                            "productSub": "NS-ce-",
+                            "vendor": "NS-ce-",
+                            "vendorSub": "NS-ce-",
+                            "language": "NS-ce-",
+                            "languages": "NS-ce-",
+                            "onLine": "NS-ce-",
+                            "cookieEnabled": "NS-ce-",
+                            "doNotTrack": "no-descriptor",
+                            "hardwareConcurrency": "NS-ce-",
+                            "deviceMemory": "no-descriptor",
+                            "maxTouchPoints": "NS-ce-",
+                            "webdriver": "NS-ce-",
+                            "plugins": "NS-ce-",
+                            "mimeTypes": "NS-ce-",
+                            "pdfViewerEnabled": "NS-ce-",
+                            "userAgentData": "no-descriptor",
+                            "connection": "no-descriptor",
+                            "permissions": "NS-ce-",
+                            "credentials": "no-descriptor",
+                            "mediaDevices": "NS-ce-",
+                            "clipboard": "NS-ce-",
+                            "serviceWorker": "NS-ce-",
+                            "storage": "NS-ce-",
+                            "locks": "NS-ce-",
+                            "sendBeacon": "NS-ce-"
+                        }
+                    },
+                    "mathDual": {
+                        "state": "ok",
+                        "value": {
+                            "acos": 1.4473588658278522,
+                            "acosh": 709.889355822726,
+                            "acoshPf": 355.291251501643,
+                            "asin": 0.12343746096704435,
+                            "asinh": 0.881373587019543,
+                            "asinhPf": 0.8813735870195429,
+                            "atanh": 0.5493061443340548,
+                            "atanhPf": 0.5493061443340549,
+                            "atan": 0.4636476090008061,
+                            "sin": 0.8178819121159085,
+                            "sinh": 1.1752011936438014,
+                            "sinhPf": 2.534342107873324,
+                            "cos": -0.8390715290095377,
+                            "cosh": 1.5430806348152437,
+                            "coshPf": 1.5430806348152437,
+                            "tan": -1.4214488238747245,
+                            "tanh": 0.7615941559557649,
+                            "tanhPf": 0.7615941559557649,
+                            "exp": 2.718281828459045,
+                            "expm1": 1.718281828459045,
+                            "expm1Pf": 1.718281828459045,
+                            "log1p": 2.3978952727983707,
+                            "log1pPf": 2.3978952727983707,
+                            "powPI": 1.9275814160560206e-50,
+                            "fma": "no-fma",
+                            "atanhAgrees": true,
+                            "tanhAgrees": true,
+                            "expm1Agrees": true,
+                            "asinhAgrees": true
+                        }
+                    },
+                    "canvasDual": {
+                        "state": "ok",
+                        "value": {
+                            "agree": true,
+                            "fillHash": "808f0273:129140",
+                            "putHash": "808f0273:129140",
+                            "winding": {
+                                "nonzero": 255,
+                                "evenodd": 0,
+                                "differ": true
+                            }
+                        }
+                    },
+                    "domBlockers": {
+                        "state": "ok",
+                        "value": {
+                            "chromeRuntime": false,
+                            "chromeCsi": false,
+                            "chromeLoadTimes": false,
+                            "getEventListeners": "undefined",
+                            "webdriverUndefined": false,
+                            "windowWebdriverEvaluate": "undefined",
+                            "windowSeleniumEvaluate": "undefined",
+                            "windowNightmare": "undefined",
+                            "windowDriverUnwrapped": "undefined",
+                            "domRectToJSON": false,
+                            "functionToStringLength": 41,
+                            "errorPrepareStackTrace": "undefined",
+                            "performanceObserverEntryTypes": "unsupported"
+                        }
+                    },
+                    "webdriverPresence": {
+                        "state": "ok",
+                        "value": {
+                            "present": true
+                        }
+                    },
+                    "canvasFill": {
+                        "state": "ok",
+                        "value": {
+                            "exact": true,
+                            "deviations": 0
+                        }
+                    },
+                    "canvasPattern": {
+                        "state": "ok",
+                        "value": {
+                            "exact": true,
+                            "deviations": 0,
+                            "stable": true
+                        }
+                    },
+                    "automationMarks": {
+                        "state": "ok",
+                        "value": {
+                            "globals": 2,
+                            "cdc": false,
+                            "pw": true,
+                            "outerEqualsInner": null,
+                            "historyLength": 2
+                        }
+                    },
+                    "lieBattery": {
+                        "state": "ok",
+                        "value": {
+                            "checked": 27,
+                            "lied": []
+                        }
+                    },
+                    "resistance": {
+                        "state": "ok",
+                        "value": {
+                            "brave": false,
+                            "timerGranularityUs": 1000,
+                            "rfp": false,
+                            "tor": false,
+                            "gecko": false
+                        }
+                    }
+                },
+                "elapsedMs": 12
+            },
+            "tier1": {
+                "dateParsing": {
+                    "20240115": "NaN",
+                    "2024-01-15": "2024-01-15T00:00:00.000Z",
+                    "2024-01-15T10:20:30": "2024-01-15T10:20:30.000Z",
+                    "2024-01-15T10:20:30Z": "2024-01-15T10:20:30.000Z",
+                    "2024-01-15T10:20:30.123Z": "2024-01-15T10:20:30.123Z",
+                    "2024-01-15 10:20:30": "2024-01-15T10:20:30.000Z",
+                    "2024-01-15T10:20": "2024-01-15T10:20:00.000Z",
+                    "2024-01-15T10:20:30+05:30": "2024-01-15T04:50:30.000Z",
+                    "2024-01-15T10:20:30-08": "NaN",
+                    "Mon, 15 Jan 2024 10:20:30 GMT": "2024-01-15T10:20:30.000Z",
+                    "January 15, 2024": "2024-01-15T00:00:00.000Z",
+                    "15 January 2024": "2024-01-15T00:00:00.000Z",
+                    "2024/01/15": "2024-01-15T00:00:00.000Z",
+                    "01/15/2024": "2024-01-15T00:00:00.000Z",
+                    "2024-13-45": "NaN",
+                    "2024-02-30T00:00:00Z": "NaN",
+                    "T10:20": "NaN",
+                    "10:20": "NaN",
+                    "Jan 15 2024": "2024-01-15T00:00:00.000Z",
+                    "2024-W03-1": "NaN",
+                    "not a date": "NaN",
+                    "": "NaN",
+                    "2024-01-15T10:20:30.123456789Z": "2024-01-15T10:20:30.123Z"
+                },
+                "cssMedia": "000001011100010011000000",
+                "codecs": "audio/ogg; codecs=\"vorbis\"=probably|audio/ogg; codecs=\"opus\"=probably|audio/mpeg=maybe|audio/mp4; codecs=\"mp4a.40.2\"=probably|audio/wav; codecs=\"1\"=probably|audio/flac=maybe|audio/webm; codecs=\"opus\"=probably|video/ogg; codecs=\"theora\"=probably|video/mp4; codecs=\"avc1.42E01E=probably|video/mp4; codecs=\"hev1.1.6.L9=probably|video/mp4; codecs=\"av01.0.05M.=probably|video/webm; codecs=\"vp8, vorbi=probably|video/webm; codecs=\"vp9, opus\"=probably|video/webm; codecs=\"av01.0.05M=probably|video/mp4; codecs=\"hvc1.1.6.L9=probably|application/x-mpegURL=no|application/vnd.apple.mpegurl=no",
+                "esFeatures": {
+                    "count": 64,
+                    "present": "weakRef,finalizationRegistry,arrayAt,errorCause,errorErrors,regExpHasIndices,arrayToSorted,arrayToReversed,arrayToSpliced,arrayWith,arrayFindLast,arrayFindLastIndex,objectGroupBy,promiseWithResolvers,arrayBufferResize,arrayBufferTransfer,regexpVFlag,stringIsWellFormed,stringToWellFormed,iteratorHelpers,setUnion,regexpEscape,promiseTry,float16Array,uint8FromBase64,uint8ToBase64,uint8SetFromBase64,uint8ToHex,errorIsError,mathSumPrecise,arrayFromAsync,mapGetOrInsert,temporal,disposableStack,structuredClone,navLocks,navMediaCapabilities,navGamepads,viewTransitions,invokerCommands,selectedContent,trustedTypes,offscreenCanvas,imageDecoder,videoFrame,wakeLock,showModalDialog,popoverApi,cssHas,cssNesting,cssSubgrid,cssOklch,cssColorMix,cssAnchor,cssScrollTimeline,cssFieldSizing,cssAttrTyped,cssTextWrapBalance,cssScrollbarGutter,cssLinearEasing,cssTransitionBehavior,cssLightDark,cssBackdropFilter,webkitAppearance"
+                },
+                "environment": {
+                    "screen": {
+                        "width": 1280,
+                        "height": 720,
+                        "availWidth": 1280,
+                        "availHeight": 720,
+                        "availLeft": 0,
+                        "availTop": 0,
+                        "colorDepth": 24,
+                        "pixelDepth": 24
+                    },
+                    "viewport": {
+                        "innerWidth": 1280,
+                        "innerHeight": 720,
+                        "outerWidth": 1280,
+                        "outerHeight": 720,
+                        "devicePixelRatio": 1,
+                        "innerWidthRatio": 1
+                    },
+                    "identity": {
+                        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15",
+                        "appVersion": "5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15",
+                        "appName": "Netscape",
+                        "appCodeName": "Mozilla",
+                        "product": "Gecko",
+                        "productSub": "20030107",
+                        "vendor": "Apple Computer, Inc.",
+                        "vendorSub": "",
+                        "platform": "Linux x86_64",
+                        "cookieEnabled": true,
+                        "webdriver": true,
+                        "hardwareConcurrency": 4,
+                        "deviceMemory": null,
+                        "maxTouchPoints": 0,
+                        "language": "en-US",
+                        "languages": [
+                            "en-US"
+                        ],
+                        "pdfViewerEnabled": true
+                    },
+                    "plugins": {
+                        "length": 5,
+                        "names": [
+                            "PDF Viewer",
+                            "Chrome PDF Viewer",
+                            "Chromium PDF Viewer",
+                            "Microsoft Edge PDF Viewer",
+                            "WebKit built-in PDF"
+                        ]
+                    }
+                },
+                "uaClientHints": {
+                    "supported": false
+                },
+                "objectShape": {
+                    "navigator": 34,
+                    "document": 233,
+                    "screen": 10,
+                    "hasChromeObject": "undefined",
+                    "hasInstallPrompt": "false"
+                },
+                "removedApiBoundary": {
+                    "webkitRequestFileSystem": "undefined",
+                    "safariNotification": "object",
+                    "webkitSpeechRecognition": "undefined",
+                    "msIndexedDB": "undefined",
+                    "external": "undefined",
+                    "showModalDialog": "undefined",
+                    "appCache": "false",
+                    "documentMode": "undefined",
+                    "mozAppearance": "false",
+                    "webkitAppearanceLegacy": "true",
+                    "backdropPrefixed": "true",
+                    "textSizeAdjustPrefixed": "false",
+                    "execCommand": "function"
+                },
+                "architecture": {
+                    "nanSign": "x86"
+                },
+                "engineIdentity": {
+                    "engine": "jsc",
+                    "errorOwnProps": "column,line,message,sourceURL,stack",
+                    "stackShape": "at-sign",
+                    "toFixedMessageLength": 44,
+                    "internalError": false
+                }
+            }
+        },
+        "tier2": {
+            "integrity": {
+                "findings": [],
+                "data": {
+                    "phantomRealm": {
+                        "state": "ok",
+                        "value": {
+                            "nativeToString": {
+                                "checked": 27,
+                                "mismatched": []
+                            },
+                            "domRect": {
+                                "math": true,
+                                "identical": true,
+                                "ghost": true,
+                                "sum": 447.34
+                            },
+                            "svgText": {
+                                "repeatEqual": true,
+                                "bboxAgrees": true
+                            },
+                            "screenTruth": {
+                                "cssWidth": null,
+                                "cssHeight": null,
+                                "cssDpr": true,
+                                "mediaWidth": true,
+                                "mediaHeight": true,
+                                "mediaDpr": true
+                            }
+                        }
+                    },
+                    "resistance": {
+                        "state": "ok",
+                        "value": {
+                            "brave": false,
+                            "timerGranularityUs": 1000,
+                            "rfp": false,
+                            "tor": false,
+                            "gecko": false
+                        }
+                    },
+                    "canvasFill": {
+                        "state": "ok",
+                        "value": {
+                            "exact": true,
+                            "deviations": 0
+                        }
+                    },
+                    "canvasPattern": {
+                        "state": "ok",
+                        "value": {
+                            "exact": true,
+                            "deviations": 0,
+                            "stable": true
+                        }
+                    }
+                },
+                "elapsedMs": 22
+            },
+            "tier2": {
+                "workerScope": {
+                    "workerType": "dedicated",
+                    "window": {
+                        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15",
+                        "platform": "Linux x86_64",
+                        "hardwareConcurrency": 4,
+                        "deviceMemory": null,
+                        "language": "en-US",
+                        "languages": "en-US",
+                        "timeZone": "UTC",
+                        "locale": "en-US",
+                        "tzOffset": 0,
+                        "uaPlatform": null,
+                        "uaMobile": null,
+                        "uaBrands": null,
+                        "webglVendor": "Apple Inc.",
+                        "webglRenderer": "Apple GPU",
+                        "currencyCount": 305,
+                        "engine": "jsc",
+                        "canvasHash": "7eb38576",
+                        "gpuMathHash": "0a1f3839",
+                        "gpuMathPrecision": "highp:23"
+                    },
+                    "worker": {
+                        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15",
+                        "platform": "Linux x86_64",
+                        "hardwareConcurrency": 4,
+                        "deviceMemory": null,
+                        "language": "en-US",
+                        "languages": "en-US",
+                        "timeZone": "UTC",
+                        "locale": "en-US",
+                        "tzOffset": 0,
+                        "uaPlatform": null,
+                        "uaMobile": null,
+                        "uaBrands": null,
+                        "webglVendor": null,
+                        "webglRenderer": null,
+                        "currencyCount": 305,
+                        "engine": "jsc",
+                        "canvasHash": "7eb38576",
+                        "gpuMathHash": null,
+                        "gpuMathPrecision": null
+                    },
+                    "elapsedMs": 465
+                },
+                "textMetrics": {
+                    "presentCount": 11,
+                    "present": "actualBoundingBoxLeft,actualBoundingBoxRight,actualBoundingBoxAscent,actualBoundingBoxDescent,fontBoundingBoxAscent,fontBoundingBoxDescent,emHeightAscent,emHeightDescent,alphabeticBaseline,ideographicBaseline,hangingBaseline",
+                    "fractional": {
+                        "16.5px serif": 104.80884,
+                        "16.6667px serif": 105.80135,
+                        "17.2px serif": 109.17587
+                    },
+                    "ratios": {
+                        "arialOverMono": 1.015072,
+                        "timesOverSerif": 0.856499,
+                        "courierOverMono": 0.996756
+                    },
+                    "letterSpacing": "136.043"
+                },
+                "errorText": {
+                    "intlCurrency": "RangeError|currency is not a well-formed currency code",
+                    "intlFractionDigits": "none",
+                    "intlCalendar": "none",
+                    "intlLocale": "RangeError|invalid language tag",
+                    "segmenterGranularity": "RangeError|granularity must be either \"grapheme\", \"word\", or \"sentence\"",
+                    "dateToISOString": "RangeError|Invalid Date",
+                    "dateInvalid": "RangeError|Invalid Date",
+                    "toFixedRange": "RangeError|toFixed() argument must be between 0 and 100",
+                    "toPrecision": "RangeError|toPrecision() argument must be between 1 and 100",
+                    "regexpBadFlags": "SyntaxError|Invalid flags supplied to RegExp constructor.",
+                    "regexpDuplicateGroup": "SyntaxError|Invalid regular expression: duplicate group specifier name",
+                    "decodeURI": "URIError|URI error",
+                    "proxyRevoked": "TypeError|Proxy has already been revoked. No more operations are allowed to be p",
+                    "nullProtoToString": "TypeError|Object.create(null).toString is not a function. (In 'Object.create(nul",
+                    "cryptoBadTypedArray": "TypeMismatchError|The type of an object was incompatible with the expected type of the p"
+                },
+                "permissions": {
+                    "supported": true,
+                    "states": "geolocation=prompt,notifications=prompt,camera=prompt,microphone=prompt,clipboard-read=TypeError,clipboard-write=TypeError,persistent-storage=TypeError,midi=NotSupportedError,screen-wake-lock=prompt,storage-access=denied,accelerometer=NotSupportedError,gyroscope=NotSupportedError,magnetometer=NotSupportedError,local-fonts=TypeError,window-management=TypeError,display-capture=NotSupportedError,payment-handler=TypeError,background-sync=TypeError",
+                    "prompt": 5,
+                    "denied": 1,
+                    "granted": 0,
+                    "unsupported": 12,
+                    "notificationPermission": "default"
+                },
+                "fontFallback": {
+                    "base": {
+                        "monospace": 1213.7344,
+                        "sans-serif": 1441.4414,
+                        "serif": 1564.2422,
+                        "cursive": 1564.2422,
+                        "fantasy": 1564.2422,
+                        "system-ui": 1441.4414
+                    },
+                    "resolve": {
+                        "Arial": {
+                            "width": 1365.1875,
+                            "collides": []
+                        },
+                        "\"Times New Roman\"": {
+                            "width": 1286.2266,
+                            "collides": []
+                        },
+                        "\"Courier New\"": {
+                            "width": 1209.7969,
+                            "collides": []
+                        },
+                        "Helvetica": {
+                            "width": 1365.1875,
+                            "collides": []
+                        },
+                        "Georgia": {
+                            "width": 1441.4414,
+                            "collides": [
+                                "sans-serif",
+                                "system-ui"
+                            ]
+                        },
+                        "Impact": {
+                            "width": 1441.4414,
+                            "collides": [
+                                "sans-serif",
+                                "system-ui"
+                            ]
+                        },
+                        "\"Segoe UI\"": {
+                            "width": 1441.4414,
+                            "collides": [
+                                "sans-serif",
+                                "system-ui"
+                            ]
+                        },
+                        "Tahoma": {
+                            "width": 1441.4414,
+                            "collides": [
+                                "sans-serif",
+                                "system-ui"
+                            ]
+                        },
+                        "Verdana": {
+                            "width": 1441.4414,
+                            "collides": [
+                                "sans-serif",
+                                "system-ui"
+                            ]
+                        },
+                        "Roboto": {
+                            "width": 1441.4414,
+                            "collides": [
+                                "sans-serif",
+                                "system-ui"
+                            ]
+                        },
+                        "\"MS Gothic\"": {
+                            "width": 1441.4414,
+                            "collides": [
+                                "sans-serif",
+                                "system-ui"
+                            ]
+                        },
+                        "\"Malgun Gothic\"": {
+                            "width": 1441.4414,
+                            "collides": [
+                                "sans-serif",
+                                "system-ui"
+                            ]
+                        }
+                    }
+                },
+                "intl": {
+                    "resolved": {
+                        "locale": "en-US",
+                        "calendar": "gregory",
+                        "numberingSystem": "latn",
+                        "timeZone": "UTC"
+                    },
+                    "maximize": [
+                        "nl-NL>nl-Latn-NL",
+                        "en-GB>en-Latn-GB",
+                        "sr-Latn>sr-Latn-RS",
+                        "ca-ES>ca-Latn-ES",
+                        "az-Arab>az-Arab-IR",
+                        "zh-Hant-TW>zh-Hant-TW"
+                    ],
+                    "collation": "-1,-1,-1",
+                    "numberFormat": "1.234.567,891",
+                    "currency": "1.234,50\u00a0\u20ac",
+                    "calendars": "gregory=1/1/1970|buddhist=1/1/2513 BE|japanese=1/1/45 S|islamic-umalqura=10/22/1389 AH|hebrew=23 Tevet 5730|persian=10/11/1348 AP|indian=10/11/1891 Saka|coptic=4/23/1686 ERA1|ethiopic=4/23/1962 ERA1|chinese=1969-11-24|roc=1/1/59 Minguo",
+                    "timeZone": {
+                        "name": "UTC",
+                        "offset": 0,
+                        "januaryOffset": 0,
+                        "julyOffset": 0
+                    }
+                },
+                "timezoneLmt": {
+                    "agree": true
+                },
+                "audioReadback": {
+                    "constantExact": true,
+                    "methodsAgree": true,
+                    "distinct": 1,
+                    "silenceExact": true,
+                    "analyserSilent": true,
+                    "trapSurvives": true
+                },
+                "heapMemory": {
+                    "supported": false,
+                    "reason": "not implemented"
+                },
+                "buildFingerprint": {
+                    "calendar": "16",
+                    "collation": "12",
+                    "currency": "305",
+                    "numberingSystem": "69",
+                    "unit": "45",
+                    "tzCount": "445",
+                    "tzKyiv": "true",
+                    "tzKiev": "false",
+                    "tzShanghai": "true"
+                },
+                "webrtc": {
+                    "audio": {
+                        "count": 8,
+                        "hash": "4b2de4b8"
+                    },
+                    "video": {
+                        "count": 32,
+                        "hash": "73ad8c9d"
+                    },
+                    "extensions": {
+                        "count": 15,
+                        "hash": "5719eca9"
+                    },
+                    "sdpHash": "e984d1c1"
+                },
+                "fontMetrics": {
+                    "count": 19,
+                    "pairs": "605:1181,607:1185,661:875,664:864,664:869,671:883,686:935,702:958,724:1025,793:1089,798:1104"
+                },
+                "emojiMetrics": {
+                    "width": 120
+                },
+                "scripts": {
+                    "bits": "1111111111111111"
+                },
+                "gpu": {
+                    "webgpu": null,
+                    "webgl": {
+                        "vendor": "Apple Inc.",
+                        "renderer": "Apple GPU",
+                        "model": "apple gpu",
+                        "precision": {
+                            "frag": "127,127,23",
+                            "vert": "127,127,23"
+                        },
+                        "limits": {
+                            "MAX_TEXTURE_SIZE": 16384,
+                            "MAX_RENDERBUFFER_SIZE": 16384,
+                            "MAX_VERTEX_ATTRIBS": 16,
+                            "MAX_VERTEX_UNIFORM_VECTORS": 1024,
+                            "MAX_FRAGMENT_UNIFORM_VECTORS": 1024,
+                            "MAX_VARYING_VECTORS": 32,
+                            "MAX_TEXTURE_IMAGE_UNITS": 32,
+                            "MAX_COMBINED_TEXTURE_IMAGE_UNITS": 64
+                        },
+                        "extCount": 31,
+                        "webgl2": true,
+                        "caps": {
+                            "compressed": "s3tc,s3tc_srgb,astc,etc,etc1",
+                            "samples": "4",
+                            "maxSamples": 4
+                        }
+                    },
+                    "mirroredParamsAgree": true
+                },
+                "gpuMath": {
+                    "hash": "0a1f3839",
+                    "precision": "highp:23",
+                    "software": false
+                },
+                "decoders": {
+                    "h264": "110",
+                    "vp9": "110",
+                    "av1": "110",
+                    "hevc": "110",
+                    "hevc10": "110",
+                    "av1_10": "110",
+                    "vp9_2": "110",
+                    "h264_4k": "110",
+                    "enc": {
+                        "h264": "11",
+                        "vp9": "10",
+                        "av1": "00"
+                    },
+                    "rtc": "H264,RED,RTX,ULPFEC,VP8,VP9"
+                },
+                "voices": {
+                    "count": 4,
+                    "osCount": 4,
+                    "osHash": "a2aa3cc6"
+                },
+                "fontFaces": {
+                    "count": 8,
+                    "windows": 3,
+                    "mac": 1,
+                    "linux": 4,
+                    "android": 0
+                },
+                "keyboardLayout": {
+                    "state": "unavailable"
+                },
+                "audioRealtime": {
+                    "sampleRate": 44100,
+                    "maxChannelCount": 0,
+                    "channelCount": 2,
+                    "channelCountMode": "explicit",
+                    "channelInterpretation": "speakers",
+                    "numberOfInputs": 1,
+                    "numberOfOutputs": 0
+                },
+                "audioOffline": 124.043453745,
+                "audioHardware": {
+                    "sampleRate": 44100,
+                    "maxChannelCount": 0
+                }
+            }
+        }
+    }
+}

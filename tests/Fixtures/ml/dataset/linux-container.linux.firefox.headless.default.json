@@ -1,0 +1,824 @@
+{
+    "schema": "device-id.capture-dataset",
+    "schema_version": 1,
+    "id": "linux-container.linux.firefox.headless.default",
+    "captured_at": "2026-10-31T06:58:16.808Z",
+    "machine": {
+        "id": "linux-container",
+        "os": "linux",
+        "os_release": "6.18.44-fc-v185",
+        "arch": "x64",
+        "cpu_count": 4,
+        "node": "v22.22.0",
+        "display": "xvfb"
+    },
+    "browser": {
+        "name": "firefox",
+        "channel": null,
+        "engine": "gecko",
+        "version": "155.0",
+        "driver": "playwright 1.63.0",
+        "mode": "headless",
+        "variant": "default",
+        "locale": "en-US"
+    },
+    "labels": {
+        "class": "headless",
+        "basis": "harness-declared: headless launch"
+    },
+    "collector": {
+        "envelope_version": 3,
+        "probe_set": 4,
+        "disabled_probes": [
+            "parallelism",
+            "behavior"
+        ]
+    },
+    "transport": {
+        "claims_request_headers": [
+            [
+                "Host",
+                "localhost:37769"
+            ],
+            [
+                "User-Agent",
+                "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0"
+            ],
+            [
+                "Accept",
+                "application/json"
+            ],
+            [
+                "Accept-Language",
+                "en-US"
+            ],
+            [
+                "Accept-Encoding",
+                "gzip, deflate, br, zstd"
+            ],
+            [
+                "content-type",
+                "application/json"
+            ],
+            [
+                "X-XSRF-TOKEN",
+                ""
+            ],
+            [
+                "Referer",
+                "http://localhost:37769/"
+            ],
+            [
+                "Content-Length",
+                "7399"
+            ],
+            [
+                "Origin",
+                "http://localhost:37769"
+            ],
+            [
+                "Connection",
+                "keep-alive"
+            ],
+            [
+                "Sec-Fetch-Dest",
+                "empty"
+            ],
+            [
+                "Sec-Fetch-Mode",
+                "cors"
+            ],
+            [
+                "Sec-Fetch-Site",
+                "same-origin"
+            ],
+            [
+                "Priority",
+                "u=4"
+            ]
+        ],
+        "navigation_headers": [
+            [
+                "Host",
+                "localhost:37769"
+            ],
+            [
+                "User-Agent",
+                "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0"
+            ],
+            [
+                "Accept",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            ],
+            [
+                "Accept-Language",
+                "en-US"
+            ],
+            [
+                "Accept-Encoding",
+                "gzip, deflate, br, zstd"
+            ],
+            [
+                "Connection",
+                "keep-alive"
+            ],
+            [
+                "Upgrade-Insecure-Requests",
+                "1"
+            ],
+            [
+                "Sec-Fetch-Dest",
+                "document"
+            ],
+            [
+                "Sec-Fetch-Mode",
+                "navigate"
+            ],
+            [
+                "Sec-Fetch-Site",
+                "none"
+            ],
+            [
+                "Sec-Fetch-User",
+                "?1"
+            ],
+            [
+                "Priority",
+                "u=0, i"
+            ]
+        ]
+    },
+    "claims": {
+        "tier1": {
+            "integrity": {
+                "findings": [],
+                "data": {
+                    "wrongReceiver": {
+                        "state": "ok",
+                        "value": {
+                            "screen.width": "threw:TypeError",
+                            "screen.availWidth": "threw:TypeError",
+                            "screen.availHeight": "threw:TypeError",
+                            "screen.colorDepth": "threw:TypeError",
+                            "screen.pixelDepth": "threw:TypeError",
+                            "navigator.userAgent": "threw:TypeError",
+                            "navigator.language": "threw:TypeError",
+                            "navigator.onLine": "threw:TypeError",
+                            "navigator.maxTouchPoints": "threw:TypeError",
+                            "navigator.hardwareConcurrency": "threw:TypeError",
+                            "intl.format": "threw:TypeError"
+                        }
+                    },
+                    "descriptorIntegrity": {
+                        "state": "ok",
+                        "value": {
+                            "userAgent": "NS-ce-",
+                            "appVersion": "NS-ce-",
+                            "appName": "NS-ce-",
+                            "platform": "NS-ce-",
+                            "product": "NS-ce-",
+                            "productSub": "NS-ce-",
+                            "vendor": "NS-ce-",
+                            "vendorSub": "NS-ce-",
+                            "language": "NS-ce-",
+                            "languages": "NS-ce-",
+                            "onLine": "NS-ce-",
+                            "cookieEnabled": "NS-ce-",
+                            "doNotTrack": "NS-ce-",
+                            "hardwareConcurrency": "NS-ce-",
+                            "deviceMemory": "no-descriptor",
+                            "maxTouchPoints": "NS-ce-",
+                            "webdriver": "NS-ce-",
+                            "plugins": "NS-ce-",
+                            "mimeTypes": "NS-ce-",
+                            "pdfViewerEnabled": "NS-ce-",
+                            "userAgentData": "no-descriptor",
+                            "connection": "no-descriptor",
+                            "permissions": "NS-ce-",
+                            "credentials": "NS-ce-",
+                            "mediaDevices": "NS-ce-",
+                            "clipboard": "NS-ce-",
+                            "serviceWorker": "NS-ce-",
+                            "storage": "NS-ce-",
+                            "locks": "NS-ce-",
+                            "sendBeacon": "NS-ce-"
+                        }
+                    },
+                    "mathDual": {
+                        "state": "ok",
+                        "value": {
+                            "acos": 1.4473588658278522,
+                            "acosh": 709.889355822726,
+                            "acoshPf": 355.291251501643,
+                            "asin": 0.12343746096704435,
+                            "asinh": 0.881373587019543,
+                            "asinhPf": 0.8813735870195429,
+                            "atanh": 0.5493061443340548,
+                            "atanhPf": 0.5493061443340548,
+                            "atan": 0.4636476090008061,
+                            "sin": 0.8178819121159085,
+                            "sinh": 1.1752011936438014,
+                            "sinhPf": 2.534342107873324,
+                            "cos": -0.8390715290095377,
+                            "cosh": 1.5430806348152437,
+                            "coshPf": 1.5430806348152437,
+                            "tan": -1.4214488238747245,
+                            "tanh": 0.7615941559557649,
+                            "tanhPf": 0.7615941559557649,
+                            "exp": 2.718281828459045,
+                            "expm1": 1.718281828459045,
+                            "expm1Pf": 1.718281828459045,
+                            "log1p": 2.3978952727983707,
+                            "log1pPf": 2.3978952727983707,
+                            "powPI": 1.9275814160560206e-50,
+                            "fma": "no-fma",
+                            "atanhAgrees": true,
+                            "tanhAgrees": true,
+                            "expm1Agrees": true,
+                            "asinhAgrees": true
+                        }
+                    },
+                    "canvasDual": {
+                        "state": "ok",
+                        "value": {
+                            "agree": true,
+                            "fillHash": "808f0273:129140",
+                            "putHash": "808f0273:129140",
+                            "winding": {
+                                "nonzero": 255,
+                                "evenodd": 0,
+                                "differ": true
+                            }
+                        }
+                    },
+                    "domBlockers": {
+                        "state": "ok",
+                        "value": {
+                            "chromeRuntime": false,
+                            "chromeCsi": false,
+                            "chromeLoadTimes": false,
+                            "getEventListeners": "undefined",
+                            "webdriverUndefined": false,
+                            "windowWebdriverEvaluate": "undefined",
+                            "windowSeleniumEvaluate": "undefined",
+                            "windowNightmare": "undefined",
+                            "windowDriverUnwrapped": "undefined",
+                            "domRectToJSON": false,
+                            "functionToStringLength": 41,
+                            "errorPrepareStackTrace": "undefined",
+                            "performanceObserverEntryTypes": "unsupported"
+                        }
+                    },
+                    "webdriverPresence": {
+                        "state": "ok",
+                        "value": {
+                            "present": true
+                        }
+                    },
+                    "canvasFill": {
+                        "state": "ok",
+                        "value": {
+                            "exact": true,
+                            "deviations": 0
+                        }
+                    },
+                    "canvasPattern": {
+                        "state": "ok",
+                        "value": {
+                            "exact": true,
+                            "deviations": 0,
+                            "stable": true
+                        }
+                    },
+                    "automationMarks": {
+                        "state": "ok",
+                        "value": {
+                            "globals": 0,
+                            "cdc": false,
+                            "pw": false,
+                            "outerEqualsInner": false,
+                            "historyLength": 1
+                        }
+                    },
+                    "lieBattery": {
+                        "state": "ok",
+                        "value": {
+                            "checked": 27,
+                            "lied": []
+                        }
+                    },
+                    "resistance": {
+                        "state": "ok",
+                        "value": {
+                            "brave": false,
+                            "timerGranularityUs": 1000,
+                            "rfp": false,
+                            "tor": false,
+                            "gecko": true
+                        }
+                    }
+                },
+                "elapsedMs": 19
+            },
+            "tier1": {
+                "dateParsing": {
+                    "20240115": "NaN",
+                    "2024-01-15": "2024-01-15T00:00:00.000Z",
+                    "2024-01-15T10:20:30": "2024-01-15T10:20:30.000Z",
+                    "2024-01-15T10:20:30Z": "2024-01-15T10:20:30.000Z",
+                    "2024-01-15T10:20:30.123Z": "2024-01-15T10:20:30.123Z",
+                    "2024-01-15 10:20:30": "2024-01-15T10:20:30.000Z",
+                    "2024-01-15T10:20": "2024-01-15T10:20:00.000Z",
+                    "2024-01-15T10:20:30+05:30": "2024-01-15T04:50:30.000Z",
+                    "2024-01-15T10:20:30-08": "NaN",
+                    "Mon, 15 Jan 2024 10:20:30 GMT": "2024-01-15T10:20:30.000Z",
+                    "January 15, 2024": "2024-01-15T00:00:00.000Z",
+                    "15 January 2024": "2024-01-15T00:00:00.000Z",
+                    "2024/01/15": "2024-01-15T00:00:00.000Z",
+                    "01/15/2024": "2024-01-15T00:00:00.000Z",
+                    "2024-13-45": "NaN",
+                    "2024-02-30T00:00:00Z": "2024-03-01T00:00:00.000Z",
+                    "T10:20": "NaN",
+                    "10:20": "NaN",
+                    "Jan 15 2024": "2024-01-15T00:00:00.000Z",
+                    "2024-W03-1": "NaN",
+                    "not a date": "NaN",
+                    "": "NaN",
+                    "2024-01-15T10:20:30.123456789Z": "2024-01-15T10:20:30.123Z"
+                },
+                "cssMedia": "000001011100010011000000",
+                "codecs": "audio/ogg; codecs=\"vorbis\"=probably|audio/ogg; codecs=\"opus\"=probably|audio/mpeg=maybe|audio/mp4; codecs=\"mp4a.40.2\"=probably|audio/wav; codecs=\"1\"=probably|audio/flac=maybe|audio/webm; codecs=\"opus\"=probably|video/ogg; codecs=\"theora\"=no|video/mp4; codecs=\"avc1.42E01E=probably|video/mp4; codecs=\"hev1.1.6.L9=probably|video/mp4; codecs=\"av01.0.05M.=probably|video/webm; codecs=\"vp8, vorbi=probably|video/webm; codecs=\"vp9, opus\"=probably|video/webm; codecs=\"av01.0.05M=probably|video/mp4; codecs=\"hvc1.1.6.L9=probably|application/x-mpegURL=no|application/vnd.apple.mpegurl=no",
+                "esFeatures": {
+                    "count": 65,
+                    "present": "weakRef,finalizationRegistry,arrayAt,errorCause,errorErrors,regExpHasIndices,arrayToSorted,arrayToReversed,arrayToSpliced,arrayWith,arrayFindLast,arrayFindLastIndex,objectGroupBy,promiseWithResolvers,arrayBufferResize,arrayBufferTransfer,regexpVFlag,stringIsWellFormed,stringToWellFormed,iteratorHelpers,setUnion,regexpEscape,promiseTry,float16Array,uint8FromBase64,uint8ToBase64,uint8SetFromBase64,uint8ToHex,errorIsError,mathSumPrecise,arrayFromAsync,mapGetOrInsert,temporal,disposableStack,structuredClone,schedulerYield,navLocks,navCredentials,navMediaCapabilities,navSerial,navGamepads,viewTransitions,invokerCommands,trustedTypes,offscreenCanvas,imageDecoder,videoFrame,wakeLock,showModalDialog,popoverApi,cssHas,cssNesting,cssSubgrid,cssOklch,cssColorMix,cssAnchor,cssFieldSizing,cssAttrTyped,cssTextWrapBalance,cssScrollbarGutter,cssLinearEasing,cssTransitionBehavior,cssLightDark,cssBackdropFilter,webkitAppearance"
+                },
+                "environment": {
+                    "screen": {
+                        "width": 1366,
+                        "height": 768,
+                        "availWidth": 1366,
+                        "availHeight": 768,
+                        "availLeft": 0,
+                        "availTop": 0,
+                        "colorDepth": 24,
+                        "pixelDepth": 24
+                    },
+                    "viewport": {
+                        "innerWidth": 1280,
+                        "innerHeight": 720,
+                        "outerWidth": 1280,
+                        "outerHeight": 806,
+                        "devicePixelRatio": 1,
+                        "innerWidthRatio": 1
+                    },
+                    "identity": {
+                        "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0",
+                        "appVersion": "5.0 (X11)",
+                        "appName": "Netscape",
+                        "appCodeName": "Mozilla",
+                        "product": "Gecko",
+                        "productSub": "20100101",
+                        "vendor": "",
+                        "vendorSub": "",
+                        "platform": "Linux x86_64",
+                        "cookieEnabled": true,
+                        "doNotTrack": "unspecified",
+                        "webdriver": true,
+                        "hardwareConcurrency": 4,
+                        "deviceMemory": null,
+                        "maxTouchPoints": 0,
+                        "language": "en-US",
+                        "languages": [
+                            "en-US"
+                        ],
+                        "pdfViewerEnabled": false
+                    },
+                    "plugins": {
+                        "length": 0,
+                        "names": []
+                    }
+                },
+                "uaClientHints": {
+                    "supported": false
+                },
+                "objectShape": {
+                    "navigator": 47,
+                    "document": 232,
+                    "screen": 16,
+                    "hasChromeObject": "undefined",
+                    "hasInstallPrompt": "false"
+                },
+                "removedApiBoundary": {
+                    "webkitRequestFileSystem": "undefined",
+                    "safariNotification": "undefined",
+                    "webkitSpeechRecognition": "undefined",
+                    "msIndexedDB": "undefined",
+                    "external": "object",
+                    "showModalDialog": "undefined",
+                    "appCache": "false",
+                    "documentMode": "undefined",
+                    "mozAppearance": "false",
+                    "webkitAppearanceLegacy": "true",
+                    "backdropPrefixed": "false",
+                    "textSizeAdjustPrefixed": "true",
+                    "execCommand": "function"
+                },
+                "architecture": {
+                    "nanSign": "x86"
+                },
+                "engineIdentity": {
+                    "engine": "spidermonkey",
+                    "errorOwnProps": "columnNumber,fileName,lineNumber,message",
+                    "stackShape": "at-sign",
+                    "toFixedMessageLength": 25,
+                    "internalError": true
+                }
+            }
+        },
+        "tier2": {
+            "integrity": {
+                "findings": [],
+                "data": {
+                    "phantomRealm": {
+                        "state": "ok",
+                        "value": {
+                            "nativeToString": {
+                                "checked": 27,
+                                "mismatched": []
+                            },
+                            "domRect": {
+                                "math": true,
+                                "identical": true,
+                                "ghost": true,
+                                "sum": 447.517
+                            },
+                            "svgText": {
+                                "repeatEqual": true,
+                                "bboxAgrees": true
+                            },
+                            "screenTruth": {
+                                "cssWidth": true,
+                                "cssHeight": true,
+                                "cssDpr": true,
+                                "mediaWidth": true,
+                                "mediaHeight": true,
+                                "mediaDpr": true
+                            }
+                        }
+                    },
+                    "resistance": {
+                        "state": "ok",
+                        "value": {
+                            "brave": false,
+                            "timerGranularityUs": 1000,
+                            "rfp": false,
+                            "tor": false,
+                            "gecko": true
+                        }
+                    },
+                    "canvasFill": {
+                        "state": "ok",
+                        "value": {
+                            "exact": true,
+                            "deviations": 0
+                        }
+                    },
+                    "canvasPattern": {
+                        "state": "ok",
+                        "value": {
+                            "exact": true,
+                            "deviations": 0,
+                            "stable": true
+                        }
+                    }
+                },
+                "elapsedMs": 22
+            },
+            "tier2": {
+                "workerScope": {
+                    "workerType": "dedicated",
+                    "window": {
+                        "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0",
+                        "platform": "Linux x86_64",
+                        "hardwareConcurrency": 4,
+                        "deviceMemory": null,
+                        "language": "en-US",
+                        "languages": "en-US",
+                        "timeZone": "UTC",
+                        "locale": "en-US",
+                        "tzOffset": 0,
+                        "uaPlatform": null,
+                        "uaMobile": null,
+                        "uaBrands": null,
+                        "webglVendor": "Mesa",
+                        "webglRenderer": "llvmpipe, or similar",
+                        "currencyCount": 307,
+                        "engine": "spidermonkey",
+                        "canvasHash": "f02b5867",
+                        "gpuMathHash": "0a1f3839",
+                        "gpuMathPrecision": "highp:23"
+                    },
+                    "worker": {
+                        "userAgent": "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0",
+                        "platform": "Linux x86_64",
+                        "hardwareConcurrency": 4,
+                        "deviceMemory": null,
+                        "language": "en-US",
+                        "languages": "en-US",
+                        "timeZone": "UTC",
+                        "locale": "en-US",
+                        "tzOffset": 0,
+                        "uaPlatform": null,
+                        "uaMobile": null,
+                        "uaBrands": null,
+                        "webglVendor": "Mesa",
+                        "webglRenderer": "llvmpipe, or similar",
+                        "currencyCount": 307,
+                        "engine": "spidermonkey",
+                        "canvasHash": "f02b5867",
+                        "gpuMathHash": "0a1f3839",
+                        "gpuMathPrecision": "highp:23"
+                    },
+                    "elapsedMs": 269
+                },
+                "textMetrics": {
+                    "presentCount": 11,
+                    "present": "actualBoundingBoxLeft,actualBoundingBoxRight,actualBoundingBoxAscent,actualBoundingBoxDescent,fontBoundingBoxAscent,fontBoundingBoxDescent,emHeightAscent,emHeightDescent,alphabeticBaseline,ideographicBaseline,hangingBaseline",
+                    "fractional": {
+                        "16.5px serif": 104.83334,
+                        "16.6667px serif": 106.38333,
+                        "17.2px serif": 109.6
+                    },
+                    "ratios": {
+                        "arialOverMono": 1.01509,
+                        "timesOverSerif": 0.856478,
+                        "courierOverMono": 0.99654
+                    },
+                    "letterSpacing": "136.05"
+                },
+                "errorText": {
+                    "intlCurrency": "RangeError|invalid currency code in NumberFormat(): XX",
+                    "intlFractionDigits": "none",
+                    "intlCalendar": "none",
+                    "intlLocale": "RangeError|invalid language tag: \"!!\"",
+                    "segmenterGranularity": "RangeError|invalid value \"nope\" for option granularity",
+                    "dateToISOString": "RangeError|invalid date",
+                    "dateInvalid": "RangeError|invalid date",
+                    "toFixedRange": "RangeError|precision 101 out of range",
+                    "toPrecision": "RangeError|precision 0 out of range",
+                    "regexpBadFlags": "SyntaxError|invalid regular expression flag q",
+                    "regexpDuplicateGroup": "SyntaxError|duplicate capture group name in regular expression",
+                    "decodeURI": "URIError|malformed URI sequence",
+                    "proxyRevoked": "TypeError|illegal operation attempted on a revoked proxy",
+                    "nullProtoToString": "TypeError|Object.create(...).toString is not a function",
+                    "cryptoBadTypedArray": "TypeMismatchError|The type of an object is incompatible with the expected type of the pa"
+                },
+                "permissions": {
+                    "supported": true,
+                    "states": "geolocation=prompt,notifications=prompt,camera=prompt,microphone=prompt,clipboard-read=TypeError,clipboard-write=TypeError,persistent-storage=prompt,midi=prompt,screen-wake-lock=granted,storage-access=prompt,accelerometer=TypeError,gyroscope=TypeError,magnetometer=TypeError,local-fonts=TypeError,window-management=TypeError,display-capture=TypeError,payment-handler=TypeError,background-sync=TypeError",
+                    "prompt": 7,
+                    "denied": 0,
+                    "granted": 1,
+                    "unsupported": 10,
+                    "notificationPermission": "default"
+                },
+                "fontFallback": {
+                    "base": {
+                        "monospace": 1213.8,
+                        "sans-serif": 1441.4,
+                        "serif": 1564.2667,
+                        "cursive": 1441.4,
+                        "fantasy": 1441.4,
+                        "system-ui": 1441.4
+                    },
+                    "resolve": {
+                        "Arial": {
+                            "width": 1365.3167,
+                            "collides": []
+                        },
+                        "\"Times New Roman\"": {
+                            "width": 1286.15,
+                            "collides": []
+                        },
+                        "\"Courier New\"": {
+                            "width": 1209.6,
+                            "collides": []
+                        },
+                        "Helvetica": {
+                            "width": 1564.2667,
+                            "collides": [
+                                "serif"
+                            ]
+                        },
+                        "Georgia": {
+                            "width": 1564.2667,
+                            "collides": [
+                                "serif"
+                            ]
+                        },
+                        "Impact": {
+                            "width": 1564.2667,
+                            "collides": [
+                                "serif"
+                            ]
+                        },
+                        "\"Segoe UI\"": {
+                            "width": 1441.4,
+                            "collides": [
+                                "sans-serif",
+                                "cursive",
+                                "fantasy",
+                                "system-ui"
+                            ]
+                        },
+                        "Tahoma": {
+                            "width": 1564.2667,
+                            "collides": [
+                                "serif"
+                            ]
+                        },
+                        "Verdana": {
+                            "width": 1564.2667,
+                            "collides": [
+                                "serif"
+                            ]
+                        },
+                        "Roboto": {
+                            "width": 1564.2667,
+                            "collides": [
+                                "serif"
+                            ]
+                        },
+                        "\"MS Gothic\"": {
+                            "width": 1564.2667,
+                            "collides": [
+                                "serif"
+                            ]
+                        },
+                        "\"Malgun Gothic\"": {
+                            "width": 1564.2667,
+                            "collides": [
+                                "serif"
+                            ]
+                        }
+                    }
+                },
+                "intl": {
+                    "resolved": {
+                        "locale": "en-US",
+                        "calendar": "gregory",
+                        "numberingSystem": "latn",
+                        "timeZone": "UTC"
+                    },
+                    "maximize": [
+                        "nl-NL>nl-Latn-NL",
+                        "en-GB>en-Latn-GB",
+                        "sr-Latn>sr-Latn-RS",
+                        "ca-ES>ca-Latn-ES",
+                        "az-Arab>az-Arab-IR",
+                        "zh-Hant-TW>zh-Hant-TW"
+                    ],
+                    "collation": "-1,-1,-1",
+                    "numberFormat": "1.234.567,891",
+                    "currency": "1.234,50\u00a0\u20ac",
+                    "calendars": "gregory=1/1/1970|buddhist=1/1/2513 BE|japanese=1/1/45 S|islamic-umalqura=10/22/1389 AH|hebrew=23 Tevet 5730|persian=10/11/1348 AP|indian=10/11/1891 \u015aaka|coptic=4/23/1686 AM|ethiopic=4/23/1962 AM|chinese=11/24/1969|roc=1/1/59 Minguo",
+                    "timeZone": {
+                        "name": "UTC",
+                        "offset": 0,
+                        "januaryOffset": 0,
+                        "julyOffset": 0
+                    }
+                },
+                "timezoneLmt": {
+                    "agree": true
+                },
+                "audioReadback": {
+                    "constantExact": true,
+                    "methodsAgree": true,
+                    "distinct": 1,
+                    "silenceExact": true,
+                    "analyserSilent": true,
+                    "trapSurvives": true
+                },
+                "heapMemory": {
+                    "supported": false,
+                    "reason": "not implemented"
+                },
+                "buildFingerprint": {
+                    "calendar": "16",
+                    "collation": "11",
+                    "currency": "307",
+                    "numberingSystem": "78",
+                    "unit": "45",
+                    "tzCount": "445",
+                    "tzKyiv": "true",
+                    "tzKiev": "false",
+                    "tzShanghai": "true"
+                },
+                "webrtc": {
+                    "audio": {
+                        "count": 5,
+                        "hash": "f463c3dc"
+                    },
+                    "video": {
+                        "count": 17,
+                        "hash": "34a7828f"
+                    },
+                    "extensions": {
+                        "count": 9,
+                        "hash": "c82a5946"
+                    },
+                    "sdpHash": "33dcf114"
+                },
+                "fontMetrics": {
+                    "count": 18,
+                    "pairs": "605:1181,607:1185,661:875,664:864,664:869,671:883,686:935,702:958,724:1025,793:1089,798:1104"
+                },
+                "emojiMetrics": {
+                    "width": 120
+                },
+                "scripts": {
+                    "bits": "1111111111111111"
+                },
+                "gpu": {
+                    "webgpu": null,
+                    "webgl": {
+                        "vendor": "Mesa",
+                        "renderer": "llvmpipe, or similar",
+                        "model": "llvmpipe or similar",
+                        "precision": {
+                            "frag": "127,127,23",
+                            "vert": "127,127,23"
+                        },
+                        "limits": {
+                            "MAX_TEXTURE_SIZE": 16384,
+                            "MAX_RENDERBUFFER_SIZE": 16384,
+                            "MAX_VERTEX_ATTRIBS": 16,
+                            "MAX_VERTEX_UNIFORM_VECTORS": 4096,
+                            "MAX_FRAGMENT_UNIFORM_VECTORS": 4096,
+                            "MAX_VARYING_VECTORS": 32,
+                            "MAX_TEXTURE_IMAGE_UNITS": 32,
+                            "MAX_COMBINED_TEXTURE_IMAGE_UNITS": 192
+                        },
+                        "extCount": 16,
+                        "webgl2": true,
+                        "caps": {
+                            "compressed": "s3tc,s3tc_srgb,astc,etc",
+                            "samples": "4",
+                            "maxSamples": 4
+                        }
+                    },
+                    "mirroredParamsAgree": true
+                },
+                "gpuMath": {
+                    "hash": "0a1f3839",
+                    "precision": "highp:23",
+                    "software": true
+                },
+                "decoders": {
+                    "h264": "110",
+                    "vp9": "110",
+                    "av1": "110",
+                    "hevc": "111",
+                    "hevc10": "111",
+                    "av1_10": "110",
+                    "vp9_2": "110",
+                    "h264_4k": "110",
+                    "enc": {
+                        "h264": "10",
+                        "vp9": "10",
+                        "av1": "10"
+                    },
+                    "rtc": "AV1,H264,RED,RTX,ULPFEC,VP8,VP9"
+                },
+                "voices": {
+                    "state": "unavailable"
+                },
+                "fontFaces": {
+                    "count": 3,
+                    "windows": 0,
+                    "mac": 0,
+                    "linux": 3,
+                    "android": 0
+                },
+                "keyboardLayout": {
+                    "state": "unavailable"
+                },
+                "audioRealtime": {
+                    "sampleRate": 44100,
+                    "maxChannelCount": 0,
+                    "channelCount": 2,
+                    "channelCountMode": "explicit",
+                    "channelInterpretation": "speakers",
+                    "numberOfInputs": 1,
+                    "numberOfOutputs": 0
+                },
+                "audioOffline": 35.749972094,
+                "audioHardware": {
+                    "sampleRate": 44100,
+                    "maxChannelCount": 0
+                }
+            }
+        }
+    }
+}
