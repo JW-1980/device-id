@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace DeviceId\Model;
 
+use DeviceId\Email\EmailAssessment;
 use DeviceId\Network\NetworkFacts;
 use DeviceId\Scoring\ScoredClaims;
 
@@ -25,6 +26,10 @@ use DeviceId\Scoring\ScoredClaims;
  * - `network`: the country code the address geolocates to and a category bucket of its network
  *   (`hosting`, `vpn`, `tor`, `other`, `unknown`); never the address or the ASN number. A country is
  *   a 2-letter bucket of millions of people; the host's k-floor applies when it is sliced on.
+ * - `email`: three buckets about the sign-up address (`domain_class` disposable, forwarding, free,
+ *   other, unknown or invalid; `mx` ok, no_mail or unknown; `generated` none, possible or likely),
+ *   never the address, its domain or a hash of either. The e-mail, novelty and velocity facts are
+ *   also features (names and numbers only).
  * - `retention_days` and `expires_on`: the host's pruning job deletes the row on that date.
  *
  * ## What it never contains
@@ -38,7 +43,7 @@ final class TrainingRowBuilder
 {
     public const DEFAULT_RETENTION_DAYS = 365;
 
-    private const ALLOWED_KEYS = ['id', 'features', 'label', 'label_weight', 'source', 'group', 'slice', 'rules_weight', 'observed_week', 'retention_days', 'expires_on', 'schema', 'network'];
+    private const ALLOWED_KEYS = ['id', 'features', 'label', 'label_weight', 'source', 'group', 'slice', 'rules_weight', 'observed_week', 'retention_days', 'expires_on', 'schema', 'network', 'email'];
 
     public function __construct(private readonly string $secret, private readonly int $retentionDays = self::DEFAULT_RETENTION_DAYS)
     {
@@ -52,9 +57,10 @@ final class TrainingRowBuilder
      * @param  string  $engine  chromium|gecko|webkit|unknown
      * @param  array<string, float>  $softFeatures  the optional features ({@see FeatureCatalogue::optional()}): reputation, network, smart signals, velocity
      * @param  NetworkFacts|null  $network  reduced to a country code and an ASN category bucket; the address and the ASN number never enter the row
+     * @param  EmailAssessment|null  $email  reduced to three buckets; the address and its domain never enter the row
      * @return array<string, mixed> JSON-ready, see the class docblock
      */
-    public function build(ScoredClaims $scored, string $deviceKey, string $engine, bool $mobile, bool $protected, ?string $label, string $labelSource, float $labelWeight, \DateTimeImmutable $observedAt, array $softFeatures = [], ?NetworkFacts $network = null): array
+    public function build(ScoredClaims $scored, string $deviceKey, string $engine, bool $mobile, bool $protected, ?string $label, string $labelSource, float $labelWeight, \DateTimeImmutable $observedAt, array $softFeatures = [], ?NetworkFacts $network = null, ?EmailAssessment $email = null): array
     {
         $omitted = 0;
         foreach ($scored->omission as $entry) {
@@ -85,6 +91,7 @@ final class TrainingRowBuilder
                 'privacy' => $protected ? 'protected' : 'none',
             ],
             'network' => $network?->trainingBuckets() ?? ['country' => 'unknown', 'asn_category' => 'unknown'],
+            'email' => $email?->trainingBuckets() ?? ['domain_class' => EmailAssessment::CLASS_UNKNOWN, 'mx' => 'unknown', 'generated' => 'none'],
             'rules_weight' => $scored->verdict->totalWeight(),
             'observed_week' => $observedAt->format('o-\WW'),
             'retention_days' => $this->retentionDays,
@@ -125,8 +132,10 @@ final class TrainingRowBuilder
             }
         });
         foreach ($leaves as $text) {
-            if (filter_var($text, FILTER_VALIDATE_IP) !== false || preg_match('/Mozilla\/|AppleWebKit|Gecko\/|HeadlessChrome|@[a-z0-9-]+\.[a-z]{2,}/i', $text) === 1) {
-                throw new \UnexpectedValueException('a training row carries a value that looks like an address, a User-Agent or an email');
+            if (filter_var($text, FILTER_VALIDATE_IP) !== false
+                || preg_match('/Mozilla\/|AppleWebKit|Gecko\/|HeadlessChrome|@[a-z0-9-]+\.[a-z]{2,}/i', $text) === 1
+                || preg_match('/^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i', $text) === 1) {
+                throw new \UnexpectedValueException('a training row carries a value that looks like an address, a User-Agent, an email or a domain');
             }
         }
     }

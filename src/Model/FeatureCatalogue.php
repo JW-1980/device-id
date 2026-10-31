@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace DeviceId\Model;
 
 use DeviceId\CheckRegistry;
+use DeviceId\Email\EmailAssessment;
+use DeviceId\Email\EmailNormalizer;
 use DeviceId\Network\NetworkFacts;
 use DeviceId\Reputation\ReputationResult;
+use DeviceId\Signals\AccountNovelty;
 use DeviceId\Signals\SmartSignals;
 use DeviceId\Signals\Velocity;
 
@@ -53,8 +56,27 @@ final class FeatureCatalogue
      */
     public const SIGNALS = ['sig_locale_disagreements', 'sig_vm_gpu', 'sig_vm_screen', 'sig_software_gpu', 'sig_emulator', 'sig_private_mode'];
 
-    /** Velocity features ({@see Velocity::features()}). */
-    public const VELOCITY = ['vel_burst', 'vel_impossible_travel'];
+    /**
+     * Velocity features ({@see Velocity::features()}): bursts, impossible travel, and the distinct
+     * counts of velocity v2 (accounts per device, devices per account, e-mail addresses per
+     * network) over three windows (1 hour, 24 hours, 7 days). Each is 1 when its limit is reached.
+     */
+    public const VELOCITY = [
+        'vel_burst', 'vel_impossible_travel',
+        'vel_accounts_per_device_1h', 'vel_accounts_per_device_24h', 'vel_accounts_per_device_7d',
+        'vel_devices_per_account_1h', 'vel_devices_per_account_24h', 'vel_devices_per_account_7d',
+        'vel_emails_per_network_1h', 'vel_emails_per_network_24h', 'vel_emails_per_network_7d',
+    ];
+
+    /**
+     * E-mail features ({@see EmailAssessment::features()}, {@see EmailNormalizer::aliasSpread()}):
+     * buckets about the address, never the address or its domain. `email_generated` is 1 (likely)
+     * or 0.5 (possible).
+     */
+    public const EMAIL = ['email_disposable', 'email_free', 'email_forwarding_alias', 'email_domain_no_mx', 'email_generated', 'email_tagged', 'email_multiple_aliases', 'email_pattern_family'];
+
+    /** Account novelty features ({@see AccountNovelty::features()}): a value the account has not shown before. */
+    public const NOVELTY = ['acct_new_device', 'acct_new_country', 'acct_new_asn', 'acct_new_language', 'acct_new_os'];
 
     /** Caps that keep one outlier from dominating a coefficient. */
     private const INTEGRITY_CAP = 5;
@@ -79,13 +101,13 @@ final class FeatureCatalogue
     }
 
     /**
-     * The optional, host-supplied soft features: reputation, network, signals, velocity.
+     * The optional, host-supplied soft features: reputation, network, signals, velocity, e-mail, novelty.
      *
      * @return list<string>
      */
     public static function optional(): array
     {
-        return [...self::REPUTATION, ...self::NETWORK, ...self::SIGNALS, ...self::VELOCITY];
+        return [...self::REPUTATION, ...self::NETWORK, ...self::SIGNALS, ...self::VELOCITY, ...self::EMAIL, ...self::NOVELTY];
     }
 
     public static function knows(string $name): bool
@@ -155,7 +177,7 @@ final class FeatureCatalogue
             }
             $features[$name] = match ($name) {
                 'sig_locale_disagreements' => min(2.0, (float) $value),
-                'sig_private_mode' => min(1.0, (float) $value),
+                'sig_private_mode', 'email_generated' => min(1.0, (float) $value),
                 default => 1.0,
             };
         }

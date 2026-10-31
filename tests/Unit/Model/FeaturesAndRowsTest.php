@@ -6,6 +6,9 @@ namespace DeviceId\Tests\Unit\Model;
 
 use DeviceId\Capture\CaptureAnalysis;
 use DeviceId\CheckRegistry;
+use DeviceId\Email\DomainMailCheck;
+use DeviceId\Email\EmailAssessment;
+use DeviceId\Email\GeneratedAddress;
 use DeviceId\Ml\CaptureRows;
 use DeviceId\Model\Evaluator;
 use DeviceId\Model\FeatureCatalogue;
@@ -102,7 +105,38 @@ final class FeaturesAndRowsTest extends TestCase
         $this->assertSame(45, $row['rules_weight']);
         $keys = array_keys($row);
         sort($keys);
-        $this->assertSame(['expires_on', 'features', 'group', 'id', 'label', 'label_weight', 'network', 'observed_week', 'retention_days', 'rules_weight', 'schema', 'slice', 'source'], $keys);
+        $this->assertSame(['email', 'expires_on', 'features', 'group', 'id', 'label', 'label_weight', 'network', 'observed_week', 'retention_days', 'rules_weight', 'schema', 'slice', 'source'], $keys);
+    }
+
+    #[Test]
+    public function a_training_row_carries_the_new_soft_features_and_email_buckets_but_never_an_address_a_domain_or_a_hash(): void
+    {
+        $builder = new TrainingRowBuilder(str_repeat('k', 40), 365);
+        $email = new EmailAssessment(EmailAssessment::CLASS_DISPOSABLE, true, false, false, DomainMailCheck::NO_MAIL, GeneratedAddress::LIKELY, true);
+        $soft = $email->features() + ['email_multiple_aliases' => 1.0, 'acct_new_device' => 1.0, 'acct_new_country' => 1.0, 'vel_accounts_per_device_24h' => 1.0, 'vel_emails_per_network_7d' => 1.0, 'net_history_bad' => 1.0];
+
+        $row = $builder->build($this->scored(), 'device-key-abcdef', 'chromium', false, false, 'fraud', 'review', 1.0, new \DateTimeImmutable('2026-10-31'), $soft, null, $email);
+
+        foreach (['email_disposable', 'email_domain_no_mx', 'email_generated', 'email_tagged', 'email_multiple_aliases', 'acct_new_device', 'acct_new_country', 'vel_accounts_per_device_24h', 'vel_emails_per_network_7d', 'net_history_bad'] as $name) {
+            $this->assertSame(1.0, $row['features'][$name], $name);
+        }
+        $this->assertSame(['domain_class' => 'disposable', 'mx' => 'no_mail', 'generated' => 'likely'], $row['email']);
+        $json = json_encode($row);
+        $this->assertStringNotContainsString('mailinator', $json);
+        $this->assertStringNotContainsString('@', $json);
+        $this->assertSame(['domain_class' => 'unknown', 'mx' => 'unknown', 'generated' => 'none'], $builder->build($this->scored(), 'd', 'chromium', false, false, null, 'none', 1.0, new \DateTimeImmutable('2026-10-31'))['email'], 'no e-mail data is unknown');
+        TrainingRowBuilder::assertDeidentified($row);
+
+        foreach (['mailinator.com' => 'domain', 'someone@example.com' => 'address', 'sub.example.co.uk' => 'subdomain'] as $leak => $what) {
+            $tainted = $row;
+            $tainted['email']['domain_class'] = $leak;
+            try {
+                TrainingRowBuilder::assertDeidentified($tainted);
+                $this->fail("a {$what} in the row must be refused");
+            } catch (\UnexpectedValueException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 
     #[Test]

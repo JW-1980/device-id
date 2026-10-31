@@ -1,0 +1,349 @@
+{
+ "21cn.com": {
+  "costs": "free",
+  "hosted": "CN",
+  "hosts": [
+   "189.cn",
+   "21cn.com",
+   "citiz.net",
+   "vip.21cn.com",
+   "vip.citiz.net",
+   "vnet.citiz.net"
+  ],
+  "jurisdiction": "CN",
+  "mx_hosts": [
+   "bent-hw.21cn.net",
+   "mta-189.21cn.com",
+   "mta.21cn.com",
+   "mta.bnet.cn",
+   "mx2-189.21cn.com",
+   "mx3-189.21cn.com"
+  ],
+  "remark": "Chinese portal and free email from 21CN/Tianyi.",
+  "signup_verification": [
+   "mobile"
+  ],
+  "type": "mailbox"
+ },
+ "24-mail.com": {
+  "costs": "free",
+  "hosted": "US",
+  "hosts": [
+   "24-mail.com"
+  ],
+  "mx_hosts": [
+   "24-mail.com"
+  ],
+  "remark": "Signup requires alternate email, CAPTCHA, and address fields.",
+  "signup_verification": [
+   "email",
+   "other"
+  ],
+  "type": "mailbox"
+ },
+ "33mail.com": {
+  "cloud": "AWS",
+  "costs": "freemium",
+  "hosted": "US",
+  "hosts": [
+   "33mail.com"
+  ],
+  "mx_hosts": [
+   "alt1.aspmx.l.google.com",
+   "alt2.aspmx.l.google.com",
+   "aspmx.l.google.com",
+   "aspmx2.googlemail.com",
+   "aspmx3.googlemail.com",
+   "aspmx4.googlemail.com",
+   "aspmx5.googlemail.com"
+  ],
+  "remark": "Alias forwarding service; unlimited private addresses forward to a real inbox.",
+  "signup_verification": [
+   "none"
+  ],
+  "type": "forwarding"
+ },
+ "addy.io": {
+  "cloud": "UpCloud",
+  "costs": "freemium",
+  "hosted": "PL",
+  "hosts": [
+   "addy.io",
+   "anonaddy.com",
+   "anonaddy.me"
+  ],
+  "jurisdiction": "GB",
+  "mx_hosts": [
+   "mail.anonaddy.me",
+   "mail2.anonaddy.me",
+   "mx1.addy.io",
+   "mx2.addy.io"
+  ],
+  "remark": "Open-source anonymous email forwarding (formerly AnonAddy).",
+  "signup_verification": [
+   "email"
+  ],
+  "type": "forwarding"
+ },
+ "apple": {
+  "costs": "paid",
+  "hosts": [
+   "privaterelay.appleid.com"
+  ],
+  "jurisdiction": "US",
+  "mx_hosts": [
+   "smtp1.privaterelay.appleid.com",
+   "smtp2.privaterelay.appleid.com",
+   "smtp3.privaterelay.appleid.com",
+   "smtp4.privaterelay.appleid.com"
+  ],
+  "remark": "Apple iCloud+ Hide My Email / Private Relay addresses.",
+  "signup_verification": [
+   "payment"
+  ],
+  "type": "forwarding"
+ },
+ "duck.com": {
+  "cloud": "Azure",
+  "costs": "free",
+  "hosted": "IE",
+  "hosts": [
+   "duck.com"
+  ],
+  "jurisdiction": "US",
+  "mx_hosts": [
+   "smtp-inbound1.duck.com"
+  ],
+  "remark": "DuckDuckGo Email Protection; @duck.com aliases forward to the real inbox.",
+  "signup_verification": [
+   "email"
+  ],
+  "type": "forwarding"
+ },
+ "gmail.com": {
+  "cloud": "Google Cloud",
+  "costs": "free",
+  "hosted": "US",
+  "hosts": [
+   "gmail.com",
+   "googlemail.com"
+  ],
+  "jurisdiction": "US",
+  "mx_hosts": [
+   "alt1.gmail-smtp-in.l.google.com",
+   "alt2.gmail-smtp-in.l.google.com",
+   "alt3.gmail-smtp-in.l.google.com",
+   "alt4.gmail-smtp-in.l.google.com",
+   "gmail-smtp-in.l.google.com"
+  ],
+  "signup_verification": [
+   "mobile"
+  ],
+  "type": "mailbox"
+ },
+ "mozmail.com": {
+  "cloud": "Google Cloud",
+  "costs": "freemium",
+  "hosted": "US",
+  "hosts": [
+   "mozmail.com",
+   "relay.firefox.com"
+  ],
+  "jurisdiction": "US",
+  "mx_hosts": [
+   "inbound-smtp.us-west-2.amazonaws.com"
+  ],
+  "remark": "Firefox Relay email masks forwarding to the real inbox.",
+  "signup_verification": [
+   "email"
+  ],
+  "type": "forwarding"
+ },
+ "outlook.com": {
+  "cloud": "Azure",
+  "costs": "free",
+  "hosted": "CA",
+  "hosts": [
+   "hotmail.at",
+   "hotmail.ba",
+   "hotmail.be",
+   "hotmail.ca",
+   "hotmail.ch",
+   "hotmail.cl",
+   "hotmail.co.il",
+   "hotmail.co.jp",
+   "hotmail.co.nz",
+   "hotmail.co.th",
+   "hotmail.co.uk",
+   "hotmail.co.za",
+   "hotmail.com",
+   "hotmail.com.ar",
+   "hotmail.com.au",
+   "hotmail.com.br",
+   "hotmail.com.hk",
+   "hotmail.com.pl",
+   "hotmail.com.ru",
+   "hotmail.com.tr",
+   "hotmail.com.tw",
+   "hotmail.cz",
+   "hotmail.de",
+   "hotmail.dk",
+   "hotmail.ee",
+   "hotmail.es",
+   "hotmail.fi",
+   "hotmail.fr",
+   "hotmail.gr",
+   "hotmail.hu",
+   "hotmail.ie",
+   "hotmail.it",
+   "hotmail.lt",
+   "hotmail.lu",
+   "hotmail.lv",
+   "hotmail.ly",
+   "hotmail.nl",
+   "hotmail.no",
+   "hotmail.pt",
+   "hotmail.rs",
+   "hotmail.se",
+   "hotmail.sh",
+   "hotmail.sk",
+   "hotmail.ua",
+   "live.at",
+   "live.be",
+   "live.ca",
+   "live.ch",
+   "live.cl",
+   "live.cn",
+   "live.co.uk",
+   "live.co.za",
+   "live.com",
+   "live.com.ar",
+   "live.com.au",
+   "live.com.mx",
+   "live.com.my",
+   "live.com.pt",
+   "live.com.sg",
+   "live.de",
+   "live.dk",
+   "live.fi",
+   "live.fr",
+   "live.hk",
+   "live.ie",
+   "live.in",
+   "live.it",
+   "live.jp",
+   "live.nl",
+   "live.no",
+   "live.ru",
+   "live.se",
+   "livemail.tw",
+   "msn.com",
+   "msn.com.au",
+   "msn.nl",
+   "outlook.at",
+   "outlook.be",
+   "outlook.bg",
+   "outlook.cl",
+   "outlook.cm",
+   "outlook.co",
+   "outlook.co.id",
+   "outlook.co.il",
+   "outlook.co.nz",
+   "outlook.co.th",
+   "outlook.com",
+   "outlook.com.ar",
+   "outlook.com.au",
+   "outlook.com.br",
+   "outlook.com.es",
+   "outlook.com.gr",
+   "outlook.com.pe",
+   "outlook.com.tr",
+   "outlook.com.ua",
+   "outlook.com.vn",
+   "outlook.cz",
+   "outlook.de",
+   "outlook.dk",
+   "outlook.es",
+   "outlook.fr",
+   "outlook.hu",
+   "outlook.ie",
+   "outlook.in",
+   "outlook.it",
+   "outlook.jp",
+   "outlook.kr",
+   "outlook.lv",
+   "outlook.my",
+   "outlook.ph",
+   "outlook.pt",
+   "outlook.ro",
+   "outlook.sa",
+   "outlook.sg",
+   "outlook.si",
+   "outlook.sk",
+   "passport.com",
+   "windowslive.com"
+  ],
+  "jurisdiction": "US",
+  "mx_hosts": [
+   "apc.olc.protection.outlook.com",
+   "eur.olc.protection.outlook.com",
+   "extmail.msn.bigpond.com",
+   "hotmail-com.olc.protection.outlook.com",
+   "hotmail-cz.f-v1.mx.microsoft",
+   "hotmail-nl.b-v1.mx.microsoft",
+   "live-com.olc.protection.outlook.com",
+   "msn-com.olc.protection.outlook.com",
+   "nam.olc.protection.outlook.com",
+   "outlook-com.olc.protection.outlook.com",
+   "outlook-cz.d-v1.mx.microsoft"
+  ],
+  "remark": "Microsoft freemail (Outlook/Hotmail/Live); anonymous signup possible (CAPTCHA-only flow; phone demanded on risk-flagged attempts).",
+  "signup_verification": [
+   "none"
+  ],
+  "type": "mailbox"
+ },
+ "proton.me": {
+  "costs": "free",
+  "hosted": "DE",
+  "hosts": [
+   "proton.me",
+   "protonmail.ch",
+   "protonmail.com",
+   "pm.me"
+  ],
+  "jurisdiction": "CH",
+  "mx_hosts": [
+   "mail.protonmail.ch",
+   "mailsec.protonmail.ch"
+  ],
+  "remark": "Swiss encrypted mail; email-only signup enables anonymous accounts.",
+  "signup_verification": [
+   "email"
+  ],
+  "type": "mailbox"
+ },
+ "ziggo.nl": {
+  "costs": "paid",
+  "hosted": "NL",
+  "hosts": [
+   "casema.nl",
+   "quicknet.nl",
+   "upc.nl",
+   "upcmail.nl",
+   "vodafone.nl",
+   "ziggo.nl"
+  ],
+  "jurisdiction": "NL",
+  "mx_hosts": [
+   "front.mail.ziggo.com",
+   "mxin10.ziggo.nl",
+   "mxin5.ziggo.nl"
+  ],
+  "remark": "Ziggo/VodafoneZiggo (NL) ISP mail; requires subscription.",
+  "signup_verification": [
+   "payment"
+  ],
+  "type": "isp"
+ }
+}
