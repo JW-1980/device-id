@@ -458,8 +458,9 @@ with the second copy. What replaced them asserts fixed values instead:
 - `demo/standalone-demo.php` — runs end to end with no framework;
 - `tools/golden-check.php` — rule codes and weights, score, band, confidence, canonical digest,
   integrity codes and derived keys for the fixture claim sets (`tests/Fixtures/fingerprint/` and
-  `demo/fixtures.php`) equal values recorded from a real run on 2026-10-21. A rule change must
-  change that file in the same commit. It proves on every run that it can fail.
+  `demo/fixtures.php`) equal values recorded from a real run (first on 2026-10-21; every
+  re-recording since is explained in the file). A rule change must change that file in the same
+  commit. It proves on every run that it can fail.
 
 The intended behaviour of each rule is asserted by this package's PHPUnit suite (`tests/Unit`)
 and by the consuming applications' suites (NutriCompare `tests/Unit/Security`,

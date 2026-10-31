@@ -198,6 +198,9 @@ final class SingleRootCauseInvariantTest extends TestCase
         // The capture is driven, so navigator.webdriver is true (20, the automation class's own
         // signal). Without it, what the privacy mode alone costs must stay below challenge.
         $this->assertArrayHasKey('webdriver_true', $answer['codes']);
+        // RFP reports window.outerWidth/outerHeight equal to the inner size: a protection the
+        // engine evidence proves, not a headless shell (review L5).
+        $this->assertArrayNotHasKey('headless_shell_geometry', $answer['codes']);
         $withoutDriver = array_filter($answer['codes'], static fn (string $code): bool => $code !== 'webdriver_true', ARRAY_FILTER_USE_KEY);
         $disagreements = array_map(static fn (string $code, array $meta): array => ['code' => $code, 'detail' => '', 'weight' => $meta['weight']], array_keys($withoutDriver), $withoutDriver);
         $scorer = new VerdictScorer(new EnvironmentConsistency);

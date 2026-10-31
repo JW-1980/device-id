@@ -683,12 +683,14 @@ final class EnvironmentConsistency
                 'rule' => fn (mixed $c, TransportIntegrityResult $t): ?string => $this->fromIntegrity($c, 'automation_global_present'),
             ],
             // Gated beyond the client's own test, because the client cannot know the claimed
-            // operating system and an engine whose protection sets outer = inner (WebKit) is no
-            // headless shell.
+            // operating system and an engine whose protection sets outer = inner (WebKit; Firefox
+            // resistFingerprinting, which reports the outer size as the inner size and was
+            // measured firing this on a HEADED window, skeptical review L5) is no headless shell.
+            // The Gecko protection counts only under its engine evidence (`protectedGecko()`).
             [
                 'code' => 'headless_shell_geometry',
                 'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
-                    if ($this->fromIntegrity($c, 'headless_shell_geometry') === null) {
+                    if ($this->fromIntegrity($c, 'headless_shell_geometry') === null || self::protectedGecko($c, $t)) {
                         return null;
                     }
 
