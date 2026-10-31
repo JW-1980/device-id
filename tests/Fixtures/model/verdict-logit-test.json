@@ -1,0 +1,53 @@
+{
+    "schema": 1,
+    "model_id": "verdict-logit-fixture-0001",
+    "kind": "logistic",
+    "task": "verdict",
+    "trained_at": "2026-10-31T00:00:00Z",
+    "training_set_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "trainer": {
+        "lib": "fixture",
+        "version": "1"
+    },
+    "features": [
+        "coverage",
+        "family_count",
+        "hit:descriptor_shadowed",
+        "hit:headless_shell_geometry",
+        "hit:lied_os",
+        "hit:ua_headless_token",
+        "hit:ua_vs_ua_header",
+        "hit:webdriver_missing",
+        "integrity_count",
+        "protected"
+    ],
+    "intercept": -3.0,
+    "coefficients": [
+        -0.5,
+        0.6,
+        1.5,
+        0.8,
+        1.0,
+        2.0,
+        1.2,
+        2.4,
+        0.4,
+        -1.0
+    ],
+    "calibration": {
+        "method": "platt",
+        "a": 1.1,
+        "b": -0.2,
+        "fitted": true,
+        "calibrated_to": "training_prevalence"
+    },
+    "rules_calibration": {
+        "a": 0.08,
+        "b": -2.0
+    },
+    "bounds": {
+        "max_adjustment_weight": 20,
+        "min_rule_families_for_escalation": 2
+    },
+    "sha256": "b67414e9abe3df692653762f563137c8ef8158cda32b6f41fbf4e119c12bf45d"
+}
