@@ -11,7 +11,7 @@ declare(strict_types=1);
  *                          [--max-adjustment=20] [--retention-days=365] [--bootstrap=40]
  *
  * Inputs (either or both):
- *   --dataset  capture-harness dataset records (default tests/Fixtures/ml/dataset)
+ *   --dataset  capture-harness dataset records (default tests/Fixtures/ml/dataset and tests/Fixtures/fingerprint/redteam)
  *   --rows     a JSONL export of de-identified training rows (`TrainingRowBuilder`), one per line:
  *              this is how a host's own traffic reaches the trainer. No Python, no network.
  *
@@ -37,7 +37,7 @@ foreach (array_slice($argv, 1) as $arg) {
     }
 }
 
-$directories = explode(',', $options['dataset'] ?? (isset($options['rows']) ? '' : __DIR__.'/../../tests/Fixtures/ml/dataset'));
+$directories = explode(',', $options['dataset'] ?? (isset($options['rows']) ? '' : __DIR__.'/../../tests/Fixtures/ml/dataset,'.__DIR__.'/../../tests/Fixtures/fingerprint/redteam'));
 $directories = array_values(array_filter($directories, static fn (string $d): bool => $d !== ''));
 $loaded = $directories === [] ? ['rows' => [], 'files' => [], 'sha256' => hash('sha256', '')] : CaptureRows::load($directories);
 $rows = $loaded['rows'];

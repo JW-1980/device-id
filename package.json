@@ -8,7 +8,9 @@
         "typecheck": "tsc --noEmit",
         "capture": "node tools/capture/capture.mjs",
         "capture:report": "php tools/capture/engine-report.php",
-        "ml:variants": "node tools/ml/variants.mjs"
+        "ml:variants": "node tools/ml/variants.mjs",
+        "redteam": "node tools/redteam/run.mjs",
+        "redteam:install": "sh tools/redteam/install.sh"
     },
     "devDependencies": {
         "@types/node": "^26.6.3",

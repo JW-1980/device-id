@@ -194,6 +194,21 @@ final class EnvironmentConsistency
         // `-headless` and under Playwright 1.63. 10: a 1366x768 panel-less Linux desktop is the
         // honest collision (Windows is excluded: an auto-hidden taskbar gives the same numbers).
         'headless_gecko_screen' => 10,
+        // Red-team measurements (tools/redteam, Chromium 153 driven by Puppeteer, Playwright, Patchright,
+        // rebrowser, nodriver and undetected-chromedriver with their stealth features on):
+        // `Emulation.setDeviceMetricsOverride`, which Playwright and Puppeteer apply by default (1280x720
+        // and 800x600), makes the page's `screen` equal its viewport while the window still has a title
+        // bar and toolbar around it. A real window cannot fill the whole screen with its viewport and
+        // still have chrome. 20: unambiguous on desktop Chromium, never block alone.
+        'viewport_fills_screen' => 20,
+        // Headless Chromium's own default screen is exactly 800x600 with no taskbar (`--window-size`
+        // default), which nodriver, undetected-chromedriver and Puppeteer keep. No desktop has had an
+        // 800x600 display for twenty years, but kiosks and legacy VMs exist, so 15.
+        'headless_default_screen' => 15,
+        // The window is larger than the screen in BOTH dimensions by more than any border or shadow
+        // (Windows adds 16 px to a maximised window): undetected-chromedriver's headless window is
+        // 1920x1080 on an 800x600 screen. A window spanning monitors exceeds the screen in one axis only.
+        'window_exceeds_screen' => 12,
         // Contract 2 integrity codes. The lie battery and the cross-realm toString are the
         // CreepJS `lies` module re-done without tables: a native function that is
         // constructible, owns a property other than length/name, or survives a cyclic
@@ -661,6 +676,47 @@ final class EnvironmentConsistency
                     }
 
                     return 'The screen is the fixed 1366x768 panel-less screen of Firefox\'s headless widget.';
+                },
+            ],
+            // Geometry a driven Chromium leaves behind (tools/redteam). Three rules over the same
+            // measurements, each silent unless a desktop Chromium reports whole, positive numbers.
+            [
+                'code' => 'viewport_fills_screen',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $g = $this->desktopChromiumGeometry($c, $t);
+                    if ($g === null || $g['outerHeight'] - $g['innerHeight'] < 40 || $g['outerWidth'] < $g['innerWidth']) {
+                        return null;
+                    }
+
+                    return $g['innerWidth'] === $g['screenWidth'] && $g['innerHeight'] === $g['screenHeight']
+                        ? 'The viewport is exactly as large as the screen although the window has a title bar and toolbar around it: an emulated device metrics override.'
+                        : null;
+                },
+            ],
+            [
+                'code' => 'headless_default_screen',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $g = $this->desktopChromiumGeometry($c, $t);
+                    if ($g === null) {
+                        return null;
+                    }
+
+                    return $g['screenWidth'] === 800 && $g['screenHeight'] === 600 && $g['availWidth'] === 800 && $g['availHeight'] === 600
+                        ? 'The screen is exactly 800x600 with no taskbar, the default screen of a headless Chromium.'
+                        : null;
+                },
+            ],
+            [
+                'code' => 'window_exceeds_screen',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $g = $this->desktopChromiumGeometry($c, $t);
+                    if ($g === null) {
+                        return null;
+                    }
+
+                    return $g['outerWidth'] - $g['screenWidth'] > 32 && $g['outerHeight'] - $g['screenHeight'] > 32
+                        ? 'The browser window is larger than the screen in both dimensions.'
+                        : null;
                 },
             ],
             // Contract 2 (notes/21 §2 items 5, 6, 11): the lie battery, the cross-realm
@@ -2407,6 +2463,42 @@ final class EnvironmentConsistency
         }
 
         return false;
+    }
+
+    /**
+     * The window and screen numbers of a desktop Chromium: null for any other engine, a phone or
+     * tablet (touch points or a mobile OS), a window that reports no outer size, or a number that is
+     * not a positive integer. The geometry rules read only this.
+     *
+     * @return array{innerWidth: int, innerHeight: int, outerWidth: int, outerHeight: int, screenWidth: int, screenHeight: int, availWidth: int, availHeight: int}|null
+     */
+    private function desktopChromiumGeometry(mixed $c, TransportIntegrityResult $t): ?array
+    {
+        if (! self::engineEvidence($c, $t)['chromium']) {
+            return null;
+        }
+
+        $ua = $this->value($c, 'tier1', 'environment', 'identity', 'userAgent');
+        if (! is_string($ua) || ! in_array(self::uaOsFamily($ua), ['windows', 'macos', 'linux'], true)
+            || $this->value($c, 'tier1', 'environment', 'identity', 'maxTouchPoints') !== 0) {
+            return null;
+        }
+
+        $g = [];
+        foreach ([
+            'innerWidth' => ['viewport', 'innerWidth'], 'innerHeight' => ['viewport', 'innerHeight'],
+            'outerWidth' => ['viewport', 'outerWidth'], 'outerHeight' => ['viewport', 'outerHeight'],
+            'screenWidth' => ['screen', 'width'], 'screenHeight' => ['screen', 'height'],
+            'availWidth' => ['screen', 'availWidth'], 'availHeight' => ['screen', 'availHeight'],
+        ] as $name => [$group, $field]) {
+            $value = $this->value($c, 'tier1', 'environment', $group, $field);
+            if (! is_int($value) || $value <= 0) {
+                return null;
+            }
+            $g[$name] = $value;
+        }
+
+        return $g;
     }
 
     /**

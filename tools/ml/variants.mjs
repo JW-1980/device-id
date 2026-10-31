@@ -87,11 +87,13 @@ const RECIPES = [
         ['ctx-gb', { locale: 'en-GB', timezoneId: 'Europe/London' }],
         ['ctx-fr', { locale: 'fr-FR', timezoneId: 'Europe/Paris' }],
         ['ctx-us', { locale: 'en-US', timezoneId: 'America/New_York' }],
-        ['ctx-dsf2', { deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } }],
+        // A person's viewport is smaller than their screen (title bar, tabs, toolbar): `screen` is set apart from `viewport`,
+        // because Playwright otherwise makes the page's screen equal to the viewport, which no browser window does.
+        ['ctx-dsf2', { deviceScaleFactor: 2, viewport: { width: 1440, height: 780 }, screen: { width: 1440, height: 900 } }],
         ['ctx-dark', { colorScheme: 'dark' }],
         ['ctx-reduced-motion', { reducedMotion: 'reduce' }],
-        ['ctx-viewport-1366', { viewport: { width: 1366, height: 768 } }],
-        ['ctx-viewport-2560', { viewport: { width: 2560, height: 1440 } }],
+        ['ctx-viewport-1366', { viewport: { width: 1366, height: 650 }, screen: { width: 1366, height: 768 } }],
+        ['ctx-viewport-2560', { viewport: { width: 2560, height: 1300 }, screen: { width: 2560, height: 1440 } }],
     ].map(([id, context]) => ({ id, engine: 'chromium', klass: 'honest', quiet: true, context, basis: `harness-declared: headed, switches suppressed, context option ${id}; driven by Playwright` })),
     // ---- stock headless, to set the baseline
     { id: 'stock-headless', engine: 'chromium', klass: 'headless', headless: true, basis: 'harness-declared: headless launch' },

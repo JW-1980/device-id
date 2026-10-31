@@ -35,7 +35,7 @@ foreach (array_slice($argv, 1) as $arg) {
     }
 }
 
-$loaded = CaptureRows::load(explode(',', $options['dataset'] ?? __DIR__.'/../../tests/Fixtures/ml/dataset'));
+$loaded = CaptureRows::load(explode(',', $options['dataset'] ?? __DIR__.'/../../tests/Fixtures/ml/dataset,'.__DIR__.'/../../tests/Fixtures/fingerprint/redteam'));
 $rows = $loaded['rows'];
 $note = 'rows: '.count($rows).'; dataset sha256 `'.$loaded['sha256'].'`. Labels are harness-declared (see `basis` in each record); the honest class is scripted browsers, not people.';
 

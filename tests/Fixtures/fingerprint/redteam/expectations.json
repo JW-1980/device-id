@@ -1,0 +1,192 @@
+{
+    "dacc57c74d71.linux.baseline.headed.honest-baseline": {
+        "tool": "baseline",
+        "mode": "headed",
+        "flagged": false,
+        "band": "pass",
+        "score": 14,
+        "codes": []
+    },
+    "dacc57c74d71.linux.baseline.headless.honest-baseline": {
+        "tool": "baseline",
+        "mode": "headless",
+        "flagged": true,
+        "band": "challenge",
+        "score": 67,
+        "codes": [
+            "headless_shell_geometry",
+            "ua_headless_token"
+        ]
+    },
+    "dacc57c74d71.linux.nodriver.headed.spoof-nodriver": {
+        "tool": "nodriver",
+        "mode": "headed",
+        "flagged": false,
+        "band": "pass",
+        "score": 14,
+        "codes": [],
+        "undetected_reason": "Headed nodriver on a fresh profile is byte-identical to an un-driven Chrome of the same binary on every probe except document.hasFocus() (false under nodriver and chromedriver, true natively), which an honest background window also gives; measured 2026-10-31 (tools/redteam research page). No JavaScript-visible lie, so no rule is shipped."
+    },
+    "dacc57c74d71.linux.nodriver.headless.spoof-nodriver": {
+        "tool": "nodriver",
+        "mode": "headless",
+        "flagged": true,
+        "band": "challenge",
+        "score": 68,
+        "codes": [
+            "headless_default_screen",
+            "ua_vs_ch_major"
+        ]
+    },
+    "dacc57c74d71.linux.patchright.headed.spoof-patchright": {
+        "tool": "patchright",
+        "mode": "headed",
+        "flagged": false,
+        "band": "pass",
+        "score": 14,
+        "codes": [],
+        "undetected_reason": "Headed Patchright (no viewport emulation, Runtime.enable avoided) is identical to an un-driven Chrome on every probe measured, including the console/Error.stack CDP traps, which return 0 even for plain Playwright on Chrome 153. With default viewport emulation viewport_fills_screen catches it."
+    },
+    "dacc57c74d71.linux.patchright.headless.spoof-patchright": {
+        "tool": "patchright",
+        "mode": "headless",
+        "flagged": true,
+        "band": "challenge",
+        "score": 72,
+        "codes": [
+            "viewport_fills_screen",
+            "ua_vs_ch_major"
+        ]
+    },
+    "dacc57c74d71.linux.playwright-stealth-py.headed.spoof-playwright-stealth-py": {
+        "tool": "playwright-stealth-py",
+        "mode": "headed",
+        "flagged": true,
+        "band": "block",
+        "score": 100,
+        "codes": [
+            "wrong_receiver_did_not_throw",
+            "descriptor_patched",
+            "lie_battery_failed",
+            "brands_vs_ch_header",
+            "lied_os",
+            "worker_vs_window_navigator",
+            "worker_vs_window_gpu",
+            "notification_permission_nonstandard"
+        ]
+    },
+    "dacc57c74d71.linux.playwright-stealth-py.headless.spoof-playwright-stealth-py": {
+        "tool": "playwright-stealth-py",
+        "mode": "headless",
+        "flagged": true,
+        "band": "block",
+        "score": 100,
+        "codes": [
+            "wrong_receiver_did_not_throw",
+            "descriptor_patched",
+            "viewport_fills_screen",
+            "lie_battery_failed",
+            "ua_vs_ch_major",
+            "brands_vs_ch_header",
+            "lied_os",
+            "worker_vs_window_navigator",
+            "worker_vs_window_gpu",
+            "notification_permission_nonstandard"
+        ]
+    },
+    "dacc57c74d71.linux.playwright-stealth-script.headed.spoof-playwright-stealth-script": {
+        "tool": "playwright-stealth-script",
+        "mode": "headed",
+        "flagged": true,
+        "band": "block",
+        "score": 89,
+        "codes": [
+            "descriptor_shadowed",
+            "lie_battery_noise_tool",
+            "notification_permission_nonstandard",
+            "gpu_webgl_params_mismatch"
+        ]
+    },
+    "dacc57c74d71.linux.playwright-stealth-script.headless.spoof-playwright-stealth-script": {
+        "tool": "playwright-stealth-script",
+        "mode": "headless",
+        "flagged": true,
+        "band": "block",
+        "score": 96,
+        "codes": [
+            "descriptor_shadowed",
+            "viewport_fills_screen",
+            "lie_battery_noise_tool",
+            "ua_vs_ch_major",
+            "notification_permission_nonstandard",
+            "gpu_webgl_params_mismatch"
+        ]
+    },
+    "dacc57c74d71.linux.puppeteer-extra-stealth.headed.spoof-puppeteer-extra-stealth": {
+        "tool": "puppeteer-extra-stealth",
+        "mode": "headed",
+        "flagged": true,
+        "band": "block",
+        "score": 83,
+        "codes": [
+            "lie_battery_failed",
+            "worker_vs_window_navigator"
+        ]
+    },
+    "dacc57c74d71.linux.puppeteer-extra-stealth.headless.spoof-puppeteer-extra-stealth": {
+        "tool": "puppeteer-extra-stealth",
+        "mode": "headless",
+        "flagged": true,
+        "band": "block",
+        "score": 95,
+        "codes": [
+            "viewport_fills_screen",
+            "headless_default_screen",
+            "lie_battery_failed",
+            "worker_vs_window_navigator",
+            "worker_vs_window_gpu"
+        ]
+    },
+    "dacc57c74d71.linux.rebrowser-puppeteer.headed.spoof-rebrowser-puppeteer": {
+        "tool": "rebrowser-puppeteer",
+        "mode": "headed",
+        "flagged": false,
+        "band": "pass",
+        "score": 14,
+        "codes": [],
+        "undetected_reason": "Headed rebrowser-puppeteer (defaultViewport null) is identical to an un-driven Chrome on every probe measured; the Runtime.enable traps are dead on Chrome 153 for every driver. With the default 800x600 viewport headless_default_screen and viewport_fills_screen catch it."
+    },
+    "dacc57c74d71.linux.rebrowser-puppeteer.headless.spoof-rebrowser-puppeteer": {
+        "tool": "rebrowser-puppeteer",
+        "mode": "headless",
+        "flagged": true,
+        "band": "challenge",
+        "score": 74,
+        "codes": [
+            "headless_default_screen",
+            "ua_vs_ch_major",
+            "lied_resolution"
+        ]
+    },
+    "dacc57c74d71.linux.undetected-chromedriver.headed.spoof-undetected-chromedriver": {
+        "tool": "undetected-chromedriver",
+        "mode": "headed",
+        "flagged": false,
+        "band": "pass",
+        "score": 14,
+        "codes": [],
+        "undetected_reason": "Headed undetected-chromedriver with a matching chromedriver is identical to an un-driven Chrome except document.hasFocus() false and a maximised 1919x1079 window, both of which honest users produce."
+    },
+    "dacc57c74d71.linux.undetected-chromedriver.headless.spoof-undetected-chromedriver": {
+        "tool": "undetected-chromedriver",
+        "mode": "headless",
+        "flagged": true,
+        "band": "challenge",
+        "score": 77,
+        "codes": [
+            "headless_default_screen",
+            "window_exceeds_screen",
+            "ua_vs_ch_major"
+        ]
+    }
+}

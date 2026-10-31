@@ -3,3 +3,5 @@
 /.phpunit.cache/
 /node_modules/
 /tools/capture/out/
+/tools/redteam/out/
+/.redteam/

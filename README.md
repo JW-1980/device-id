@@ -271,6 +271,53 @@ confidence and keys under a fixed test secret). `index.jsonl` has one summary li
 version changes with any change to these names; `engine` is derived and should be recomputed, not trained
 on, when the engine changes.
 
+## Red-team testing (`npm run redteam`, `tools/redteam/`)
+
+The capture harness above measures honest browsers. `npm run redteam` points the same harness (the real
+collector, the real challenge and claims endpoints, the same engine step) at the free stealth and
+anti-detect tools fraudsters use, with their stealth features on, headless and headed, and reports what
+the engine says about each. The tools are never repository dependencies: they live in a scratch
+directory you choose.
+
+```bash
+npm run redteam:install -- /path/to/scratch     # npm + a python venv in that directory; needs network
+npm run redteam -- --dir=/path/to/scratch       # every tool, headless and headed, 2 runs each
+npm run redteam -- --dir=... --tools=nodriver,patchright --mode=headless --repeat=3
+npm run redteam -- --dir=... --save-fixtures=tests/Fixtures/fingerprint/redteam   # refresh the regression fixtures
+```
+
+- **Tools** (`tools/redteam/tools.mjs`): `puppeteer-extra-stealth` (puppeteer-extra + stealth plugin),
+  `rebrowser-puppeteer`, `patchright`, `playwright-stealth-script` (Playwright plus the init script every
+  "stealth" gist ships), `playwright-stealth-py`, `nodriver`, `undetected-chromedriver` and `camoufox`.
+  The Chromium tools drive the Playwright Chromium (`PLAYWRIGHT_BROWSERS_PATH`, default `/opt/pw-browsers`,
+  or `REDTEAM_CHROME`); `undetected-chromedriver` needs a chromedriver of the same version, which
+  `install.sh` downloads from Chrome for Testing to `<dir>/chromedriver/chromedriver` (or set
+  `REDTEAM_CHROMEDRIVER`). Camoufox's own Firefox build is a
+  separate download from its GitHub releases; when it is absent the tool is reported "not installed".
+  A `baseline` run (plain Playwright Chromium, same machine and mode) is added every time: it is the
+  honest browser the matcher comparison uses.
+- **Headless runs** pass a normal Chrome user agent (every tutorial starts by removing
+  `HeadlessChrome`); headed runs use the tool's best-practice configuration (no viewport emulation).
+- **Labels.** Every run is `labels.class = "spoof"` with `labels.name = "spoof:<tool>"`, so the ML
+  dataset (`tools/ml`) gains adversarial rows. The evaluation reads
+  `tests/Fixtures/fingerprint/redteam` as well as `tests/Fixtures/ml/dataset`.
+- **Report** (`tools/redteam/out/<timestamp>/report.md` and `report.json`, plus `dataset/`): per tool and
+  mode the band, score, confidence, codes, whether every repeat reached `challenge` ("flagged"), whether
+  the browser key differs between repeats ("fresh identity per run"; it does not for any tool measured:
+  the identity follows the machine, not the tool) and whether `DeviceMatcher` links the run to the
+  baseline browser of the same machine.
+- **Regression guard.** `tests/Unit/RedteamFixturesTest` runs the engine over the saved runs and
+  asserts, per tool and mode, the expected outcome in `tests/Fixtures/fingerprint/redteam/expectations.json`:
+  flagged with the named codes, or, for the combinations the engine does not catch, still unflagged with
+  the reason written down. Detection that improves therefore fails the test until the expectation is
+  promoted, and a rule that stops catching a tool fails it too.
+
+What the measurements show, and what they cannot: engine-level stealth (Patchright, rebrowser, nodriver,
+undetected-chromedriver driving a real Chrome headed) leaves no JavaScript-visible lie on a fresh profile;
+only default configuration leaves geometry behind (`viewport_fills_screen`, `headless_default_screen`,
+`window_exceeds_screen`). The measurements come from one Linux container with software GL, not from
+Windows or macOS hardware.
+
 ## Usage without a framework
 
 ```php
