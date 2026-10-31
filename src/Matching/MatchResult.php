@@ -62,6 +62,12 @@ final readonly class MatchResult
      */
     public const VETO_OTHER_NETWORK = 'other_network';
 
+    /**
+     * A mobile or WebKit match reached the ordinary link posterior but not the stricter one
+     * those classes need (`MatcherPolicy`).
+     */
+    public const VETO_STRICTER_THRESHOLD = 'stricter_threshold';
+
     public function __construct(
         public ?int $deviceId,
         public float $posterior,
@@ -74,6 +80,8 @@ final readonly class MatchResult
         public ?int $clusterId = null,
         public ?string $linkVeto = null,
         public bool $provisional = false,
+        /** The learned (Fellegi-Sunter) posterior of the best candidate, for logging; null when the learned matcher is off or has no weights. */
+        public ?float $shadowPosterior = null,
     ) {}
 
     /**

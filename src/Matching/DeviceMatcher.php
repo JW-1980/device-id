@@ -69,7 +69,7 @@ final class DeviceMatcher
     /** Scripts: disagree above this distance; between the two is neutral (round-2 BR2-5). */
     private const SCRIPTS_NEUTRAL_DISTANCE = 6;
 
-    public function __construct(private readonly DeviceCandidateSource $source) {}
+    public function __construct(private readonly DeviceCandidateSource $source, private readonly ?LearnedMatcher $learned = null) {}
 
     public function source(): DeviceCandidateSource
     {
@@ -89,6 +89,8 @@ final class DeviceMatcher
         }
 
         $settings = MatcherSettings::current();
+        $policy = MatcherPolicy::current();
+        $weights = $policy->effectiveWeights($settings['weights']);
 
         if ($keys->browserKey !== null) {
             $exact = $this->source->exact($keys->browserKey, $keys->saltVersion, $organizationId, $excludeDeviceId, $settings['window_days'], $network);
@@ -133,7 +135,7 @@ final class DeviceMatcher
         // Ties are counted on the integer score, not the posterior: the logistic
         // saturates, so two strong candidates scoring 14 and 12 both round to 1.0.
         foreach ($candidates as $candidate) {
-            $score = $this->score($keys, $candidate, $settings['weights'], $settings);
+            $score = $this->score($keys, $candidate, $weights, $settings);
 
             if ($best === null || $score > $bestScore) {
                 $best = $candidate;
@@ -146,25 +148,46 @@ final class DeviceMatcher
 
         $bestPosterior = $best === null ? 0.0 : $this->posterior($bestScore, $settings['midpoint'], $settings['scale']);
 
+        // The learned posterior: logged beside the hand one in `shadow`, deciding in `active`
+        // (which `LearnedMatcher` grants only once every slice has its 1,000 pairs).
+        $shadowPosterior = null;
+        if ($best !== null && $this->learned !== null && $this->learned->effectiveMode() !== LearnedMatcher::MODE_OFF) {
+            $learnedPosterior = $this->learned->posterior($this, $keys, $best, $settings);
+            if ($learnedPosterior !== null) {
+                $shadowPosterior = $learnedPosterior;
+                if ($this->learned->effectiveMode() === LearnedMatcher::MODE_ACTIVE) {
+                    $bestPosterior = $learnedPosterior;
+                }
+            }
+        }
+
         $confidence = MatchResult::confidenceFor($keys->coverage, $bestPosterior);
         $considered = count($candidates);
         $tied = max(1, $tied);
 
-        if ($best !== null && $bestPosterior >= $settings['link_posterior']) {
+        $linkThreshold = $best === null ? $settings['link_posterior'] : $policy->linkPosteriorFor($keys->components, $best->matchComponents(), $settings['link_posterior']);
+
+        if ($best !== null && $bestPosterior >= $settings['link_posterior'] && $bestPosterior < $linkThreshold) {
+            // Mobile and WebKit classes are less unique than desktop Chromium (survey #11), so
+            // they need a stricter posterior to link; below it the match is only `possible`.
+            return new MatchResult(null, $bestPosterior, $confidence, MatchResult::METHOD_POSSIBLE, $best->matchId(), $considered, $tied, false, $best->matchClusterId(), MatchResult::VETO_STRICTER_THRESHOLD, false, $shadowPosterior);
+        }
+
+        if ($best !== null && $bestPosterior >= $linkThreshold) {
             $veto = $this->linkVeto($keys, $best, $tied, $settings);
 
             if ($veto === null) {
-                return new MatchResult($best->matchId(), $bestPosterior, $confidence, MatchResult::METHOD_HARDWARE, null, $considered, $tied, false, $best->matchClusterId());
+                return new MatchResult($best->matchId(), $bestPosterior, $confidence, MatchResult::METHOD_HARDWARE, null, $considered, $tied, false, $best->matchClusterId(), null, false, $shadowPosterior);
             }
 
-            return new MatchResult(null, $bestPosterior, $confidence, MatchResult::METHOD_POSSIBLE, $best->matchId(), $considered, $tied, false, $best->matchClusterId(), $veto);
+            return new MatchResult(null, $bestPosterior, $confidence, MatchResult::METHOD_POSSIBLE, $best->matchId(), $considered, $tied, false, $best->matchClusterId(), $veto, false, $shadowPosterior);
         }
 
         if ($best !== null && $bestPosterior >= $settings['possible_posterior']) {
-            return new MatchResult(null, $bestPosterior, $confidence, MatchResult::METHOD_POSSIBLE, $best->matchId(), $considered, $tied, false, $best->matchClusterId());
+            return new MatchResult(null, $bestPosterior, $confidence, MatchResult::METHOD_POSSIBLE, $best->matchId(), $considered, $tied, false, $best->matchClusterId(), null, false, $shadowPosterior);
         }
 
-        return new MatchResult(null, $bestPosterior, $confidence, MatchResult::METHOD_NEW, null, $considered, $tied);
+        return new MatchResult(null, $bestPosterior, $confidence, MatchResult::METHOD_NEW, null, $considered, $tied, false, null, null, false, $shadowPosterior);
     }
 
     /**
@@ -181,6 +204,10 @@ final class DeviceMatcher
         $theirs = $candidate->matchComponents();
 
         foreach ($settings['veto_components'] as $name) {
+            // An output hash or a capability list is evidence for, never against (survey #4).
+            if (in_array($name, MatcherPolicy::NEVER_VETO, true)) {
+                continue;
+            }
             if ($this->componentAgreement($name, $keys->components, $theirs, $settings) === false) {
                 return MatchResult::VETO_HIGH_ENTROPY_DISAGREEMENT;
             }
@@ -228,10 +255,52 @@ final class DeviceMatcher
     public function score(DeviceKeys $keys, MatchCandidate $candidate, array $weights, ?array $settings = null): int
     {
         $settings ??= MatcherSettings::current();
+        $score = 0;
+
+        foreach ($this->comparisons($keys, $candidate, $weights, $settings) as $name => $agreement) {
+            $weight = $weights[$name] ?? 0;
+            $score += $agreement ? $weight : -$weight;
+        }
+
+        $theirBrowserKey = $candidate->matchBrowserKey();
+        if ($keys->browserKey !== null && $theirBrowserKey !== null && hash_equals($theirBrowserKey, $keys->browserKey)) {
+            $score += $weights['browser_key'] ?? 0;
+        }
+
+        $theirHardwareKey = $candidate->matchHardwareKey();
+        if ($keys->hardwareKey !== null && $theirHardwareKey !== null && hash_equals($theirHardwareKey, $keys->hardwareKey)) {
+            $score += $weights['hardware_key'] ?? 0;
+        }
+
+        return $score;
+    }
+
+    /**
+     * The decisive soft-component comparisons of one candidate: component => agrees (true) or
+     * disagrees (false). A component that says nothing (missing on a side, neutral, or ruled
+     * out by the rules below) is absent from the map.
+     *
+     * This is the one place the comparison rules live; {@see score()} weighs it symmetrically
+     * and the learned (Fellegi-Sunter) weights weigh it asymmetrically in shadow mode, so the
+     * two can never disagree about what a component said.
+     *
+     * - `gpuMath` is consulted only where `gpu` could not decide, and is agree-only;
+     * - `keyboard` and `gpuCaps` are agree-only;
+     * - `keyboard` is dropped when `voices` already agrees: the physical layout and the OS voice
+     *   set both follow the person's language, so counting both double-counts one fact
+     *   (survey #10, language and keyboard layout have high mutual information).
+     *
+     * @param  array<string, int>  $weights  components with a weight of 0 or less are not compared
+     * @param  array{fonts_agree_jaccard: float, fonts_disagree_jaccard: float}  $settings
+     * @return array<string, bool>
+     */
+    public function comparisons(DeviceKeys $keys, MatchCandidate $candidate, array $weights, array $settings): array
+    {
         $theirs = $candidate->matchComponents();
         $myEngine = DeviceComponents::engineOf($keys->components);
         $theirEngine = DeviceComponents::engineOf($theirs);
-        $score = 0;
+        $guardKeyboard = MatcherPolicy::current()->keyboardIsIndependentOfLanguage === false;
+        $out = [];
         $gpuDecided = false;
 
         foreach (DeviceComponents::SOFT as $name) {
@@ -249,19 +318,20 @@ final class DeviceMatcher
 
             $agreement = $this->agreement($name, (string) $mine, (string) $other, $settings, $myEngine, $theirEngine);
 
-            // `gpuMath` (notes/22 M1) exists for the case `gpu` cannot decide — two engines'
-            // WebGL classes are incomparable — so it is consulted only then, and it is
+            // `gpuMath` (notes/22 M1) exists for the case `gpu` cannot decide - two engines'
+            // WebGL classes are incomparable - so it is consulted only then, and it is
             // agree-only: a driver or browser update changes the shader compiler, and a
             // lost agreement must not become a penalty. `gpu` precedes it in SOFT.
             if ($name === 'gpuMath' && ($gpuDecided || $agreement !== true)) {
                 continue;
             }
 
-            // `keyboard` is agree-only for the same reason: a person adds a layout or switches
-            // input language, which must never read as another device. `gpuCaps` is agree-only
-            // because a driver update changes a feature list. (`codecsHw` is exact: a
-            // hardware-codec bit changes with the hardware or an OS media update.)
             if (in_array($name, ['keyboard', 'gpuCaps'], true) && $agreement !== true) {
+                continue;
+            }
+
+            if ($name === 'keyboard' && $guardKeyboard
+                && $this->componentAgreement('voices', $keys->components, $theirs, $settings) === true) {
                 continue;
             }
 
@@ -273,20 +343,10 @@ final class DeviceMatcher
                 $gpuDecided = true;
             }
 
-            $score += $agreement ? $weight : -$weight;
+            $out[$name] = $agreement;
         }
 
-        $theirBrowserKey = $candidate->matchBrowserKey();
-        if ($keys->browserKey !== null && $theirBrowserKey !== null && hash_equals($theirBrowserKey, $keys->browserKey)) {
-            $score += $weights['browser_key'] ?? 0;
-        }
-
-        $theirHardwareKey = $candidate->matchHardwareKey();
-        if ($keys->hardwareKey !== null && $theirHardwareKey !== null && hash_equals($theirHardwareKey, $keys->hardwareKey)) {
-            $score += $weights['hardware_key'] ?? 0;
-        }
-
-        return $score;
+        return $out;
     }
 
     /**
