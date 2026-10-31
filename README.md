@@ -513,6 +513,77 @@ here — see "How the Laravel application depends on it" above.
 renders them from `describe()` and writes them to the same `constraint_weights` the engine reads
 through the resolver.
 
+## Smart signals (`src/Network/`, `src/Signals/`)
+
+Soft, evidence-based signals that read a visitor's network, machine and storage. None blocks alone (the heaviest is 8; the engine's invariant is a maximum of 45 and no single check blocks), none makes a network call on the request path, and every one is **silent when its evidence is missing**: no data is never "clean" and never "listed".
+
+| rule code | weight | fires when | honest cases that fire it (why the weight is low) | honest cases it ignores |
+|---|---|---|---|---|
+| `ip_country_vs_locale` | 5 | the IP's country is named by **neither** the time zone **nor** any language/locale region (both independent settings must disagree) | a VPN user; a traveller who changed both | an expat (foreign language, local clock), a traveller who changed only one, a bare `nl` (no region), an unlisted time zone, a protected Firefox (UTC, en-US) |
+| `network_hosting` | 5 | the ASN is a hosting/cloud/colocation network (name classifier, bad-asn-list) or the address is in a published cloud range (`IpReputation`) | corporate gateways, VPN egress, cloud-hosted browsers | residential and mobile networks, unknown data, protected Firefox |
+| `network_vpn` | 4 | the ASN's registered name says VPN (exclusive with `network_hosting`) | everyone who bought a commercial VPN | as above |
+| `vm_gpu_renderer` | 5 | the WebGL renderer names VMware, VirtualBox, Parallels, QEMU/virtio/virgl, Hyper-V (non-headless desktop UA, no touch) | corporate VDI users, developers | real GPUs, Windows "Basic Render" (WARP), Linux llvmpipe, headless (other rules) |
+| `vm_software_gpu_screen` | 4 | a software rasteriser **and** a screen exactly 800x600, 1024x768 or 1152x864 | a VDI session on a small screen | a software renderer alone (many honest Linux desktops), a small screen alone |
+| `emulator_android` | 8 | an Android UA/device model with an emulator token (`sdk_gphone`, `Android SDK built for`, `ranchu`, `goldfish`, Genymotion...) or a software GPU | developers and testers | real phones; a desktop on SwiftShader |
+| `private_mode_with_other_signals` | 3 | private browsing is likely **and** a hosting/VPN network, a hypervisor GPU, an emulator or a locale mismatch is present | privacy-minded users on a VPN | a private tab alone: never scored |
+
+The same facts are model features (`net_hosting`, `net_vpn`, `net_tor_exit`, `sig_locale_disagreements`, `sig_vm_gpu`, `sig_vm_screen`, `sig_software_gpu`, `sig_emulator`, `sig_private_mode`, `vel_burst`, `vel_impossible_travel`; `FeatureCatalogue::optional()`). Rules are in `CheckRegistry` (so an operator can switch each off with weight 0).
+
+**What was deliberately skipped.** A WebRTC public-IP versus HTTP-IP mismatch needs ICE candidate gathering, which the collector does not do on purpose (it would expose the visitor's local and public addresses; the `webrtc` probe reads codecs from a local offer only). `hardwareConcurrency` against measured parallelism already exists as `cores_vs_measured_parallelism` (the `parallelism` probe is off by default because it costs CPU); a VM reports its configured vCPUs honestly, so no VM-specific cores rule was added. Corporate VDI is documented above as the honest cohort of the two VM rules.
+
+### Private browsing is context, not fraud
+
+`storageProfile` (probe set 5, tier 2, no permission prompt) sends three coarse facts: the storage quota and the Chromium heap limit as half-octave steps (no byte count) and what the origin-private file system did. `SmartSignals::privateMode()` reads them per engine. Measured 2026-10-31 on the installed Chromium 153, Firefox 155 and WebKit 26.6, normal against private/ephemeral contexts, and by the real collector in the capture harness:
+
+| engine | normal profile | private / non-persistent | rule | confidence |
+|---|---|---|---|---|
+| Chromium | quota 10 GiB, heap limit 3.5-4.1 GiB (ratio 2.3-2.9) | `--incognito`: quota 3 GiB (ratio 0.86) | quota not above the heap limit | low: one machine; a nearly full disk makes a normal profile look private; much more RAM than the heap cap hides it |
+| Firefox | quota 10 GiB, OPFS ok | `privatebrowsing.autostart`: OPFS `SecurityError` (quota identical) | OPFS rejected with SecurityError | medium (also fires when all site data is blocked: a storage-restricted mode) |
+| WebKit | quota 1000 MB, OPFS ok | ephemeral context: OPFS `UnknownError` | OPFS rejected | low: Safari itself could not be measured |
+
+The decision: private mode is **exposed as a feature (`sig_private_mode`, 1 or 0.5) and a context flag, and scored only as `private_mode_with_other_signals` (3)** when another signal is present. A private tab is a legitimate privacy choice, and alone it says nothing about fraud. The capture harness's Chromium and WebKit contexts are ephemeral, so its "honest" runs read as private; no rule fires on them.
+
+### Data sources and licences (checked 2026-10-31; re-check, terms change)
+
+| data | source | licence | account | used for |
+|---|---|---|---|---|
+| IP to country | DB-IP "IP to Country Lite", monthly CSV | CC BY 4.0, **attribution required** | none | the geolocation country |
+| IP to ASN and registered name | IPtoASN `ip2asn-combined.tsv.gz`, hourly | Public Domain (PDDL 1.0) | none | the ASN; the name is classified `vpn` or `hosting` at refresh. Its country column is the *registration* country and is never used as a location |
+| hosting/cloud ASN list | `brianhama/bad-asn-list` (about 740 ASNs) | MIT, keep the notice | none | extra hosting ASNs; ignored after a year |
+| country bounding boxes | Natural Earth admin-0 1:50m | Public Domain | none | impossible travel (`tools/network/generate-country-bounds.php` regenerates `CountryBounds`) |
+| cloud ranges, Tor exits, abuse list | `src/Reputation` feeds | see `FeedCatalogue` | none | `datacenterRange`, `torExit` |
+
+Not used, with reasons: **MaxMind GeoLite2** needs an account and a licence key, its EULA grants use for "your own internal business purposes", forbids disclosing the data to third parties without consent and requires destroying superseded versions within 30 days (usable by one application on its own account, not something a shared package should fetch for its hosts). **DB-IP City/ASN Lite**: same licence as the country file, larger, not needed. **X4BNet/lists_vpn and IPLocate**: derived from a CC BY-SA 4.0 database (share-alike). **A licensed list of VPN ASNs**: none was found, so VPN detection is the name classifier (it finds a VPN company that says so in its name, and misses one that does not).
+
+**Attribution.** Show `NetworkDatabase::attribution()` in the host's notices: "IP Geolocation by DB-IP (https://db-ip.com), licensed CC BY 4.0." (DB-IP asks for `<a href='https://db-ip.com'>IP Geolocation by DB-IP</a>` on web pages that display results) and the bad-asn-list MIT credit. `NetworkFacts::$attribution` lists the lines of the datasets that answered a lookup.
+
+### Host API
+
+```php
+// 1. Scheduled job (daily is enough; the monthly file refreshes itself monthly). Never on a request.
+$network = NetworkDatabase::withDefaults($yourRangeFetcher, $yourCrawlerCache);   // the same interfaces the crawlers and IpReputation use
+$network->refreshStale();            // ['dbip_country' => 'refreshed'|'fresh'|'failed', 'iptoasn' => ..., 'bad_asn_list' => ...]
+// Or from a shell:  php -d memory_limit=512M tools/network/refresh.php --cache-dir=/var/cache/device-id
+//                   php tools/network/refresh.php --cache-dir=/var/cache/device-id --lookup=8.8.8.8
+
+// 2. Per request (cache reads only, ~0.1 ms, no network):
+$facts   = $network->lookup($ip)->withReputation($ipReputation->lookup($ip));      // NetworkFacts; or build one from your CDN's country header
+$verdict = $verdictScorer->score($claims, $transport, $deviceKey, $salt, $confidence, $facts);   // adds the network and locale rules
+$soft    = SmartSignals::features($claims, $facts, $transport) + $facts->features();            // model features
+[$verdict, $opinion] = $modelScorer->score($scored, $soft + $reputation->features());
+$row     = $trainingRowBuilder->build($scored, $deviceKey, $engine, $mobile, $protected, $label, $source, $weight, $at, $soft, $facts);  // country + category bucket only
+
+// 3. Velocity (pure functions over history YOU select; thresholds from fingerprint.velocity.*):
+Velocity::burst('signup', 'device_key', $key, $timestampsOfThatKeyInTheLastDay, time());          // ?VelocityFinding
+Velocity::burst('login', 'network_hash', $hash, $timestamps, time());
+Velocity::impossibleTravel($accountId, $sessions);   // [['at' => int, 'country' => 'NL', 'anonymised' => bool], ...]
+Velocity::features($findings);  $finding->toReviewItem();                                    // model features, review queue
+```
+
+Cache cost: about 4,000 keys and 52 MB for the three datasets (shards are base64 so a JSON cache stores them); a refresh needs `ext-zlib` and about 120 MB of memory and took 5 seconds. Velocity configuration (`fingerprint.velocity.*`): `window_seconds` 3600, `signups_per_device` 3, `logins_per_device` 10, `signups_per_network` 8, `logins_per_network` 30, `max_speed_kmh` 1000, `min_distance_km` 500, `min_seconds_between` 300.
+
+Impossible travel judges the *smallest possible* distance between two countries (between their bounding boxes, overseas territories included, so neighbours and France or the USA are 0 km from much of the world). It under-detects by design and cannot raise a false alarm from a large country's centroid. A VPN, proxy, hosting or Tor session (`anonymised: true`) is skipped, because its country says nothing about the person.
+
 ## Machine learning (`src/Model/`, `src/Scoring/ModelScorer.php`, `src/Matching/`, `src/Detectors/`, `src/Reputation/`, `tools/ml/`)
 
 Everything here is plain PHP 8.2: no extension, no Python, no network, no GPU. Training runs on the application's own server. The rules stay the decision-maker; the model is a bounded second opinion, and every part falls back to the rules when it is missing.

@@ -12,7 +12,8 @@
         "phpunit/phpunit": "^11.5"
     },
     "suggest": {
-        "ext-intl": "Region inference for `tz_vs_lang_region`; the rule degrades to silent without it."
+        "ext-intl": "Region inference for `tz_vs_lang_region`; the rule degrades to silent without it.",
+        "ext-zlib": "Reads the gzip files of the local network data (src/Network); without it a refresh stores nothing and the network signals stay silent."
     },
     "autoload": {
         "psr-4": {
