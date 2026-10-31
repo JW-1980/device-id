@@ -304,9 +304,14 @@ The script is also a demonstration: `src/autoload.php` is a short `spl_autoload_
 php demo/standalone-demo.php     # the whole engine, no framework
 php tools/prove-standalone.php   # framework-freedom, as a gate
 php tools/golden-check.php       # fixed answers for fixed claim sets
+php tools/probe-bypass-shapes.php  # every probe feeding several checks is classified (silence/trip/mixed)
 vendor/bin/phpunit               # unit tests
 composer gates                   # all of the above
 ```
+
+`probe-bypass-shapes` is an audit, not a proof: it parses the collector source and fails when a probe
+that feeds more than one rule has no recorded direction (what a one-property stub does to it), so a new
+probe or rule cannot widen the single-point-bypass surface unnoticed.
 
 The demo is not a preview. It runs the engine over labelled fixture claim sets
 (`demo/fixtures.php`) and prints what came out, including its own load-graph check so the

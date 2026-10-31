@@ -28,10 +28,12 @@
         "test": "phpunit",
         "prove-standalone": "php tools/prove-standalone.php",
         "golden-check": "php tools/golden-check.php",
+        "probe-bypass-shapes": "php tools/probe-bypass-shapes.php",
         "demo": "php demo/standalone-demo.php",
         "gates": [
             "@prove-standalone",
             "@golden-check",
+            "@probe-bypass-shapes",
             "@demo",
             "@test"
         ]
