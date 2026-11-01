@@ -155,7 +155,7 @@ final class CheckRegistry
         'ua_reduced_shape_violation' => [15, 'environment', 'A plain-Chrome User-Agent from release 110 on carries an OS version or device model that Chromium freezes (Windows NT 10.0, Mac OS X 10_15_7, Android 10 with model K) while Sec-CH-UA is present.'],
         'webview_ua_shape' => [8, 'environment', 'An Android WebView User-Agent (; wv) without the device model and Build token every WebView ships; OEM overrides are the honest collision.'],
         'audio_readback_perturbed' => [4, 'environment', 'A constant audio source rendered offline read back with values other than the constant, so audio values are noised and cannot identify the device.'],
-        'ua_headless_token' => [30, 'environment', 'The User-Agent, as reported by the page or sent by the browser, carries a headless-browser product token (HeadlessChrome, PhantomJS, SlimerJS).'],
+        'ua_headless_token' => [30, 'environment', 'The User-Agent, as reported by the page or sent by the browser, carries a headless-browser product token (HeadlessChrome, PhantomJS, SlimerJS, Lightpanda).'],
         'screen_vs_css_media' => [20, 'environment', 'screen.width and screen.height both differ from the device size the CSS media-query path reports, which a JavaScript override of screen cannot change.'],
         'tz_intl_vs_date' => [20, 'environment', 'The Intl time zone\'s historic (1113) offset differs from the offset the engine computes itself, the signature of an Intl-only time zone spoof.'],
         'fonts_vs_ua_os' => [15, 'environment', 'None of the fonts the User-Agent\'s operating system ships is installed while another operating system\'s set is.'],

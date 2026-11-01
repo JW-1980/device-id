@@ -270,7 +270,7 @@ npm run capture:report                           # redo the engine step for the 
   `.tar.gz` of it, which is what to send back from another machine: `runs/` (raw envelopes and request
   headers), `dataset/` (see below), `report.md`, `report.json`.
 - **What the report means.** Per capture: the verdict (band, score, rule codes with weights), the
-  confidence number with missing probes and penalties, and whether `tools/capture/expectations.php` is
+  confidence number with missing probes and penalties, and whether `tools/capture/capture-expectations.php` is
   met. An honest headed browser must not reach `challenge` and may fire no code; a headless run is
   expected to give itself away (headless Chromium: `ua_headless_token`); any other code on an honest
   run is a reported failure with the engine's own detail sentence, and the command exits non-zero.

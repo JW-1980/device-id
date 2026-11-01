@@ -362,11 +362,14 @@ final class EnvironmentConsistency
         // noised. Same reasoning and weight as `canvas_readback_perturbed`.
         'audio_readback_perturbed' => 4,
         // The User-Agent — claimed or on the wire — carries a headless/automation product
-        // token (`HeadlessChrome/`, `PhantomJS`, `SlimerJS`). Nothing in this system
+        // token (`HeadlessChrome/`, `PhantomJS`, `SlimerJS`, `Lightpanda`). Nothing in this system
         // looked for it: `headless_automation` reads WebGL strings only. PayPal's
         // challenge script gates its token on exactly this regex (notes/21 §6), and
         // CreepJS's `hasHeadlessUA` is the same test. 30: a browser announcing itself as
-        // headless is not a liar, but it is not a visitor either.
+        // headless is not a liar, but it is not a visitor either. Lightpanda (a headless
+        // browser in Zig on V8 with no rendering engine, github.com/lightpanda-io/browser)
+        // sends `Lightpanda/1.0` on the wire and in `navigator.userAgent` by default; its
+        // `--user_agent_suffix` appends to that string, so the token survives it.
         'ua_headless_token' => 30,
         // Contract 2 claim rules.
         // `screen.width/height` against the CSS `device-width/height` media path read in
@@ -2235,7 +2238,7 @@ final class EnvironmentConsistency
                     $header = $t->witnessString('user_agent');
 
                     foreach ([$claimed, $header] as $userAgent) {
-                        if (is_string($userAgent) && preg_match('/HeadlessChrome\/|PhantomJS|SlimerJS/i', $userAgent) === 1) {
+                        if (is_string($userAgent) && preg_match('/HeadlessChrome\/|PhantomJS|SlimerJS|Lightpanda\b/i', $userAgent) === 1) {
                             return 'The User-Agent carries a headless-browser product token.';
                         }
                     }

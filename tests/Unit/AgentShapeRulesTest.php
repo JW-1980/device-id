@@ -92,6 +92,18 @@ final class AgentShapeRulesTest extends TestCase
         return $out;
     }
 
+    // ------------------------------------------------ ua_headless_token
+
+    #[Test]
+    public function lightpanda_is_caught_by_its_user_agent_token_on_the_page_or_on_the_wire(): void
+    {
+        // Lightpanda's default User-Agent, page and header alike (github.com/lightpanda-io/browser).
+        $this->assertContains('ua_headless_token', self::codes(self::claims('Lightpanda/1.0')), 'the page claim alone');
+        $this->assertContains('ua_headless_token', self::codes(self::claims(), ['user_agent' => 'Lightpanda/1.0']), 'the header alone, the page claim rewritten');
+        $this->assertContains('ua_headless_token', self::codes(self::claims('Lightpanda/1.0 my-agent/2.3')), '--user_agent_suffix appends; the token stays');
+        $this->assertNotContains('ua_headless_token', self::codes(self::claims(), ['user_agent' => self::WINDOWS_CHROME]), 'an honest Chrome');
+    }
+
     // ------------------------------------------------ notification_permission_nonstandard
 
     /**

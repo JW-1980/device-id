@@ -17,7 +17,7 @@ require_once __DIR__.'/../../tools/capture/Expectations.php';
 /**
  * The permanent honest-traffic regression suite: the engine over captures taken by
  * `npm run capture` with the REAL collector in real browsers (Playwright Chromium, Firefox and
- * WebKit on Linux, headless and headed under Xvfb), judged by `tools/capture/expectations.php`.
+ * WebKit on Linux, headless and headed under Xvfb), judged by `tools/capture/capture-expectations.php`.
  *
  * The fixtures hold what the browser said (claims of both envelopes, request headers, labels),
  * never what the engine answered, so an engine change is re-evaluated against real browsers
@@ -118,7 +118,7 @@ final class CaptureFixturesTest extends TestCase
 
         $this->assertSame('pass', $answer['band']);
         // The one documented harness artefact: the capture container is UTC with an en-US locale
-        // (tools/capture/expectations.php, environment_artefacts), weight 6.
+        // (tools/capture/capture-expectations.php, environment_artefacts), weight 6.
         $this->assertSame(['tz_utc_vs_language_region'], array_keys($answer['codes']));
         $this->assertSame(6, $answer['score'] > 0 ? array_sum(array_column($answer['codes'], 'weight')) : 0);
         $this->assertSame([], $answer['confidence']['penalties']);

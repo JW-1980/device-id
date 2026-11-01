@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace DeviceId\Capture;
 
 /**
- * Judges one analysed capture against `expectations.php`.
+ * Judges one analysed capture against `capture-expectations.php`.
  *
  * Every failure names the capture, the code and the engine's own detail sentence, so a false
  * positive on an honest browser can be read off the report without opening the claims.
@@ -20,7 +20,7 @@ final class Expectations
     public static function load(): array
     {
         /** @var array<string, mixed> $rules */
-        $rules = require __DIR__.'/expectations.php';
+        $rules = require __DIR__.'/capture-expectations.php';
 
         return $rules;
     }
