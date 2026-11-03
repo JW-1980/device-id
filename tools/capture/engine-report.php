@@ -17,7 +17,7 @@ declare(strict_types=1);
  *   report.json         everything the report knows
  *   report.md           the human-readable report
  *
- * Exit code 1 when an expectation (`expectations.php`) fails or a run was incomplete.
+ * Exit code 1 when an expectation (`capture-expectations.php`) fails or a run was incomplete.
  */
 require __DIR__.'/../../src/autoload.php';
 require __DIR__.'/CaptureAnalysis.php';

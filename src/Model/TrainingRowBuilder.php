@@ -149,7 +149,7 @@ final class TrainingRowBuilder
         });
         foreach ($leaves as $text) {
             if (filter_var($text, FILTER_VALIDATE_IP) !== false
-                || preg_match('/Mozilla\/|AppleWebKit|Gecko\/|HeadlessChrome|@[a-z0-9-]+\.[a-z]{2,}/i', $text) === 1
+                || preg_match('/Mozilla\/|AppleWebKit|Gecko\/|HeadlessChrome|Lightpanda|@[a-z0-9-]+\.[a-z]{2,}/i', $text) === 1
                 || preg_match('/^(?:[a-z0-9-]+\.)+[a-z]{2,}$/i', $text) === 1) {
                 throw new \UnexpectedValueException('a training row carries a value that looks like an address, a User-Agent, an email or a domain');
             }
