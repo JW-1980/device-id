@@ -19,6 +19,10 @@ use DeviceId\Support\TransportIntegrityResult;
  * resumption changes section c and the extension count only (notes/14) and is ignored,
  * and so is a TCP↔QUIC switch (`t` against `q` is never compared). Any null on either
  * side is silence. Soft, weight 25.
+ *
+ * Two more compare the previous observation of the same cookie: `temporal_hard_component_changed`
+ * (OS, architecture, touch) and `temporal_engine_changed` (the measured engine; a cookie moved
+ * into another browser). See their methods.
  */
 final readonly class TemporalConsistency
 {
@@ -27,6 +31,9 @@ final readonly class TemporalConsistency
 
     /** Stored as `transport_temporal_hard_component_changed`. */
     public const HARD_COMPONENT_CHANGED = 'temporal_hard_component_changed';
+
+    /** Stored as `transport_temporal_engine_changed`. */
+    public const ENGINE_CHANGED = 'temporal_engine_changed';
 
     /** One observation back: a wider window fires on honest browsers that updated. */
 
@@ -39,6 +46,7 @@ final readonly class TemporalConsistency
      *
      * @param  string|null  $userAgentSummary  what THIS observation reported
      * @param  string|null  $blockTuple  `DeviceComponents::blockTuple()` of THIS observation (null when a hard component is unknown)
+     * @param  string|null  $engine  `EnvironmentConsistency::measuredEngine()` of THIS observation
      * @return list<TransportFinding>
      */
     public function findings(
@@ -46,6 +54,7 @@ final readonly class TemporalConsistency
         ?TransportIntegrityResult $transport,
         ?string $userAgentSummary,
         ?string $blockTuple = null,
+        ?string $engine = null,
     ): array {
         if ($previous === null) {
             return [];
@@ -54,6 +63,35 @@ final readonly class TemporalConsistency
         return [
             ...$this->ja4Findings($previous, $transport, $userAgentSummary),
             ...$this->hardComponentFindings($previous, $blockTuple),
+            ...$this->engineFindings($previous, $engine),
+        ];
+    }
+
+    /**
+     * `temporal_engine_changed`: the browser engine the page measured (`measuredEngine()`: the
+     * JavaScript engine marks, or Lightpanda's own brand) differs from the previous observation of
+     * the SAME first-party cookie. A cookie lives in one browser's jar; it reaches another engine
+     * only when someone exports it, which is how a logged-in session is moved into a headless
+     * browser (a Chrome profile's cookies loaded into Lightpanda over CDP or a cookie file). So the
+     * observation is still linked to the cookie's device, which is the link, and flagged.
+     *
+     * It complements `temporal_hard_component_changed`, which stays silent here: Lightpanda reports
+     * no operating system, so its hard tuple is unknown. A UA switcher does not move the measured
+     * engine, so it cannot trip this rule. Either side null is silence.
+     *
+     * @return list<TransportFinding>
+     */
+    private function engineFindings(PreviousObservation $previous, ?string $engine): array
+    {
+        if ($engine === null || $engine === '' || $previous->engine === null || $previous->engine === '' || $previous->engine === $engine) {
+            return [];
+        }
+
+        return [
+            TransportFinding::soft(
+                self::ENGINE_CHANGED,
+                sprintf('The browser engine changed from %s to %s under the same cookie, which a cookie only does when it is exported into another browser.', $previous->engine, $engine),
+            ),
         ];
     }
 

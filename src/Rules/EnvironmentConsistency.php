@@ -278,6 +278,11 @@ final class EnvironmentConsistency
         // hash, so no claim value is kept. 25: a cookie jar shared across devices is the honest
         // collision, so it is never the 45 of a protocol violation.
         'transport_temporal_hard_component_changed' => 25,
+        // The measured engine (marks, or Lightpanda's brand) differs between two observations of the
+        // same first-party cookie: the cookie was exported into another browser. 20: a one-time
+        // browser migration that imports cookies (Firefox can import Chrome's) is the honest
+        // collision, so it is weaker than the hardware change and never blocks alone.
+        'transport_temporal_engine_changed' => 20,
         // The Referer against Sec-Fetch-Site (see TransportIntegrity). Both are improbable rather
         // than impossible (an embedder or a privacy tool can add a header), hence soft and 8.
         'transport_fetch_none_with_referer' => 8,
@@ -371,6 +376,10 @@ final class EnvironmentConsistency
         // sends `Lightpanda/1.0` on the wire and in `navigator.userAgent` by default; its
         // `--user_agent_suffix` appends to that string, so the token survives it.
         'ua_headless_token' => 30,
+        // matchMedia matches neither `(hover: hover)` nor `(hover: none)`: no media-query
+        // engine behind it (Lightpanda, DOM emulators). 15: the same size as the other
+        // headless-shape tells, a block only together with them.
+        'media_hover_unanswered' => 15,
         // Contract 2 claim rules.
         // `screen.width/height` against the CSS `device-width/height` media path read in
         // the phantom realm: a JavaScript hook on `screen` does not reach a stylesheet.
@@ -1326,6 +1335,26 @@ final class EnvironmentConsistency
                 },
             ],
 
+            // `(hover: hover)` and `(hover: none)` are complementary: every engine that knows the
+            // Media Queries 4 `hover` feature (Chrome 38, Firefox 64, Safari 9 on) matches exactly
+            // one. Both false is an engine with no media-query evaluation behind matchMedia:
+            // Lightpanda answers every feature but width, height and orientation with false
+            // (css/MediaQuery.zig), whatever User-Agent it was given. A throw ('x') is no evidence.
+            [
+                'code' => 'media_hover_unanswered',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    $media = self::read($c, 'tier1', 'cssMedia');
+
+                    if (! is_string($media) || strlen($media) <= self::CSS_HOVER_NONE) {
+                        return null;
+                    }
+
+                    return ($media[self::CSS_HOVER_HOVER] === '0' && $media[self::CSS_HOVER_NONE] === '0')
+                        ? 'matchMedia matches neither (hover: hover) nor (hover: none), two queries one of which every browser matches.'
+                        : null;
+                },
+            ],
+
             // A 3x-or-higher device pixel ratio on a screen narrower than 360 CSS
             // pixels does not correspond to a shipping device. Weight 6, because
             // zoom and OS scaling settings make this softer than it looks.
@@ -2243,7 +2272,7 @@ final class EnvironmentConsistency
                         }
                     }
 
-                    return null;
+                    return self::lightpandaBrand($c, $t);
                 },
             ],
 
@@ -3140,6 +3169,52 @@ final class EnvironmentConsistency
     }
 
     /**
+     * Where Lightpanda names itself even under a replaced User-Agent, as a detail sentence, or
+     * null. It sends `Sec-Ch-Ua: "Lightpanda";v="1"` on every request and refuses to let
+     * `--http_header` override it, and `userAgentData.brands` says the same.
+     */
+    public static function lightpandaBrand(mixed $claims, TransportIntegrityResult $transport): ?string
+    {
+        $hint = $transport->witnessString('sec_ch_ua');
+        if ($hint !== null && preg_match('/"Lightpanda"/i', $hint) === 1) {
+            return 'The Sec-CH-UA header names the Lightpanda headless browser.';
+        }
+
+        $brands = self::read($claims, 'tier1', 'uaClientHints', 'brands');
+        foreach (is_array($brands) ? $brands : [] as $brand) {
+            if (is_array($brand) && is_string($brand['brand'] ?? null) && strcasecmp($brand['brand'], 'Lightpanda') === 0) {
+                return 'userAgentData.brands names the Lightpanda headless browser.';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The browser engine of one observation as the page measured it, never as the User-Agent
+     * says it: `lightpanda` when Lightpanda names itself in its User-Agent, brand header or
+     * brands (its JavaScript is V8, so the marks alone would say `chromium`), otherwise the
+     * engine marks' family (`chromium`|`gecko`|`webkit`), otherwise null. A UA switcher does not
+     * move it. The host stores it per observation for `temporal_engine_changed`
+     * ({@see \DeviceId\Support\PreviousObservation::$engine}).
+     */
+    public static function measuredEngine(mixed $claims, TransportIntegrityResult $transport): ?string
+    {
+        foreach ([self::read($claims, 'tier1', 'environment', 'identity', 'userAgent'), $transport->witnessString('user_agent')] as $userAgent) {
+            if (is_string($userAgent) && preg_match('/Lightpanda\b/i', $userAgent) === 1) {
+                return 'lightpanda';
+            }
+        }
+        if (self::lightpandaBrand($claims, $transport) !== null) {
+            return 'lightpanda';
+        }
+
+        $marks = self::read($claims, 'tier1', 'engineIdentity');
+
+        return is_array($marks) ? self::engineFromMarks($marks) : null;
+    }
+
+    /**
      * The engine family the JavaScript object model belongs to, from the raw marks the
      * `engineIdentity` probe sends, or null when they identify none.
      *
@@ -3241,6 +3316,11 @@ final class EnvironmentConsistency
     private const CSS_ANY_POINTER_COARSE = 6;
 
     private const CSS_POINTER_COARSE = 22;
+
+    /** `(hover: hover)` and `(hover: none)` in the same string. */
+    private const CSS_HOVER_HOVER = 8;
+
+    private const CSS_HOVER_NONE = 23;
 
     private const CSS_MIN_LENGTH = 23;
 

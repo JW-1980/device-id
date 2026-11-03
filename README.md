@@ -407,7 +407,7 @@ and the application depends on it.
 | `Settings`, `CheckRegistry`, `ProbeRegistry` | **yes** | — |
 | `Support/Config` — the configuration bridge | **yes**: `use()` (snapshot) or `resolveWith()` (live resolver) | the values |
 | `Rules/EnvironmentConsistency`, `Rules/IntegrityFindings` | **yes** | — |
-| `Rules/TemporalConsistency` | **yes**, over a `Support/PreviousObservation` | the previous observation, via `Support/ObservationReader` (app: `EloquentObservationReader`) |
+| `Rules/TemporalConsistency` | **yes**, over a `Support/PreviousObservation` | the previous observation, via `Support/ObservationReader` (app: `EloquentObservationReader`); for `temporal_engine_changed` the host stores `EnvironmentConsistency::measuredEngine()` per observation and passes it as `PreviousObservation::$engine` (without it the rule is silent) |
 | `Scoring/VerdictScorer`, `ConfidenceScorer`, `ProbeOmission`, `ScoredClaims`, `OmissionGateSettings` | **yes** | the gate settings via `fingerprint.omission_gate` |
 | `Keys/DeviceKeyDeriver`, `DeviceComponents`, `DeviceKeys` — keyed derivation | **yes** | `fingerprint.device_key_secret` (32+ chars, or no key is derived) |
 | `Matching/DeviceMatcher`, `MatchResult`, `MatchCandidate`, `LinkState`, `MatcherSettings`, `MatchesAsCandidate` | **yes** | the candidate rows: a `Matching/DeviceCandidateSource` (required constructor argument; app: `FingerprintDeviceCandidates`, `VisitorDeviceCandidates`) |

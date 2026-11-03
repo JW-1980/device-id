@@ -104,6 +104,52 @@ final class AgentShapeRulesTest extends TestCase
         $this->assertNotContains('ua_headless_token', self::codes(self::claims(), ['user_agent' => self::WINDOWS_CHROME]), 'an honest Chrome');
     }
 
+    #[Test]
+    public function lightpanda_is_caught_by_its_brand_when_the_user_agent_is_replaced(): void
+    {
+        // `--user_agent` replaces the string (never with "Mozilla" in it); the brand stays.
+        $this->assertContains('ua_headless_token', self::codes(self::claims('MyAgent/2.0'), ['sec_ch_ua' => '"Lightpanda";v="1"']), 'the header Lightpanda cannot override');
+        $claims = self::claims('MyAgent/2.0');
+        $claims['tier1']['uaClientHints'] = ['state' => 'ok', 'value' => ['brands' => [['brand' => 'Lightpanda', 'version' => '1']]]];
+        $this->assertContains('ua_headless_token', self::codes($claims), 'the page brands');
+        $this->assertNotContains('ua_headless_token', self::codes(self::claims(), self::CHROMIUM_HINT), 'an honest Chromium brand list');
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: bool}>
+     */
+    public static function hoverMedia(): array
+    {
+        // value-probes.ts cssMedia(): bit 8 is (hover: hover), bit 23 (hover: none).
+        $with = static function (array $bits): string {
+            $media = str_repeat('0', 24);
+            foreach ($bits as $index => $bit) {
+                $media[$index] = $bit;
+            }
+
+            return $media;
+        };
+
+        return [
+            'Lightpanda: every feature false' => [str_repeat('0', 24), true],
+            'desktop mouse: hover' => [$with([7 => '1', 8 => '1', 13 => '1', 16 => '1']), false],
+            'phone: hover none' => [$with([6 => '1', 13 => '1', 22 => '1', 23 => '1']), false],
+            'hover query threw' => [$with([8 => 'x']), false],
+            'truncated string' => [str_repeat('0', 20), false],
+        ];
+    }
+
+    #[Test]
+    #[DataProvider('hoverMedia')]
+    public function a_matchmedia_that_matches_neither_hover_query_has_no_media_engine(string $media, bool $fires): void
+    {
+        $claims = self::claims();
+        $claims['tier1']['cssMedia'] = ['state' => 'ok', 'value' => $media];
+
+        $this->assertSame($fires, in_array('media_hover_unanswered', self::codes($claims), true));
+        $this->assertSame(15, EnvironmentConsistency::weights()['media_hover_unanswered']);
+    }
+
     // ------------------------------------------------ notification_permission_nonstandard
 
     /**
@@ -291,7 +337,7 @@ final class AgentShapeRulesTest extends TestCase
     public function every_new_environment_rule_is_registered_with_a_description_and_no_single_check_can_block(): void
     {
         $weights = ['notification_permission_nonstandard' => 25, 'fonts_single_family_desktop' => 10, 'tz_utc_vs_language_region' => 6, 'ua_reduced_shape_violation' => 15, 'webview_ua_shape' => 8,
-            'transport_temporal_hard_component_changed' => 25, 'transport_fetch_none_with_referer' => 8, 'transport_referer_implausible' => 8, 'transport_agent_self_identified' => 0];
+            'transport_temporal_hard_component_changed' => 25, 'transport_temporal_engine_changed' => 20, 'media_hover_unanswered' => 15, 'transport_fetch_none_with_referer' => 8, 'transport_referer_implausible' => 8, 'transport_agent_self_identified' => 0];
 
         foreach ($weights as $code => $weight) {
             $this->assertSame($weight, EnvironmentConsistency::weights()[$code], $code);
@@ -440,6 +486,42 @@ final class AgentShapeRulesTest extends TestCase
         $this->assertSame([], $rule->findings(new PreviousObservation(blockTuple: ''), null, null, $android));
         $this->assertSame([], $rule->findings(null, null, null, $android), 'a first visit');
         $this->assertSame([], $rule->findings(new PreviousObservation(blockTuple: $windows), null, null), 'a host that does not pass the tuple');
+    }
+
+    // ------------------------------------------------ temporal_engine_changed
+
+    #[Test]
+    public function a_cookie_exported_from_chrome_into_lightpanda_is_linked_and_flagged(): void
+    {
+        $rule = new TemporalConsistency;
+        $chrome = self::claims();
+        $lightpanda = self::claims('MyAgent/2.0');
+
+        $this->assertSame('chromium', EnvironmentConsistency::measuredEngine($chrome, new TransportIntegrityResult));
+        $this->assertSame('lightpanda', EnvironmentConsistency::measuredEngine($lightpanda, new TransportIntegrityResult([], ['sec_ch_ua' => '"Lightpanda";v="1"'])), 'its V8 marks say chromium; the brand wins');
+        $this->assertSame('lightpanda', EnvironmentConsistency::measuredEngine(self::claims('Lightpanda/1.0'), new TransportIntegrityResult));
+
+        // The Chrome profile's cookie, now presented by Lightpanda, whose OS (and so hard tuple) is unknown.
+        $moved = $rule->findings(new PreviousObservation(blockTuple: hash('sha256', 'linux|x86|0'), engine: 'chromium'), null, null, null, 'lightpanda');
+        $this->assertSame([TemporalConsistency::ENGINE_CHANGED], array_map(static fn (TransportFinding $f): string => $f->code, $moved));
+        $this->assertFalse($moved[0]->isHard());
+    }
+
+    #[Test]
+    public function the_engine_rule_ignores_a_ua_switch_an_unchanged_engine_and_anything_unknown(): void
+    {
+        $rule = new TemporalConsistency;
+
+        // A UA switcher claiming Firefox on Chrome leaves the V8 marks: still chromium.
+        $this->assertSame('chromium', EnvironmentConsistency::measuredEngine(self::claims('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0'), new TransportIntegrityResult));
+        $this->assertSame('webkit', EnvironmentConsistency::measuredEngine(self::claims(self::MAC_SAFARI, marks: self::SAFARI_MARKS), new TransportIntegrityResult));
+
+        $this->assertSame([], $rule->findings(new PreviousObservation(engine: 'chromium'), null, null, null, 'chromium'));
+        $this->assertSame([], $rule->findings(new PreviousObservation(engine: 'chromium'), null, null, null, null), 'unknown now');
+        $this->assertSame([], $rule->findings(new PreviousObservation(engine: null), null, null, null, 'lightpanda'), 'unknown before');
+        $this->assertSame([], $rule->findings(new PreviousObservation(engine: ''), null, null, null, 'gecko'));
+        $this->assertSame([], $rule->findings(new PreviousObservation(engine: 'chromium'), null, null), 'a host that does not pass the engine');
+        $this->assertTrue((new PreviousObservation(engine: 'gecko'))->isInformative());
     }
 
     #[Test]

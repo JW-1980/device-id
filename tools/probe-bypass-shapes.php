@@ -253,6 +253,12 @@ $DIRECTION = [
     // the renderer rules (the matcher then loses the `gpu` component, which is a coverage cost).
     'gpu' => ['mixed', 'patching one WebGL context trips gpu_webgl_params_mismatch and the renderer rules; removing WebGL silences the renderer rules at a coverage cost'],
 
+    // `cssMedia`: read by `touch_vs_pointer_media` (6) and `media_hover_unanswered` (15). A matchMedia stub
+    // answering false trips the hover rule (both complementary hover queries unmatched); deleting or
+    // throwing matchMedia yields 'x' per query and silences both. Open item: no rule fires on "no
+    // matchMedia in a desktop engine".
+    'cssMedia' => ['mixed', 'an always-false matchMedia trips media_hover_unanswered; a throwing or deleted matchMedia answers x and silences it and touch_vs_pointer_media'],
+
     // `intl`: read by the two time-zone/language rules only (weights 4 and 6). Hiding the zone silences them,
     // but the same stub is what `tz_intl_vs_date`, `worker_vs_window_timezone` and the lie battery on `Intl`
     // exist to catch, so the cheap rules are not the only defence of the zone.
