@@ -7,17 +7,17 @@ namespace DeviceId\Support;
 /**
  * The one previous observation `TemporalConsistency` needs.
  *
- * ## Why a three-field value object rather than an interface over the model
+ * ## Why a four-field value object rather than an interface over the model
  *
- * The rules read exactly THREE things off a previous row: `ja4_correlator`, `user_agent_summary`
- * and the `block_tuple` hash. Nothing else. So the honest dependency is three nullable strings, and
+ * The rules read exactly FOUR things off a previous row: `ja4_correlator`, `user_agent_summary`,
+ * the `block_tuple` hash and the measured engine. Nothing else. So the honest dependency is four nullable strings, and
  * an interface that let a host pass anything with a `->ja4_correlator` property would be a
  * wider contract than the code actually uses — wider contracts are what let a refactor break
  * something that was never touched.
  *
- * Making it a value object also means the package's storage adapter is one `SELECT` of three
+ * Making it a value object also means the package's storage adapter is one `SELECT` of four
  * columns rather than a whole Eloquent model, and the rule cannot accidentally come to depend
- * on a fourth field.
+ * on a fifth field.
  */
 final class PreviousObservation
 {
@@ -31,6 +31,12 @@ final class PreviousObservation
          * browser key.
          */
         public readonly ?string $blockTuple = null,
+        /**
+         * The engine that observation measured, `EnvironmentConsistency::measuredEngine()`
+         * (`chromium`|`gecko`|`webkit`|`lightpanda`). A class word, not a claim value; read only by
+         * `temporal_engine_changed`, and only when the host picked this row by cookie.
+         */
+        public readonly ?string $engine = null,
     ) {}
 
     /**
@@ -45,6 +51,7 @@ final class PreviousObservation
     {
         return ($this->ja4Correlator !== null && $this->ja4Correlator !== '')
             || ($this->userAgentSummary !== null && $this->userAgentSummary !== '')
-            || ($this->blockTuple !== null && $this->blockTuple !== '');
+            || ($this->blockTuple !== null && $this->blockTuple !== '')
+            || ($this->engine !== null && $this->engine !== '');
     }
 }
