@@ -10,6 +10,7 @@ use DeviceId\Scoring\VerdictScorer;
 use DeviceId\Signals\SmartSignals;
 use DeviceId\Support\Config;
 use DeviceId\Support\FeatureShipVersions;
+use DeviceId\Support\PreviousObservation;
 use DeviceId\Support\ProbeEnvelope;
 use DeviceId\Support\TransportIntegrityResult;
 use DeviceId\Transport\StructuredFieldList;
@@ -3241,7 +3242,7 @@ final class EnvironmentConsistency
      * brands (its JavaScript is V8, so the marks alone would say `chromium`), otherwise the
      * engine marks' family (`chromium`|`gecko`|`webkit`), otherwise null. A UA switcher does not
      * move it. The host stores it per observation for `temporal_engine_changed`
-     * ({@see \DeviceId\Support\PreviousObservation::$engine}).
+     * ({@see PreviousObservation::$engine}).
      */
     public static function measuredEngine(mixed $claims, TransportIntegrityResult $transport): ?string
     {

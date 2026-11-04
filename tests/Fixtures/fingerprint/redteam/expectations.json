@@ -194,9 +194,10 @@
         "mode": "headless",
         "flagged": true,
         "band": "block",
-        "score": 98,
+        "score": 99,
         "codes": [
             "render_surfaces_stubbed",
+            "media_hover_unanswered",
             "canvas_winding_false",
             "wrong_receiver_did_not_throw",
             "descriptor_patched",
@@ -208,11 +209,12 @@
         "tool": "lightpanda",
         "mode": "headless",
         "flagged": true,
-        "band": "challenge",
-        "score": 75,
+        "band": "block",
+        "score": 90,
         "codes": [
-            "engine_lightpanda_identity",
+            "ua_headless_token",
             "render_surfaces_stubbed",
+            "media_hover_unanswered",
             "canvas_winding_false"
         ]
     }

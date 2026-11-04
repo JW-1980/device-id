@@ -17,7 +17,8 @@ require_once __DIR__.'/../../tools/capture/CaptureAnalysis.php';
 
 /**
  * Lightpanda (https://github.com/lightpanda-io/browser, a Zig browser with V8, no layout and no
- * rendering) against `engine_lightpanda_identity` and `render_surfaces_stubbed`.
+ * rendering) against `render_surfaces_stubbed` (this file), together with the name-based
+ * `ua_headless_token` and the `media_hover_unanswered` tell (AgentShapeRulesTest).
  *
  * The fixtures under `tests/Fixtures/fingerprint/redteam/lightpanda-container.*` are real runs: the
  * 2026-11-04 nightly (`1.1.0-nightly.11647+b8e234a77`, Linux x86_64) driven over CDP by puppeteer-core
@@ -36,7 +37,7 @@ final class LightpandaDetectionTest extends TestCase
 
     private const SPOOFED_RUN = 'lightpanda-container.linux.lightpanda-spoofed.headless.spoof-lightpanda-spoofed';
 
-    private const CODES = ['engine_lightpanda_identity', 'render_surfaces_stubbed'];
+    private const CODES = ['render_surfaces_stubbed', 'media_hover_unanswered'];
 
     protected function setUp(): void
     {
@@ -81,15 +82,14 @@ final class LightpandaDetectionTest extends TestCase
     }
 
     #[Test]
-    public function the_default_lightpanda_run_fires_both_codes_and_is_challenged(): void
+    public function the_default_lightpanda_run_is_blocked_by_independent_evidence(): void
     {
         $answer = CaptureAnalysis::analyse(self::record(self::REDTEAM.'/'.self::DEFAULT_RUN.'.json'))['merged'];
 
-        $this->assertSame('challenge', $answer['band'], json_encode($answer['codes']));
-        foreach (self::CODES as $code) {
+        $this->assertSame('block', $answer['band'], json_encode($answer['codes']));
+        foreach (['ua_headless_token', 'render_surfaces_stubbed', 'media_hover_unanswered', 'canvas_winding_false'] as $code) {
             $this->assertArrayHasKey($code, $answer['codes']);
         }
-        $this->assertSame(40, $answer['codes']['engine_lightpanda_identity']['weight']);
         $this->assertSame(30, $answer['codes']['render_surfaces_stubbed']['weight']);
     }
 
@@ -117,7 +117,7 @@ final class LightpandaDetectionTest extends TestCase
         $this->assertStringNotContainsString('Lightpanda', $headers['sec-ch-ua']);
 
         $answer = CaptureAnalysis::analyse($record)['merged'];
-        $this->assertArrayNotHasKey('engine_lightpanda_identity', $answer['codes']);
+        $this->assertArrayNotHasKey('ua_headless_token', $answer['codes']);
         $this->assertArrayHasKey('render_surfaces_stubbed', $answer['codes']);
         $this->assertContains($answer['band'], ['challenge', 'block']);
     }
@@ -157,42 +157,6 @@ final class LightpandaDetectionTest extends TestCase
                 $this->assertNotContains($code, $codes, basename($file));
             }
         }
-    }
-
-    /**
-     * @return array<string, array{0: array<string, mixed>, 1: array<string, string>, 2: bool}>
-     */
-    public static function identitySources(): array
-    {
-        $ua = static fn (string $value): array => ['tier1' => ['environment' => ['identity' => ['userAgent' => $value]]]];
-
-        return [
-            'page User-Agent token' => [$ua('Lightpanda/1.0'), [], true],
-            'page User-Agent token with a suffix' => [$ua('Lightpanda/1.0 my-crawler'), [], true],
-            'header User-Agent token only' => [$ua('Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36'), ['user_agent' => 'Lightpanda/1.0'], true],
-            'Sec-CH-UA header only' => [$ua('Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36'), ['sec_ch_ua' => '"Lightpanda";v="1"'], true],
-            'full version list header only' => [$ua('Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36'), ['sec_ch_ua_full_version_list' => '"Lightpanda";v="1.1.0-nightly.11647+b8e234a77"'], true],
-            'userAgentData brand only' => [['tier1' => ['uaClientHints' => ['brands' => [['brand' => 'lightpanda', 'version' => '1']]]]], [], true],
-            'userAgentData full version list only' => [['tier1' => ['uaClientHints' => ['high' => ['fullVersionList' => [['brand' => 'Lightpanda', 'version' => '1.1.0']]]]]], [], true],
-            'a real Chrome' => [$ua('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'), ['sec_ch_ua' => '"Chromium";v="141", "Not)A;Brand";v="24"'], false],
-            'a product that merely ends in the word' => [$ua('NotLightpanda/1.0'), [], false],
-            'the word in a comment, no version' => [$ua('Mozilla/5.0 (compatible; lightpanda-fan)'), [], false],
-            'a brand that merely contains the word' => [['tier1' => ['uaClientHints' => ['brands' => [['brand' => 'Lightpanda Fan Browser', 'version' => '1']]]]], [], false],
-            'no claims at all' => [[], [], false],
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $claims
-     * @param  array<string, string>  $witnesses
-     */
-    #[Test]
-    #[DataProvider('identitySources')]
-    public function the_identity_code_reads_the_token_the_brand_and_the_headers(array $claims, array $witnesses, bool $expected): void
-    {
-        $codes = array_column((new EnvironmentConsistency)->contradictions($claims, new TransportIntegrityResult([], $witnesses)), 'code');
-
-        $this->assertSame($expected, in_array('engine_lightpanda_identity', $codes, true));
     }
 
     /**
@@ -254,28 +218,26 @@ final class LightpandaDetectionTest extends TestCase
     }
 
     #[Test]
-    public function the_two_codes_and_the_stub_canvas_are_one_root_cause_of_at_most_forty_five(): void
+    public function the_stub_rule_and_the_stub_canvas_are_one_root_cause_below_the_block_band(): void
     {
-        $this->assertSame(CheckRegistry::evidenceGroupOf('canvas_winding_false'), CheckRegistry::evidenceGroupOf('engine_lightpanda_identity'));
-        $this->assertSame(CheckRegistry::evidenceGroupOf('render_surfaces_stubbed'), CheckRegistry::evidenceGroupOf('engine_lightpanda_identity'));
+        $this->assertSame(CheckRegistry::evidenceGroupOf('canvas_winding_false'), CheckRegistry::evidenceGroupOf('render_surfaces_stubbed'));
+        $this->assertNotSame(CheckRegistry::evidenceGroupOf('media_hover_unanswered'), CheckRegistry::evidenceGroupOf('render_surfaces_stubbed'));
 
         $together = CheckRegistry::effectiveWeight([
-            ['code' => 'engine_lightpanda_identity', 'weight' => 40],
             ['code' => 'render_surfaces_stubbed', 'weight' => 30],
             ['code' => 'canvas_winding_false', 'weight' => 25],
         ]);
-        $this->assertSame(40, $together);
+        $this->assertSame(30, $together);
         $this->assertLessThanOrEqual(EnvironmentConsistency::MAX_WEIGHT, $together);
     }
 
     #[Test]
-    public function the_codes_are_registered_with_matching_weights_and_a_description(): void
+    public function the_rule_is_registered_with_a_matching_weight_and_a_description(): void
     {
-        foreach (self::CODES as $code) {
-            $this->assertTrue(CheckRegistry::isKnown($code));
-            $this->assertSame('environment', CheckRegistry::familyOf($code));
-            $this->assertSame(EnvironmentConsistency::weights()[$code], CheckRegistry::describe()[$code]['default_weight']);
-            $this->assertNotSame('', trim((string) CheckRegistry::descriptionOf($code)));
-        }
+        $code = 'render_surfaces_stubbed';
+        $this->assertTrue(CheckRegistry::isKnown($code));
+        $this->assertSame('environment', CheckRegistry::familyOf($code));
+        $this->assertSame(EnvironmentConsistency::weights()[$code], CheckRegistry::describe()[$code]['default_weight']);
+        $this->assertNotSame('', trim((string) CheckRegistry::descriptionOf($code)));
     }
 }

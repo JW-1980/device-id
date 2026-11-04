@@ -349,15 +349,16 @@ HTML/DOM, libcurl, no layout, no rendering, CDP for Puppeteer/Playwright) needs 
 
 - Default: User-Agent `Lightpanda/1.0`, `Sec-CH-UA: "Lightpanda";v="1"` and a Lightpanda-only `userAgentData`
   brand list; no WebGL, WebGPU, WebRTC, plugins, voices or `performance.memory`; every font measures alike;
-  `canvas_winding_false`. It is V8, so the V8-error-shape engine checks cannot tell it from Chrome.
-  Before the dedicated rules: `challenge`, 64 (only the canvas stub, `canvas_winding_false` 25, and soft
-  codes). Now: `challenge`, 75 (`engine_lightpanda_identity` 40 and `render_surfaces_stubbed` 30 are one
-  evidence group, `non_rendering_engine`, together with the stub canvas: 40 counted once).
+  `matchMedia` answers neither `hover` query; `canvas_winding_false`. It is V8, so the V8-error-shape engine
+  checks cannot tell it from Chrome. `ua_headless_token` (token, Sec-CH-UA, brands) and
+  `media_hover_unanswered` already caught it (`block`, 88); `render_surfaces_stubbed` (30, one evidence group
+  with `canvas_winding_false`) adds the layout/drawing absence: `block`, 90.
 - Spoofed: Lightpanda and its CDP refuse any User-Agent containing "Mozilla" and cannot change the brand, so
   an attacker needs an init script (`navigator.*`, `userAgentData`) plus a header-rewriting proxy. That removes
-  the token (`engine_lightpanda_identity` silent) but not the missing layout: `render_surfaces_stubbed` still
-  fires, next to the lies the script leaves (`wrong_receiver_did_not_throw`, `descriptor_patched`,
-  `lie_battery_failed`, `plugins_vs_ua`): `block`, 98.
+  the token (`ua_headless_token` silent) but not the missing layout: `render_surfaces_stubbed` still fires,
+  next to `media_hover_unanswered` and the lies the script leaves (`wrong_receiver_did_not_throw`,
+  `descriptor_patched`, `lie_battery_failed`, `plugins_vs_ua`): `block`, 99 (saturated by the script's lies;
+  the layout rule is the one a lie-free spoof could not remove).
 - Fixtures: `tests/Fixtures/fingerprint/redteam/lightpanda-container.*`, guarded by `RedteamFixturesTest` and
   `LightpandaDetectionTest` (which also proves both codes are silent on every honest capture).
 

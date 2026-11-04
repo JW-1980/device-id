@@ -215,10 +215,10 @@ final class CheckRegistry
         ],
         // A VPN exit is commonly also a hosting network.
         'network' => ['network_vpn', 'network_hosting'],
-        // An engine that neither lays out, answers media queries nor draws (Lightpanda, DOM-only
-        // scrapers): its missing layout, its unanswered `hover` query and its stub canvas are one
-        // cause. Its self-announced name (`ua_headless_token`) is a separate fact and stays outside.
-        'non_rendering_engine' => ['render_surfaces_stubbed', 'media_hover_unanswered', 'canvas_winding_false'],
+        // An engine that neither lays out nor draws (Lightpanda, DOM-only scrapers): font-independent
+        // text with no WebGL, and a canvas whose fill rules are stubs, are one cause. The unanswered
+        // `hover` query and the self-announced token are separate measurements and stay outside.
+        'non_rendering_engine' => ['render_surfaces_stubbed', 'canvas_winding_false'],
         // A virtual machine shows as a virtual GPU and as a VM default screen.
         'virtual_machine' => ['vm_gpu_renderer', 'vm_software_gpu_screen'],
     ];
