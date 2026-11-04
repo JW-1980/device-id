@@ -380,6 +380,11 @@ final class EnvironmentConsistency
         // engine behind it (Lightpanda, DOM emulators). 15: the same size as the other
         // headless-shape tells, a block only together with them.
         'media_hover_unanswered' => 15,
+        // The engine renders nothing: every font measures alike (Lightpanda: one fixed width per character
+        // whatever the font), and there is no WebGL/WebGPU or the canvas fill rules are stubs. Survives a
+        // spoofed User-Agent and brands because a spoofer cannot make a layout engine appear. 30: honest
+        // browsers always have both a font-dependent layout and a canvas that follows its fill rules.
+        'render_surfaces_stubbed' => 30,
         // Contract 2 claim rules.
         // `screen.width/height` against the CSS `device-width/height` media path read in
         // the phantom realm: a JavaScript hook on `screen` does not reach a stylesheet.
@@ -2273,6 +2278,46 @@ final class EnvironmentConsistency
                     }
 
                     return self::lightpandaBrand($c, $t);
+                },
+            ],
+
+            // render_surfaces_stubbed: a browser that does not lay out or draw. Required: text width does not
+            // depend on the font at all (every generic family measures alike and no named font resolves to
+            // anything else, and the per-font metrics found no difference), which a real layout engine only
+            // produces with no fonts installed. Plus one of: neither WebGL nor WebGPU exists, or the canvas
+            // fill rules are stubs (`canvas_winding_false`). Measured: Lightpanda (all of it); every honest
+            // capture, headed or headless, Chromium/Firefox/WebKit, has font-dependent widths. Silent under
+            // the Gecko protections, which restrict fonts on purpose.
+            [
+                'code' => 'render_surfaces_stubbed',
+                'rule' => function (mixed $c, TransportIntegrityResult $t): ?string {
+                    if (self::protectedGecko($c, $t)) {
+                        return null;
+                    }
+
+                    $base = $this->value($c, 'tier2', 'fontFallback', 'base');
+                    $resolve = $this->value($c, 'tier2', 'fontFallback', 'resolve');
+                    $metrics = $this->value($c, 'tier2', 'fontMetrics', 'count');
+                    if (! is_array($base) || count($base) < 4 || ! is_array($resolve) || count($resolve) < 8 || $metrics !== 0) {
+                        return null;
+                    }
+                    if (count(array_unique(array_map('strval', $base))) !== 1) {
+                        return null;
+                    }
+                    foreach ($resolve as $entry) {
+                        if (! is_array($entry) || ! is_array($entry['collides'] ?? null) || count($entry['collides']) < count($base)) {
+                            return null;
+                        }
+                    }
+
+                    $gpu = $this->value($c, 'tier2', 'gpu');
+                    $noGl = is_array($gpu) && array_key_exists('webgl', $gpu) && $gpu['webgl'] === null
+                        && array_key_exists('webgpu', $gpu) && $gpu['webgpu'] === null;
+                    if (! $noGl && $this->fromIntegrity($c, 'canvas_winding_false') === null) {
+                        return null;
+                    }
+
+                    return 'Text width does not depend on the font and the page has no WebGL or a canvas whose fill rules are stubs: an engine that does not lay out or draw.';
                 },
             ],
 

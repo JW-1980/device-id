@@ -188,5 +188,32 @@
             "window_exceeds_screen",
             "ua_vs_ch_major"
         ]
+    },
+    "lightpanda-container.linux.lightpanda-spoofed.headless.spoof-lightpanda-spoofed": {
+        "tool": "lightpanda-spoofed",
+        "mode": "headless",
+        "flagged": true,
+        "band": "block",
+        "score": 98,
+        "codes": [
+            "render_surfaces_stubbed",
+            "canvas_winding_false",
+            "wrong_receiver_did_not_throw",
+            "descriptor_patched",
+            "lie_battery_failed",
+            "plugins_vs_ua"
+        ]
+    },
+    "lightpanda-container.linux.lightpanda.headless.spoof-lightpanda": {
+        "tool": "lightpanda",
+        "mode": "headless",
+        "flagged": true,
+        "band": "challenge",
+        "score": 75,
+        "codes": [
+            "engine_lightpanda_identity",
+            "render_surfaces_stubbed",
+            "canvas_winding_false"
+        ]
     }
 }

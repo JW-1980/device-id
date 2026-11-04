@@ -115,6 +115,7 @@ for (const tool of wanted) {
         continue;
     }
     for (const runMode of modes) {
+        if (spec.headlessOnly && runMode === 'headed') continue; // Lightpanda has no headed mode
         if (runMode === 'headed' && displayKind === 'none') {
             summary.push({ id: `${tool}.${runMode}`, status: 'skipped', reason: 'no display and no xvfb-run' });
             continue;

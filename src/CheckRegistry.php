@@ -158,6 +158,7 @@ final class CheckRegistry
         'audio_readback_perturbed' => [4, 'environment', 'A constant audio source rendered offline read back with values other than the constant, so audio values are noised and cannot identify the device.'],
         'ua_headless_token' => [30, 'environment', 'The User-Agent, as reported by the page or sent by the browser, carries a headless-browser product token (HeadlessChrome, PhantomJS, SlimerJS, Lightpanda), or Sec-CH-UA or userAgentData.brands names Lightpanda.'],
         'media_hover_unanswered' => [15, 'environment', 'matchMedia matches neither (hover: hover) nor (hover: none), which every browser with a media-query engine does; a headless engine without one (Lightpanda) answers false to both.'],
+        'render_surfaces_stubbed' => [30, 'environment', 'Text width does not depend on the font (no layout engine behind the page) and there is no WebGL or the canvas fill rules are stubs: an engine that neither lays out nor draws (Lightpanda, DOM-only scrapers).'],
         'screen_vs_css_media' => [20, 'environment', 'screen.width and screen.height both differ from the device size the CSS media-query path reports, which a JavaScript override of screen cannot change.'],
         'tz_intl_vs_date' => [20, 'environment', 'The Intl time zone\'s historic (1113) offset differs from the offset the engine computes itself, the signature of an Intl-only time zone spoof.'],
         'fonts_vs_ua_os' => [15, 'environment', 'None of the fonts the User-Agent\'s operating system ships is installed while another operating system\'s set is.'],
@@ -214,6 +215,10 @@ final class CheckRegistry
         ],
         // A VPN exit is commonly also a hosting network.
         'network' => ['network_vpn', 'network_hosting'],
+        // An engine that neither lays out, answers media queries nor draws (Lightpanda, DOM-only
+        // scrapers): its missing layout, its unanswered `hover` query and its stub canvas are one
+        // cause. Its self-announced name (`ua_headless_token`) is a separate fact and stays outside.
+        'non_rendering_engine' => ['render_surfaces_stubbed', 'media_hover_unanswered', 'canvas_winding_false'],
         // A virtual machine shows as a virtual GPU and as a VM default screen.
         'virtual_machine' => ['vm_gpu_renderer', 'vm_software_gpu_screen'],
     ];

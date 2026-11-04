@@ -30,6 +30,8 @@ export function chromedriverPath(dir) {
 
 const node = (tool) => (dir, mode, url) => ({ cmd: process.execPath, args: [join(drivers, 'node-driver.mjs'), tool, mode, url, dir] });
 const py = (dir) => join(dir, 'venv', 'bin', 'python');
+/** Lightpanda's own binary (a Zig browser, not Chromium): `<dir>/lightpanda/lightpanda` or LIGHTPANDA_BIN. */
+const hasLightpanda = (dir) => existsSync(process.env.LIGHTPANDA_BIN || join(dir, 'lightpanda', 'lightpanda')) && hasNodePackage('puppeteer-core')(dir);
 const hasNodePackage = (name) => (dir) => existsSync(join(dir, 'node', 'node_modules', name));
 const hasPythonPackage = (name) => (dir) => {
     const lib = join(dir, 'venv', 'lib');
@@ -58,6 +60,8 @@ export const TOOLS = {
         requires: hasPythonPackage('undetected_chromedriver'),
         launch: (dir, mode, url) => ({ cmd: py(dir), args: [join(drivers, 'rt_uc.py'), mode, url, chromePath(), chromedriverPath(dir)] }),
     },
+    lightpanda: { engine: 'lightpanda', headlessOnly: true, requires: hasLightpanda, launch: node('lightpanda') },
+    'lightpanda-spoofed': { engine: 'lightpanda', headlessOnly: true, requires: hasLightpanda, launch: node('lightpanda-spoofed') },
     camoufox: {
         engine: 'gecko',
         requires: () => existsSync(join(process.env.HOME || '', '.cache', 'camoufox', 'version.json')),

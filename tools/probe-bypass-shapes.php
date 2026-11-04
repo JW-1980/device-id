@@ -267,6 +267,12 @@ $DIRECTION = [
     // `fontFaces`: always-resolving `FontFace.load` is caught by the honesty gate (sentinel family) and the
     // probe becomes unavailable; always-rejecting reports zero fonts and trips fonts_single_family_desktop
     // on a Windows or macOS User-Agent; deleting `FontFace` is unavailable('no-font-loading').
+    // `fontFallback`: read by `render_surfaces_stubbed` only (with `fontMetrics` and `gpu`). Deleting the
+    // measuring element's API leaves the probe unavailable and silences that rule at a coverage cost (weight
+    // 422); forging font-dependent widths needs a layout engine, or a per-font width table consistent with
+    // `fontMetrics`, `textMetrics` and `fontFaces`, which a one-property stub cannot supply.
+    'fontFallback' => ['silence', 'an unavailable probe silences render_surfaces_stubbed at a coverage cost; forged widths must also agree with fontMetrics, textMetrics and fontFaces'],
+
     'fontFaces' => ['mixed', 'always-reject trips fonts_single_family_desktop; always-resolve is caught by the sentinel honesty gate; deleting FontFace silences fonts_vs_ua_os and fonts_single_family_desktop'],
 
 ];

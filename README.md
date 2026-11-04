@@ -317,7 +317,8 @@ npm run redteam -- --dir=... --save-fixtures=tests/Fixtures/fingerprint/redteam 
 
 - **Tools** (`tools/redteam/tools.mjs`): `puppeteer-extra-stealth` (puppeteer-extra + stealth plugin),
   `rebrowser-puppeteer`, `patchright`, `playwright-stealth-script` (Playwright plus the init script every
-  "stealth" gist ships), `playwright-stealth-py`, `nodriver`, `undetected-chromedriver` and `camoufox`.
+  "stealth" gist ships), `playwright-stealth-py`, `nodriver`, `undetected-chromedriver`, `camoufox` and
+  `lightpanda` / `lightpanda-spoofed` (see below; headless only, no Chromium).
   The Chromium tools drive the Playwright Chromium (`PLAYWRIGHT_BROWSERS_PATH`, default `/opt/pw-browsers`,
   or `REDTEAM_CHROME`); `undetected-chromedriver` needs a chromedriver of the same version, which
   `install.sh` downloads from Chrome for Testing to `<dir>/chromedriver/chromedriver` (or set
@@ -340,6 +341,25 @@ npm run redteam -- --dir=... --save-fixtures=tests/Fixtures/fingerprint/redteam 
   flagged with the named codes, or, for the combinations the engine does not catch, still unflagged with
   the reason written down. Detection that improves therefore fails the test until the expectation is
   promoted, and a rule that stops catching a tool fails it too.
+
+**Lightpanda** ([lightpanda-io/browser](https://github.com/lightpanda-io/browser), a Zig browser: V8, its own
+HTML/DOM, libcurl, no layout, no rendering, CDP for Puppeteer/Playwright) needs the official binary in
+`<dir>/lightpanda/lightpanda` (or `LIGHTPANDA_BIN`) and puppeteer-core in `<dir>/node`. Measured with the
+2026-11-04 nightly (`1.1.0-nightly.11647+b8e234a77`, Linux x86_64):
+
+- Default: User-Agent `Lightpanda/1.0`, `Sec-CH-UA: "Lightpanda";v="1"` and a Lightpanda-only `userAgentData`
+  brand list; no WebGL, WebGPU, WebRTC, plugins, voices or `performance.memory`; every font measures alike;
+  `canvas_winding_false`. It is V8, so the V8-error-shape engine checks cannot tell it from Chrome.
+  Before the dedicated rules: `challenge`, 64 (only the canvas stub, `canvas_winding_false` 25, and soft
+  codes). Now: `challenge`, 75 (`engine_lightpanda_identity` 40 and `render_surfaces_stubbed` 30 are one
+  evidence group, `non_rendering_engine`, together with the stub canvas: 40 counted once).
+- Spoofed: Lightpanda and its CDP refuse any User-Agent containing "Mozilla" and cannot change the brand, so
+  an attacker needs an init script (`navigator.*`, `userAgentData`) plus a header-rewriting proxy. That removes
+  the token (`engine_lightpanda_identity` silent) but not the missing layout: `render_surfaces_stubbed` still
+  fires, next to the lies the script leaves (`wrong_receiver_did_not_throw`, `descriptor_patched`,
+  `lie_battery_failed`, `plugins_vs_ua`): `block`, 98.
+- Fixtures: `tests/Fixtures/fingerprint/redteam/lightpanda-container.*`, guarded by `RedteamFixturesTest` and
+  `LightpandaDetectionTest` (which also proves both codes are silent on every honest capture).
 
 What the measurements show, and what they cannot: engine-level stealth (Patchright, rebrowser, nodriver,
 undetected-chromedriver driving a real Chrome headed) leaves no JavaScript-visible lie on a fresh profile;

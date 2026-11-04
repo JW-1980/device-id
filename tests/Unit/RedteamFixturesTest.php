@@ -30,6 +30,11 @@ final class RedteamFixturesTest extends TestCase
 {
     private const DIRECTORY = __DIR__.'/../Fixtures/fingerprint/redteam';
 
+    /**
+     * Tools with no headed mode (Lightpanda has no window), so one headless run is the whole set.
+     */
+    private const HEADLESS_ONLY = ['lightpanda', 'lightpanda-spoofed'];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -139,7 +144,7 @@ final class RedteamFixturesTest extends TestCase
         }
         $this->assertNotSame([], $byTool);
         foreach ($byTool as $tool => $flags) {
-            $this->assertCount(2, $flags, $tool.' needs a headless and a headed run');
+            $this->assertCount(in_array($tool, self::HEADLESS_ONLY, true) ? 1 : 2, $flags, $tool.' needs '.(in_array($tool, self::HEADLESS_ONLY, true) ? 'its headless run' : 'a headless and a headed run'));
         }
     }
 }

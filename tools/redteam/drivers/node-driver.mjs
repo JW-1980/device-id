@@ -9,7 +9,9 @@
  * features ON. Tools live in <redteam-dir>/node (a scratch directory, never a repo dependency).
  */
 import { createRequire } from 'node:module';
-import { readdirSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { createServer, request as httpRequest } from 'node:http';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -62,7 +64,82 @@ async function viaPlaywright(lib, init, req = require) {
     return { browser, version: browser.version() };
 }
 
+/**
+ * Lightpanda (https://github.com/lightpanda-io/browser): not Chromium. The binary lives in
+ * <redteam-dir>/lightpanda/lightpanda (or LIGHTPANDA_BIN); it serves CDP and puppeteer-core connects to it.
+ * Its own User-Agent and Sec-CH-UA cannot be set to a Mozilla/Chrome string (the CLI and
+ * Emulation.setUserAgentOverride refuse any value containing "Mozilla"), so the spoofed variant does what
+ * an attacker does: an init script that rewrites navigator.* and navigator.userAgentData, and a local HTTP
+ * proxy that rewrites the User-Agent and Sec-CH-UA request headers.
+ */
+const CHROME_UA = process.env.REDTEAM_UA || 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36';
+const SPOOF_NAVIGATOR = `
+(() => {
+    const ua = ${JSON.stringify(CHROME_UA)};
+    const major = /Chrome\\/(\\d+)/.exec(ua)[1];
+    const def = (o, k, v) => Object.defineProperty(o, k, { get: () => v, configurable: true });
+    def(Navigator.prototype, 'userAgent', ua);
+    def(Navigator.prototype, 'appVersion', ua.replace('Mozilla/', ''));
+    def(Navigator.prototype, 'vendor', 'Google Inc.');
+    const brands = [{ brand: 'Chromium', version: major }, { brand: 'Google Chrome', version: major }, { brand: 'Not.A/Brand', version: '99' }];
+    const data = { brands, mobile: false, platform: 'Linux', toJSON() { return { brands, mobile: false, platform: 'Linux' }; },
+        getHighEntropyValues: async () => ({ brands, mobile: false, platform: 'Linux', architecture: 'x86', bitness: '64', model: '', platformVersion: '6.8.0', uaFullVersion: major + '.0.0.0', fullVersionList: brands }) };
+    def(Navigator.prototype, 'userAgentData', data);
+    window.chrome = { runtime: {}, loadTimes() {}, csi() {}, app: {} };
+})();
+`;
+
+async function startRewritingProxy() {
+    const proxy = createServer((req, res) => {
+        const target = new URL(req.url);
+        const headers = { ...req.headers, 'user-agent': CHROME_UA, host: target.host };
+        const major = /Chrome\/(\d+)/.exec(CHROME_UA)[1];
+        headers['sec-ch-ua'] = `"Chromium";v="${major}", "Google Chrome";v="${major}", "Not.A/Brand";v="99"`;
+        delete headers['sec-ch-ua-full-version-list'];
+        const upstream = httpRequest({ host: target.hostname, port: target.port, path: target.pathname + target.search, method: req.method, headers }, (r) => {
+            res.writeHead(r.statusCode ?? 502, r.headers);
+            r.pipe(res);
+        });
+        upstream.on('error', () => res.writeHead(502).end());
+        req.pipe(upstream);
+    });
+    await new Promise((ok) => proxy.listen(0, '127.0.0.1', ok));
+    return proxy;
+}
+
+async function viaLightpanda(spoof) {
+    const binary = process.env.LIGHTPANDA_BIN || join(dir, 'lightpanda', 'lightpanda');
+    if (!existsSync(binary)) throw new Error(`lightpanda binary not found at ${binary}`);
+    const port = 9300 + Math.floor(Math.random() * 500);
+    const proxy = spoof ? await startRewritingProxy() : null;
+    const child = spawn(binary, ['serve', '--host', '127.0.0.1', '--port', String(port), ...(proxy ? ['--http-proxy', `http://127.0.0.1:${proxy.address().port}`] : [])], {
+        // libcurl honours NO_PROXY even with --http-proxy, and the capture server is on loopback.
+        stdio: 'ignore', env: { ...process.env, LIGHTPANDA_DISABLE_TELEMETRY: 'true', NO_PROXY: '', no_proxy: '' },
+    });
+    let browser = null;
+    for (let n = 0; n < 40 && !browser; n++) {
+        await new Promise((ok) => setTimeout(ok, 250));
+        browser = await require('puppeteer-core').connect({ browserWSEndpoint: `ws://127.0.0.1:${port}` }).catch(() => null);
+    }
+    if (!browser) {
+        child.kill('SIGKILL');
+        throw new Error('lightpanda CDP server did not start');
+    }
+    const context = await browser.createBrowserContext();
+    const page = await context.newPage();
+    if (spoof) {
+        await page.setUserAgent(CHROME_UA).catch(() => undefined);
+        await page.evaluateOnNewDocument(SPOOF_NAVIGATOR);
+    }
+    page.goto(url, { waitUntil: 'load' }).catch(() => undefined);
+    const version = (await browser.version().catch(() => 'Lightpanda')) || 'Lightpanda';
+    const handle = { close: async () => { await browser.disconnect().catch(() => undefined); child.kill('SIGKILL'); proxy?.close(); } };
+    return { browser: handle, version };
+}
+
 const tools = {
+    lightpanda: async () => ({ ...(await viaLightpanda(false)), driver: 'lightpanda via puppeteer-core CDP, default user agent' }),
+    'lightpanda-spoofed': async () => ({ ...(await viaLightpanda(true)), driver: 'lightpanda via puppeteer-core CDP, Chrome UA spoofed (init script + rewriting proxy)' }),
     baseline: async () => {
         const r = await viaPlaywright('playwright', null, repoRequire);
         return { ...r, driver: 'playwright (pinned), honest baseline' };
